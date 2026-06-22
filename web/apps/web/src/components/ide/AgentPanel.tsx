@@ -18,6 +18,7 @@ export function AgentPanel({
   onInterrupt,
   onDecide,
   decidingReqId,
+  onApprovalExpire,
 }: {
   events: SessionEvent[];
   approvals: PendingApproval[];
@@ -27,6 +28,7 @@ export function AgentPanel({
   onInterrupt: () => void;
   onDecide: (reqId: string, allow: boolean) => void;
   decidingReqId?: string | null;
+  onApprovalExpire?: (reqId: string) => void;
 }) {
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -50,6 +52,7 @@ export function AgentPanel({
                 approval={a}
                 onDecide={onDecide}
                 pending={decidingReqId === a.reqId}
+                onExpire={onApprovalExpire}
               />
             ))}
           </>

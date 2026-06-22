@@ -38,6 +38,8 @@ export interface PendingApproval {
   resource: string;
   reason: string;
   seq: number;
+  /** Epoch ms when this approval was first observed (for timeout/expiry UX). */
+  receivedAt: number;
 }
 
 export interface SessionStreamState {
@@ -109,6 +111,7 @@ export function reduce(
             resource: event.resource,
             reason: event.reason,
             seq: event.seq,
+            receivedAt: Date.now(),
           },
         ];
       }

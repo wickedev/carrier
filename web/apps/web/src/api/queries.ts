@@ -4,8 +4,18 @@ import {
   useQueryClient,
   type UseQueryOptions,
 } from "@tanstack/react-query";
-import { api } from "./client";
-import type { Me, Org, Project, Session, TreeEntry, FileContent, FileDiff } from "@carrier/contract";
+import { api, type Member, type Installation } from "./client";
+import type {
+  Me,
+  Org,
+  Project,
+  Session,
+  TreeEntry,
+  FileContent,
+  FileDiff,
+  Usage,
+  PermissionRule,
+} from "@carrier/contract";
 
 /** Centralized query keys so invalidation stays consistent. */
 export const qk = {
@@ -19,6 +29,10 @@ export const qk = {
   file: (sessionId: string, path: string) => ["file", sessionId, path] as const,
   diff: (sessionId: string, path: string) => ["diff", sessionId, path] as const,
   permissions: (projectId: string) => ["permissions", projectId] as const,
+  members: (org: string) => ["members", org] as const,
+  installations: ["installations"] as const,
+  sessionUsage: (id: string) => ["usage", "session", id] as const,
+  projectUsage: (id: string) => ["usage", "project", id] as const,
 };
 
 export function useMe(opts?: Partial<UseQueryOptions<Me>>) {
@@ -132,3 +146,109 @@ export function usePromote(sessionId: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.session(sessionId) }),
   });
 }
+
+// ── Permissions (add/delete — Req 18) ────────────────────────────────────────
+
+export function useAddPermission(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (rule: { action: string; pattern: string; effect: "allow" | "deny" | "ask" }) =>
+      api.addPermission(projectId, rule),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.permissions(projectId) }),
+  });
+}
+
+export function useDeletePermission(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ruleId: string) => api.deletePermission(projectId, ruleId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.permissions(projectId) }),
+  });
+}
+
+// ── Members (Req 21) ─────────────────────────────────────────────────────────
+
+export function useMembers(orgSlug: string, opts?: Partial<UseQueryOptions<Member[]>>) {
+  return useQuery({
+    queryKey: qk.members(orgSlug),
+    queryFn: ({ signal }) => api.members(orgSlug, signal),
+    ...opts,
+  });
+}
+
+export function useAddMember(orgSlug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (member: { login: string; role: "owner" | "admin" | "member" }) =>
+      api.addMember(orgSlug, member),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.members(orgSlug) }),
+  });
+}
+
+export function useRemoveMember(orgSlug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (accountId: string) => api.removeMember(orgSlug, accountId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.members(orgSlug) }),
+  });
+}
+
+// ── GitHub installations (Req 21) ────────────────────────────────────────────
+
+export function useInstallations(opts?: Partial<UseQueryOptions<Installation[]>>) {
+  return useQuery({
+    queryKey: qk.installations,
+    queryFn: ({ signal }) => api.installations(signal),
+    ...opts,
+  });
+}
+
+// ── Repo binding (Req 21) ────────────────────────────────────────────────────
+
+export function useBindRepo(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (binding: {
+      installationId: number;
+      repoFullName: string;
+      defaultBranch?: string;
+    }) => api.bindRepo(projectId, binding),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.project(projectId) }),
+  });
+}
+
+export function useUnbindRepo(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.unbindRepo(projectId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.project(projectId) }),
+  });
+}
+
+export function useArchiveProject(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.archiveProject(projectId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.project(projectId) }),
+  });
+}
+
+// ── Usage (Req 20) ───────────────────────────────────────────────────────────
+
+export function useSessionUsage(sessionId: string, opts?: Partial<UseQueryOptions<Usage>>) {
+  return useQuery({
+    queryKey: qk.sessionUsage(sessionId),
+    queryFn: ({ signal }) => api.sessionUsage(sessionId, signal),
+    ...opts,
+  });
+}
+
+export function useProjectUsage(projectId: string, opts?: Partial<UseQueryOptions<Usage>>) {
+  return useQuery({
+    queryKey: qk.projectUsage(projectId),
+    queryFn: ({ signal }) => api.projectUsage(projectId, signal),
+    ...opts,
+  });
+}
+
+export type { PermissionRule };

@@ -7,6 +7,7 @@ import {
   FileContentSchema,
   FileDiffSchema,
   PermissionRuleSchema,
+  UsageSchema,
   type Me,
   type Org,
   type Project,
@@ -15,6 +16,7 @@ import {
   type FileContent,
   type FileDiff,
   type PermissionRule,
+  type Usage,
 } from "@carrier/contract";
 
 /**
@@ -128,13 +130,83 @@ export interface PromoteResult {
 const PromoteResultSchema: Parser<PromoteResult> = {
   parse(input: unknown): PromoteResult {
     const o = (input ?? {}) as Record<string, unknown>;
+    // The BFF returns `pullRequestUrl`; accept `prUrl` too for forward-compat.
+    const url =
+      typeof o.pullRequestUrl === "string"
+        ? o.pullRequestUrl
+        : typeof o.prUrl === "string"
+          ? o.prUrl
+          : null;
     return {
       ok: Boolean(o.ok),
-      prUrl: typeof o.prUrl === "string" ? o.prUrl : null,
+      prUrl: url,
       message: typeof o.message === "string" ? o.message : undefined,
     };
   },
 };
+
+// ── Members (org membership management — Req 17/21) ──────────────────────────
+export interface Member {
+  accountId: string;
+  login: string;
+  name?: string | null;
+  avatarUrl?: string | null;
+  role: "owner" | "admin" | "member";
+}
+
+const MemberSchema: Parser<Member> = {
+  parse(input: unknown): Member {
+    const o = (input ?? {}) as Record<string, unknown>;
+    if (typeof o.login !== "string") throw new Error("Invalid member: login");
+    const role = o.role;
+    if (role !== "owner" && role !== "admin" && role !== "member") {
+      throw new Error("Invalid member: role");
+    }
+    return {
+      accountId: typeof o.accountId === "string" ? o.accountId : String(o.accountId ?? ""),
+      login: o.login,
+      name: typeof o.name === "string" ? o.name : null,
+      avatarUrl: typeof o.avatarUrl === "string" ? o.avatarUrl : null,
+      role,
+    };
+  },
+};
+const MemberListSchema = arrayOf(MemberSchema);
+
+// ── GitHub installations (Req 9/21) ──────────────────────────────────────────
+export interface InstallationRepo {
+  fullName: string;
+  defaultBranch: string;
+  private: boolean;
+}
+export interface Installation {
+  installationId: number;
+  accountLogin: string;
+  repos: InstallationRepo[];
+}
+
+const InstallationSchema: Parser<Installation> = {
+  parse(input: unknown): Installation {
+    const o = (input ?? {}) as Record<string, unknown>;
+    if (typeof o.installationId !== "number") {
+      throw new Error("Invalid installation: installationId");
+    }
+    const repos = Array.isArray(o.repos) ? o.repos : [];
+    return {
+      installationId: o.installationId,
+      accountLogin: typeof o.accountLogin === "string" ? o.accountLogin : "",
+      repos: repos.map((r) => {
+        const rr = (r ?? {}) as Record<string, unknown>;
+        return {
+          fullName: String(rr.fullName ?? ""),
+          defaultBranch: String(rr.defaultBranch ?? "main"),
+          private: Boolean(rr.private),
+        };
+      }),
+    };
+  },
+};
+const InstallationListSchema = arrayOf(InstallationSchema);
 
 export const api = {
   // ── Identity ───────────────────────────────────────────────────────────
@@ -187,6 +259,42 @@ export const api = {
     return request(`/projects/${encodeURIComponent(projectId)}/bind`, ProjectSchema, {
       method: "DELETE",
     });
+  },
+
+  archiveProject(projectId: string): Promise<void> {
+    return request(`/projects/${encodeURIComponent(projectId)}/archive`, VoidSchema, {
+      method: "POST",
+    });
+  },
+
+  // ── Org members (Req 17/21) ─────────────────────────────────────────────
+  members(orgSlug: string, signal?: AbortSignal): Promise<Member[]> {
+    return request(`/orgs/${encodeURIComponent(orgSlug)}/members`, MemberListSchema, {
+      signal,
+    });
+  },
+
+  addMember(
+    orgSlug: string,
+    member: { login: string; role: "owner" | "admin" | "member" },
+  ): Promise<Member> {
+    return request(`/orgs/${encodeURIComponent(orgSlug)}/members`, MemberSchema, {
+      method: "POST",
+      body: member,
+    });
+  },
+
+  removeMember(orgSlug: string, accountId: string): Promise<void> {
+    return request(
+      `/orgs/${encodeURIComponent(orgSlug)}/members/${encodeURIComponent(accountId)}`,
+      VoidSchema,
+      { method: "DELETE" },
+    );
+  },
+
+  // ── GitHub installations (Req 9/21) ─────────────────────────────────────
+  installations(signal?: AbortSignal): Promise<Installation[]> {
+    return request(`/github/installations`, InstallationListSchema, { signal });
   },
 
   // ── Sessions ───────────────────────────────────────────────────────────
@@ -260,12 +368,44 @@ export const api = {
     });
   },
 
+  // ── Usage / cost (Req 16/20) ─────────────────────────────────────────────
+  sessionUsage(sessionId: string, signal?: AbortSignal): Promise<Usage> {
+    return request(`/sessions/${encodeURIComponent(sessionId)}/usage`, UsageSchema, {
+      signal,
+    });
+  },
+
+  projectUsage(projectId: string, signal?: AbortSignal): Promise<Usage> {
+    return request(`/projects/${encodeURIComponent(projectId)}/usage`, UsageSchema, {
+      signal,
+    });
+  },
+
   // ── Permissions ──────────────────────────────────────────────────────────
   permissions(projectId: string, signal?: AbortSignal): Promise<PermissionRule[]> {
     return request(
       `/projects/${encodeURIComponent(projectId)}/permissions`,
       PermissionListSchema,
       { signal },
+    );
+  },
+
+  addPermission(
+    projectId: string,
+    rule: { action: string; pattern: string; effect: "allow" | "deny" | "ask" },
+  ): Promise<PermissionRule> {
+    return request(
+      `/projects/${encodeURIComponent(projectId)}/permissions`,
+      PermissionRuleSchema,
+      { method: "POST", body: rule },
+    );
+  },
+
+  deletePermission(projectId: string, ruleId: string): Promise<void> {
+    return request(
+      `/projects/${encodeURIComponent(projectId)}/permissions/${encodeURIComponent(ruleId)}`,
+      VoidSchema,
+      { method: "DELETE" },
     );
   },
 };

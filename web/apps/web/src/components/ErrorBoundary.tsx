@@ -1,5 +1,6 @@
 import * as React from "react";
 import { ErrorState } from "./primitives";
+import { recordError } from "../telemetry";
 
 interface Props {
   children: React.ReactNode;
@@ -16,6 +17,10 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   static getDerivedStateFromError(error: Error): State {
     return { error };
+  }
+
+  componentDidCatch(error: Error) {
+    recordError(error, "ErrorBoundary");
   }
 
   reset = () => this.setState({ error: null });

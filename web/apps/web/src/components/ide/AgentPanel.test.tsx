@@ -38,6 +38,7 @@ describe("ApprovalCard", () => {
     resource: "rm -rf /tmp/x",
     reason: "Deletes files",
     seq: 7,
+    receivedAt: Date.now(),
   };
 
   it("renders the request and correlates approve/deny to the reqId", () => {

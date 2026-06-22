@@ -6,7 +6,7 @@ import { Files, GitCompareArrows } from "lucide-react";
 import { cn } from "@carrier/ui";
 
 import { api, eventsUrl } from "../api/client";
-import { useSession, qk } from "../api/queries";
+import { useSession, useSessionUsage, qk } from "../api/queries";
 import {
   useSessionStream,
   connectSessionStream,
@@ -23,6 +23,12 @@ export function SessionPage() {
   const { org = "", project = "", session: sessionId = "" } = useParams();
   const qc = useQueryClient();
   const sessionQ = useSession(sessionId);
+  // Per-session usage/cost (Req 20). Poll while the session is running; tolerate
+  // the endpoint being unavailable (don't surface a hard error in the IDE).
+  const usageQ = useSessionUsage(sessionId, {
+    retry: false,
+    refetchInterval: 15_000,
+  });
 
   const stream = useSessionStream;
   const events = useStore(stream, (s) => s.events);
@@ -38,6 +44,7 @@ export function SessionPage() {
   const [deciding, setDeciding] = React.useState<string | null>(null);
   const [prUrl, setPrUrl] = React.useState<string | null>(null);
   const [promoting, setPromoting] = React.useState(false);
+  const [promoteStatus, setPromoteStatus] = React.useState<string | null>(null);
 
   // Reset + connect the stream when the session changes.
   React.useEffect(() => {
@@ -88,13 +95,30 @@ export function SessionPage() {
 
   const onPromote = async () => {
     setPromoting(true);
+    setPromoteStatus(null);
     try {
       const res = await api.promote(sessionId);
-      if (res.prUrl) setPrUrl(res.prUrl);
+      if (res.prUrl) {
+        setPrUrl(res.prUrl);
+        setPromoteStatus("PR opened");
+      } else if (res.ok) {
+        setPromoteStatus("merged");
+      } else {
+        setPromoteStatus(res.message ?? "promote failed");
+      }
       void qc.invalidateQueries({ queryKey: qk.session(sessionId) });
+    } catch (e) {
+      setPromoteStatus(e instanceof Error ? e.message : "promote failed");
     } finally {
       setPromoting(false);
     }
+  };
+
+  // Approval timeout (Req 11.4): an unanswered approval auto-denies. Deliver the
+  // timeout-denial to the BFF (best-effort) and clear it from the pending list.
+  const onApprovalExpire = (reqId: string) => {
+    void api.approve(sessionId, reqId, false).catch(() => undefined);
+    stream.getState().resolveApproval(reqId);
   };
 
   const onSelect = (path: string) => {
@@ -113,6 +137,9 @@ export function SessionPage() {
         onPromote={onPromote}
         promoting={promoting}
         prUrl={prUrl}
+        promoteStatus={promoteStatus}
+        usage={usageQ.data}
+        usageLoading={usageQ.isLoading}
       />
       <div className="min-h-0 flex-1">
         <ErrorBoundary>
@@ -178,6 +205,7 @@ export function SessionPage() {
                 onInterrupt={onInterrupt}
                 onDecide={onDecide}
                 decidingReqId={deciding}
+                onApprovalExpire={onApprovalExpire}
               />
             }
           />

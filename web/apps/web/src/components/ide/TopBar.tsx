@@ -10,9 +10,10 @@ import {
   Loader2,
   ChevronRight,
 } from "lucide-react";
-import type { Session, SessionStatus } from "@carrier/contract";
+import type { Session, SessionStatus, Usage } from "@carrier/contract";
 import type { ConnectionState } from "../../session/stream";
 import { Spinner } from "../primitives";
+import { UsagePill } from "./UsagePanel";
 
 function StatusDot({ status }: { status: SessionStatus }) {
   if (status === "running")
@@ -57,6 +58,9 @@ export function TopBar({
   onPromote,
   promoting,
   prUrl,
+  promoteStatus,
+  usage,
+  usageLoading,
 }: {
   orgSlug: string;
   projectId: string;
@@ -67,6 +71,10 @@ export function TopBar({
   onPromote: () => void;
   promoting?: boolean;
   prUrl?: string | null;
+  /** Outcome of the last promote (e.g. "merged", "PR opened", conflict text). */
+  promoteStatus?: string | null;
+  usage?: Usage;
+  usageLoading?: boolean;
 }) {
   const branch = session?.workingCopy?.branch ?? null;
   return (
@@ -93,7 +101,17 @@ export function TopBar({
         </span>
       ) : null}
 
+      {promoteStatus ? (
+        <span
+          className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+          data-testid="promote-status"
+        >
+          {promoteStatus}
+        </span>
+      ) : null}
+
       <div className="ml-auto flex items-center gap-3">
+        <UsagePill usage={usage} loading={usageLoading} />
         <ConnectionPill connection={connection} />
         <StatusDot status={status} />
         {prUrl ? (
@@ -102,6 +120,7 @@ export function TopBar({
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline dark:text-blue-400"
+            data-testid="pr-link"
           >
             <GitPullRequest className="h-3.5 w-3.5" aria-hidden /> PR
           </a>
