@@ -43,13 +43,13 @@ Only the runtime core is in scope here; deployment/infra is out of scope.
 
 ## Phase 2 — Engines (provider adapters)
 
-- [ ] 6. Anthropic engine
+- [x] 6. Anthropic engine
   - Implement `AnthropicEngine.RunStep` on the official Go SDK: system as top-level param, tools via `input_schema`, stream mapping (`tool_use` parsed input, thinking, text) → `StreamEvent`, `stop_reason` → `Done`, usage normalization.
   - Model `claude-opus-4-8`, `max_tokens` required, adaptive thinking, stream large outputs.
   - Golden-stream unit tests for the event/usage/stop-reason mapping.
   - _Requirements: 1.2, 1.3, 1.5, 3.1_
 
-- [ ] 7. OpenAI engine
+- [x] 7. OpenAI engine
   - Implement `OpenAIEngine.RunStep` on Chat Completions: system as `messages[0]`, tools as function defs, parse `tool_calls[].function.arguments` via `encoding/json`, `finish_reason` → `Done`, usage normalization.
   - Golden-stream unit tests.
   - _Requirements: 1.2, 1.4, 1.5, 3.1_
@@ -61,17 +61,17 @@ Only the runtime core is in scope here; deployment/infra is out of scope.
 
 ## Phase 3 — Tools, permissions, sandbox
 
-- [ ] 9. Tool contract, registry, concurrency partitioning
-  - [ ] 9.1 Define the `Tool` interface (schema, `IsReadOnly`, `IsConcurrencySafe`, `Exposure`, `Exec`) with fail-closed defaults in `internal/tool`.
+- [x] 9. Tool contract, registry, concurrency partitioning
+  - [x] 9.1 Define the `Tool` interface (schema, `IsReadOnly`, `IsConcurrencySafe`, `Exposure`, `Exec`) with fail-closed defaults in `internal/tool`.
     - _Requirements: 4.1, 4.2, 4.6_
-  - [ ] 9.2 Implement the registry (built-ins, dedupe by name, stable sort for cache prefix) and the turn-level concurrency partitioner (`errgroup` + semaphore for read batches, serial barriers for writes); one result per call by ID.
+  - [x] 9.2 Implement the registry (built-ins, dedupe by name, stable sort for cache prefix) and the turn-level concurrency partitioner (`errgroup` + semaphore for read batches, serial barriers for writes); one result per call by ID.
     - Test parallel read batches, serial write barriers, and ordering preservation.
     - _Requirements: 4.3, 4.4_
-  - [ ] 9.3 Implement result spill-to-store with bounded preview substitution above a size threshold.
+  - [x] 9.3 Implement result spill-to-store with bounded preview substitution above a size threshold.
     - _Requirements: 4.5_
 
 - [ ] 10. Executor / sandbox
-  - [ ] 10.1 Define the `Executor` interface and `ExecSpec`/`ExecResult` in `internal/bay`; route all tool command execution through it.
+  - [x] 10.1 Define the `Executor` interface and `ExecSpec`/`ExecResult` in `internal/bay`; route all tool command execution through it.
     - _Requirements: 5.1_
   - [ ] 10.2 Implement `LocalReExecExecutor` with the arg0 self-re-exec dispatch in `cmd/carrier` (sentinel `argv[0]` → sandbox-helper path); hardcode and validate the helper path.
     - _Requirements: 5.2, 5.5_
