@@ -29,12 +29,12 @@ Only the runtime core is in scope here; deployment/infra is out of scope.
   - Race-test concurrent Submit/Emit/Wake and the queued-input-between-idle-and-start race.
   - _Requirements: 2.5, 2.6, 7.1, 7.4_
 
-- [ ] 4. Tower: registry, concurrency cap, shutdown
+- [x] 4. Tower: registry, concurrency cap, shutdown
   - Extend `internal/tower` with a `map[SessionID]*Flight` registry behind a mutex, graceful shutdown (cancel Fleet + wait), and slot acquisition with backpressure and ctx-cancel-while-waiting.
   - Race-test many concurrent Launches under the cap and graceful shutdown.
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.7, 2.8_
 
-- [ ] 5. Flight loop wired to events, store, and SQ/EQ
+- [x] 5. Flight loop wired to events, store, and SQ/EQ
   - Extend `internal/flight` to stream `StreamEvent`s to the EQ, reload history from the Store each step, enforce the step budget, and feed tool errors back as tool results.
   - Add recovery transitions: idle-timeout per streaming receive (context deadline); `ContextOverflow` → compact-hook → retry placeholder.
   - Add steer (interrupt active turn via `context.CancelFunc`) and queue consumption at cycle boundaries.
