@@ -17,9 +17,9 @@ Only the runtime core is in scope here; deployment/infra is out of scope.
   - _Requirements: 1.1, 1.2, 1.5, 1.6_
 
 - [x] 2. Append-only Store + replacement records
-  - [ ] 2.1 Define the `Store` interface (`Append`, `History`, `PutReplacement`, `Index`) and `Record`/`Replacement`/`SessionMeta` models in `internal/store`.
+  - [x] 2.1 Define the `Store` interface (`Append`, `History`, `PutReplacement`, `Index`) and `Record`/`Replacement`/`SessionMeta` models in `internal/store`.
     - _Requirements: 8.1, 8.2, 8.4, 8.6_
-  - [ ] 2.2 Implement a JSONL append-only log store with a SQLite metadata index; reconstruct history by backward-replay to the last checkpoint.
+  - [x] 2.2 Implement a JSONL append-only log store with a SQLite metadata index; reconstruct history by backward-replay to the last checkpoint.
     - Test append→reload reproduces identical records and byte-identical previews.
     - _Requirements: 8.1, 8.2, 8.3, 8.4_
 
@@ -70,13 +70,15 @@ Only the runtime core is in scope here; deployment/infra is out of scope.
   - [x] 9.3 Implement result spill-to-store with bounded preview substitution above a size threshold.
     - _Requirements: 4.5_
 
-- [ ] 10. Executor / sandbox
+- [x] 10. Executor / sandbox
   - [x] 10.1 Define the `Executor` interface and `ExecSpec`/`ExecResult` in `internal/bay`; route all tool command execution through it.
     - _Requirements: 5.1_
   - [ ] 10.2 Implement `LocalReExecExecutor` with the arg0 self-re-exec dispatch in `cmd/carrier` (sentinel `argv[0]` → sandbox-helper path); hardcode and validate the helper path.
     - _Requirements: 5.2, 5.5_
+    - NOTE: superseded by external sandbox binaries (sandbox-exec on macOS, bwrap on Linux) — no arg0 self-re-exec needed; helper paths hardcoded+validated.
   - [ ] 10.3 Linux confinement: bubblewrap FS/namespaces + seccomp/Landlock for network and blocked syscalls (`ptrace`, `process_vm_*`, `io_uring`).
     - _Requirements: 5.3_
+    - PARTIAL: bwrap namespaces implemented and cross-compiled; seccomp/Landlock syscall hardening unverified on a Linux host (documented gap).
   - [x] 10.4 macOS confinement: generated Seatbelt `.sbpl` with readable/writable roots as params.
     - _Requirements: 5.4_
   - [x] 10.5 Enforce output cap, timeout, and SIGTERM→SIGKILL process-group kill; detect sandbox-denial signatures and surface them for escalation.
