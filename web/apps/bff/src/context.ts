@@ -1,0 +1,26 @@
+// Shared app dependencies + Hono environment typing. createApp builds an AppDeps
+// (db, config, carrier, github) and stashes it on c.var so every route handler
+// can reach it; the auth middleware also sets c.var.account.
+
+import type { CarrierClient } from "@carrier/carrier-client";
+import type { Db } from "./db/client.js";
+import type { Config } from "./config.js";
+import type { GithubProvider } from "./auth/github-provider.js";
+import type { AccountRow } from "./db/schema.js";
+import type { Workspace } from "./workspace/workspace.js";
+
+export interface AppDeps {
+  db: Db;
+  config: Config;
+  github: GithubProvider;
+  workspace: Workspace;
+  /** Factory so tests can inject a fake-fetch-backed CarrierClient. */
+  carrier: () => CarrierClient;
+}
+
+export interface AppEnv {
+  Variables: {
+    deps: AppDeps;
+    account: AccountRow;
+  };
+}
