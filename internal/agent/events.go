@@ -4,15 +4,16 @@ package agent
 type EventKind int
 
 const (
-	EvText           EventKind = iota // assistant text delta
-	EvReasoning                       // reasoning/thinking delta
-	EvToolInputDelta                  // partial tool-call argument delta
-	EvToolCall                        // a complete tool call the model wants run
-	EvToolResult                      // the result of a tool call, fed back
-	EvStepStart                       // a model turn began
-	EvStepFinish                      // a model turn finished (carries Usage)
-	EvUsage                           // an incremental usage update
-	EvError                           // a classified engine error
+	EvText            EventKind = iota // assistant text delta
+	EvReasoning                        // reasoning/thinking delta
+	EvToolInputDelta                   // partial tool-call argument delta
+	EvToolCall                         // a complete tool call the model wants run
+	EvToolResult                       // the result of a tool call, fed back
+	EvStepStart                        // a model turn began
+	EvStepFinish                       // a model turn finished (carries Usage)
+	EvUsage                            // an incremental usage update
+	EvError                            // a classified engine error
+	EvApprovalRequest                  // a tool action awaiting human approval
 )
 
 // StreamEvent is the canonical, provider-agnostic unit of streaming output.
@@ -37,6 +38,9 @@ type StreamEvent struct {
 
 	// Err is set for EvError.
 	Err *EngineError
+
+	// Approval is set for EvApprovalRequest.
+	Approval *ApprovalRequest
 }
 
 // ToolResult is the outcome of executing a ToolCall, normalized for feedback to
@@ -45,6 +49,15 @@ type ToolResult struct {
 	ToolCallID string
 	Content    string
 	IsError    bool
+}
+
+// ApprovalRequest is a tool action surfaced to a human for approval, carried on
+// an EvApprovalRequest event and correlated back by ReqID.
+type ApprovalRequest struct {
+	ReqID    string
+	Tool     string
+	Resource string
+	Reason   string
 }
 
 func (k EventKind) String() string {
@@ -67,6 +80,8 @@ func (k EventKind) String() string {
 		return "usage"
 	case EvError:
 		return "error"
+	case EvApprovalRequest:
+		return "approval_request"
 	default:
 		return "unknown"
 	}

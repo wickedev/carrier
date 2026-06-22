@@ -138,6 +138,11 @@ func (f *Flight) ID() string { return f.id }
 // Queues exposes the SQ/EQ queues so callers can Submit input and read Events.
 func (f *Flight) Queues() *sq.Queues { return f.queues }
 
+// SetApprover installs (or replaces) the human-in-the-loop Approver. Call it
+// before Run starts (no active turn) — e.g. the server wires a hitl.ChannelApprover
+// right after constructing the Flight so Ask-effect tools surface for approval.
+func (f *Flight) SetApprover(a Approver) { f.approver = a }
+
 func (f *Flight) sid() store.SessionID { return store.SessionID(f.id) }
 
 // Run drives the session until ctx is cancelled. It blocks for input, runs

@@ -18,9 +18,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/wickedev/carrier/internal/agent"
 	"github.com/wickedev/carrier/internal/flight"
+	"github.com/wickedev/carrier/internal/hitl"
 	"github.com/wickedev/carrier/internal/sq"
 	"github.com/wickedev/carrier/internal/store"
 	"github.com/wickedev/carrier/internal/tower"
@@ -49,9 +51,10 @@ type Server struct {
 	baseCtx    context.Context
 	baseCancel context.CancelFunc
 
-	mu     sync.RWMutex
-	owners map[string]string // session ID → owning tenant
-	hubs   map[string]*hub   // session ID → fan-out hub
+	mu        sync.RWMutex
+	owners    map[string]string                // session ID → owning tenant
+	hubs      map[string]*hub                  // session ID → fan-out hub
+	approvers map[string]*hitl.ChannelApprover // session ID → HITL approver
 }
 
 // New builds a Server. tokens maps each accepted bearer token to its tenant;
@@ -71,6 +74,7 @@ func New(tw *tower.Tower, factory Factory, st store.Store, tokens map[string]str
 		baseCancel: cancel,
 		owners:     make(map[string]string),
 		hubs:       make(map[string]*hub),
+		approvers:  make(map[string]*hitl.ChannelApprover),
 	}
 }
 
@@ -86,7 +90,9 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/sessions", s.handleCreate)
 	mux.HandleFunc("POST /v1/sessions/{id}/input", s.handleInput)
+	mux.HandleFunc("POST /v1/sessions/{id}/interrupt", s.handleInterrupt)
 	mux.HandleFunc("GET /v1/sessions/{id}/events", s.handleEvents)
+	mux.HandleFunc("POST /v1/sessions/{id}/approvals/{reqId}", s.handleApproval)
 	return mux
 }
 
@@ -110,6 +116,16 @@ type eventDTO struct {
 	ToolCallID string `json:"tool_call_id,omitempty"`
 	Name       string `json:"name,omitempty"`
 	IsError    bool   `json:"is_error,omitempty"`
+	// Approval fields (approval_request events).
+	ReqID    string `json:"req_id,omitempty"`
+	Tool     string `json:"tool,omitempty"`
+	Resource string `json:"resource,omitempty"`
+	Reason   string `json:"reason,omitempty"`
+	// Usage fields (usage / step_finish events).
+	InputTokens      int `json:"input_tokens,omitempty"`
+	OutputTokens     int `json:"output_tokens,omitempty"`
+	CacheReadTokens  int `json:"cache_read_tokens,omitempty"`
+	CacheWriteTokens int `json:"cache_write_tokens,omitempty"`
 }
 
 // handleCreate authenticates the caller, builds and launches a Flight, starts
@@ -124,6 +140,19 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	sid := newSessionID()
 	f := s.factory(sid, tenant)
 
+	// Wire a human-in-the-loop approver: when an Ask-effect tool fires, surface an
+	// approval_request event on the stream and block until the client answers via
+	// POST /v1/sessions/{id}/approvals/{reqId}.
+	approver := hitl.New(func(req hitl.Request) {
+		_ = f.Queues().Emit(s.baseCtx, agent.StreamEvent{
+			Kind: agent.EvApprovalRequest,
+			Approval: &agent.ApprovalRequest{
+				ReqID: req.ID, Tool: req.Tool, Resource: req.Resource, Reason: req.Reason,
+			},
+		})
+	}, 10*time.Minute)
+	f.SetApprover(approver)
+
 	// Launch on the Tower under the server's base context; the Flight runs on its
 	// own goroutine until the context ends (request lifetime / Shutdown).
 	if err := s.tower.Launch(s.baseCtx, f); err != nil {
@@ -135,10 +164,19 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	s.owners[sid] = tenant
 	s.hubs[sid] = h
+	s.approvers[sid] = approver
 	s.mu.Unlock()
 
-	// Drain the Flight's single event channel and fan it out to subscribers.
-	go h.run(f.Queues().Events())
+	// Drain the Flight's single event channel into the hub; clean up the per-session
+	// registries when the Flight ends.
+	go func() {
+		h.run(f.Queues().Events())
+		s.mu.Lock()
+		delete(s.owners, sid)
+		delete(s.hubs, sid)
+		delete(s.approvers, sid)
+		s.mu.Unlock()
+	}()
 
 	writeJSON(w, http.StatusOK, createResponse{SessionID: sid})
 }
@@ -173,6 +211,57 @@ func (s *Server) handleInput(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := f.Queues().Submit(r.Context(), in); err != nil {
 		writeError(w, http.StatusServiceUnavailable, "submit failed: "+err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+// handleInterrupt steers the session's active turn to a stop (Req 7 interrupt).
+func (s *Server) handleInterrupt(w http.ResponseWriter, r *http.Request) {
+	sid := r.PathValue("id")
+	if _, ok := s.authorize(w, r, sid); !ok {
+		return
+	}
+	f, ok := s.tower.Get(sid)
+	if !ok {
+		writeError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	in := sq.Input{Msg: agent.Message{Role: agent.RoleUser, Text: "(interrupted)"}, Delivery: sq.Steer}
+	if err := f.Queues().Submit(r.Context(), in); err != nil {
+		writeError(w, http.StatusServiceUnavailable, "interrupt failed: "+err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+// approvalRequest is the body of POST /v1/sessions/{id}/approvals/{reqId}.
+type approvalRequest struct {
+	Allow bool `json:"allow"`
+}
+
+// handleApproval delivers a human approve/deny decision to the blocked
+// Ask-effect tool, correlated by request ID (Req 11 / web-client task 17).
+func (s *Server) handleApproval(w http.ResponseWriter, r *http.Request) {
+	sid := r.PathValue("id")
+	if _, ok := s.authorize(w, r, sid); !ok {
+		return
+	}
+	reqID := r.PathValue("reqId")
+	var body approvalRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid body: "+err.Error())
+		return
+	}
+	s.mu.RLock()
+	approver := s.approvers[sid]
+	s.mu.RUnlock()
+	if approver == nil {
+		writeError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	if !approver.Resolve(reqID, body.Allow) {
+		writeError(w, http.StatusNotFound, "no pending approval for that request id")
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
@@ -322,6 +411,16 @@ func eventToDTO(ev agent.StreamEvent) eventDTO {
 		if dto.Text == "" {
 			dto.Text = ev.Result.Content
 		}
+	case ev.Approval != nil:
+		dto.ReqID = ev.Approval.ReqID
+		dto.Tool = ev.Approval.Tool
+		dto.Resource = ev.Approval.Resource
+		dto.Reason = ev.Approval.Reason
+	case ev.Usage != nil:
+		dto.InputTokens = ev.Usage.InputTokens
+		dto.OutputTokens = ev.Usage.OutputTokens
+		dto.CacheReadTokens = ev.Usage.CacheReadTokens
+		dto.CacheWriteTokens = ev.Usage.CacheWriteTokens
 	}
 	return dto
 }
