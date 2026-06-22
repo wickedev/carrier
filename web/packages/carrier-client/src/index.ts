@@ -34,6 +34,10 @@ export interface RawCarrierEvent {
   tool?: string;
   resource?: string;
   reason?: string;
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_read_tokens?: number;
+  cache_write_tokens?: number;
 }
 
 export class CarrierError extends Error {
@@ -87,6 +91,20 @@ export class CarrierClient {
       headers: this.headers(),
     });
     if (!res.ok && res.status !== 404) throw new CarrierError(`interrupt failed`, res.status);
+  }
+
+  /** Delivers a human approve/deny decision for a pending Ask-effect tool,
+   *  correlated by the approval request ID. */
+  async resolveApproval(sessionId: string, reqId: string, allow: boolean): Promise<void> {
+    const res = await this.fetchImpl(
+      `${this.baseUrl}/v1/sessions/${sessionId}/approvals/${reqId}`,
+      {
+        method: "POST",
+        headers: this.headers({ "content-type": "application/json" }),
+        body: JSON.stringify({ allow }),
+      },
+    );
+    if (!res.ok) throw new CarrierError(`resolveApproval failed`, res.status);
   }
 
   /** Streams normalized raw Carrier events; closes when the upstream ends or the
