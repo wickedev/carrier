@@ -84,7 +84,7 @@ Only the runtime core is in scope here; deployment/infra is out of scope.
     - _Requirements: 5.6, 5.7_
 
 - [ ] 11. Permissions & approval
-  - [ ] 11.1 Implement `internal/perm`: `{action, pattern, effect}` rules, wildcard matching, `findLast` wins, default `ask`, source precedence (managed > project > user > session).
+  - [x] 11.1 Implement `internal/perm`: `{action, pattern, effect}` rules, wildcard matching, `findLast` wins, default `ask`, source precedence (managed > project > user > session).
     - Test precedence and wildcard matching.
     - _Requirements: 6.1, 6.2_
   - [ ] 11.2 Wire the permission gate into tool dispatch: `ask` blocks the tool on a reply channel; `always` persists a rule; categories independently gateable; independent of the Bay (confined reads auto-allowed).
