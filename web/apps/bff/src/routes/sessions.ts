@@ -18,7 +18,8 @@ import {
 import { z } from "zod";
 import type { AppEnv } from "../context.js";
 import { session as sessionTable } from "../db/schema.js";
-import { resolveSession } from "./authz.js";
+import { orgById, resolveSession } from "./authz.js";
+import { orgOwnsRepo } from "./github.js";
 import { toSessionDto } from "./projects.js";
 import { normalizeEvent } from "../carrier.js";
 import { usageDeltaFromRaw } from "../usage.js";
@@ -185,12 +186,38 @@ export function sessionRoutes(): Hono<AppEnv> {
 
   // ── promote ────────────────────────────────────────────────────────────────
   app.post("/:id/promote", async (c) => {
-    const { db, workspace } = c.var.deps;
+    const { db, workspace, github } = c.var.deps;
     const ctx = await resolveSession(db, c.var.account.id, c.req.param("id"));
     if (!ctx) return c.json({ error: "not_found" }, 404);
     if (!ctx.session.workingBranch) {
       return c.json({ error: "no_working_branch" }, 409);
     }
+
+    const hasBinding =
+      ctx.project.repoBound &&
+      !!ctx.project.repoFullName &&
+      !!ctx.project.repoDefaultBranch &&
+      ctx.project.installationId != null;
+
+    // SECURITY: re-verify the stored binding at USE time against the project's
+    // org. A binding created before the org-scoping gate (or whose installation/
+    // repo access was since revoked) must not be usable to push/PR to another
+    // tenant's repo — confirm ownership with GitHub before minting a token.
+    if (hasBinding) {
+      const orgRow = await orgById(db, ctx.project.orgId);
+      const allowed =
+        orgRow &&
+        (await orgOwnsRepo(
+          github,
+          orgRow,
+          ctx.project.installationId!,
+          ctx.project.repoFullName!,
+        ));
+      if (!allowed) {
+        return c.json({ error: "binding_not_owned" }, 403);
+      }
+    }
+
     try {
       const result = await workspace.promote({
         projectId: ctx.project.id,
@@ -199,17 +226,13 @@ export function sessionRoutes(): Hono<AppEnv> {
         workingBranch: ctx.session.workingBranch,
         repoBound: ctx.project.repoBound,
         message: `Promote session ${ctx.session.id}`,
-        repo:
-          ctx.project.repoBound &&
-          ctx.project.repoFullName &&
-          ctx.project.repoDefaultBranch &&
-          ctx.project.installationId
-            ? {
-                installationId: ctx.project.installationId,
-                repoFullName: ctx.project.repoFullName,
-                defaultBranch: ctx.project.repoDefaultBranch,
-              }
-            : undefined,
+        repo: hasBinding
+          ? {
+              installationId: ctx.project.installationId!,
+              repoFullName: ctx.project.repoFullName!,
+              defaultBranch: ctx.project.repoDefaultBranch!,
+            }
+          : undefined,
       });
       return c.json({
         ok: true,

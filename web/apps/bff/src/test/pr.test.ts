@@ -75,6 +75,40 @@ describe("promotion opens a PR for repo-bound projects (task 19)", () => {
     ).toBe(true);
   });
 
+  it("refuses to promote a stored binding the org no longer owns (403)", async () => {
+    const state = defaultGithubState();
+    const h = await makeHarness({ githubState: state });
+    const { cookie, project } = await setupRepoBound(h);
+
+    const session = await (
+      await h.app.request(`/projects/${project.id}/sessions`, {
+        method: "POST",
+        headers: { cookie, "content-type": "application/json" },
+        body: JSON.stringify({ title: "S" }),
+      })
+    ).json();
+    const cwd = h.carrier.createdWith[0]!.cwd!;
+    await writeFile(join(cwd, "feature.txt"), "from session\n");
+
+    // The installation access is revoked AFTER the binding was stored — promote
+    // must re-check and refuse rather than push/PR with a now-foreign binding.
+    h.githubState.installations = [];
+    h.githubState.reposByInstallation = {};
+    // Ignore the clone token minted during bind; assert promote mints none.
+    state.cloneInfoCalls = [];
+    state.pullRequests = [];
+
+    const res = await h.app.request(`/sessions/${session.id}/promote`, {
+      method: "POST",
+      headers: { cookie },
+    });
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toBe("binding_not_owned");
+    // No clone token minted, no PR opened with the stale binding.
+    expect(state.pullRequests).toHaveLength(0);
+    expect(state.cloneInfoCalls).toHaveLength(0);
+  });
+
   it("unbound projects do not open a PR", async () => {
     const state = defaultGithubState();
     const h = await makeHarness({ githubState: state });

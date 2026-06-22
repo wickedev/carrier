@@ -48,6 +48,24 @@ export async function orgInstallations(
   return live.filter((i) => i.accountLogin === org.slug);
 }
 
+/**
+ * Whether an org may use a given installation + repo RIGHT NOW. Re-checked at
+ * every use (bind AND promote/clone) so a stored binding — created before this
+ * gate existed, or whose installation/repo access was since revoked — can never
+ * be used to reach another tenant's repo. GitHub is the source of truth.
+ */
+export async function orgOwnsRepo(
+  github: GithubProvider,
+  org: OrgRow,
+  installationId: number,
+  repoFullName: string,
+): Promise<boolean> {
+  const owned = await orgInstallations(github, org);
+  if (!owned.some((i) => i.installationId === installationId)) return false;
+  const repos = await github.listInstallationRepos(installationId);
+  return repos.some((r) => r.fullName === repoFullName);
+}
+
 export function githubRoutes(): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
 
