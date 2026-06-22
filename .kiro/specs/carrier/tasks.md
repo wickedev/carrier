@@ -54,7 +54,7 @@ Only the runtime core is in scope here; deployment/infra is out of scope.
   - Golden-stream unit tests.
   - _Requirements: 1.2, 1.4, 1.5, 3.1_
 
-- [ ] 8. Provider-parity suite + per-provider concurrency throttle
+- [x] 8. Provider-parity suite + per-provider concurrency throttle
   - Add a test that runs the same Flight against both engines and asserts identical loop behavior and `StreamEvent` shapes.
   - Add per-provider/per-model `x/sync/semaphore` throttling and `RetryAfter`-honoring backoff for `RateLimited`/`Retryable`.
   - _Requirements: 1.6, 1.7_
