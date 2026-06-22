@@ -87,7 +87,7 @@ Only the runtime core is in scope here; deployment/infra is out of scope.
   - [x] 11.1 Implement `internal/perm`: `{action, pattern, effect}` rules, wildcard matching, `findLast` wins, default `ask`, source precedence (managed > project > user > session).
     - Test precedence and wildcard matching.
     - _Requirements: 6.1, 6.2_
-  - [ ] 11.2 Wire the permission gate into tool dispatch: `ask` blocks the tool on a reply channel; `always` persists a rule; categories independently gateable; independent of the Bay (confined reads auto-allowed).
+  - [x] 11.2 Wire the permission gate into tool dispatch: `ask` blocks the tool on a reply channel; `always` persists a rule; categories independently gateable; independent of the Bay (confined reads auto-allowed).
     - _Requirements: 6.3, 6.4, 6.7_
   - [ ] 11.3 Off-loop classifier: run on a sanitized input projection via a child goroutine; consecutive-denial fallback to human approval; record decision source.
     - _Requirements: 6.5, 6.6, 16.4_
@@ -99,7 +99,7 @@ Only the runtime core is in scope here; deployment/infra is out of scope.
 
 ## Phase 4 — Context, checkpoint, extension surface
 
-- [ ] 13. Context budget & compaction
+- [x] 13. Context budget & compaction
   - Track per-turn usage vs usable budget; proactive compaction at a sub-limit threshold; preserve recent turns + carry summary forward.
   - Frozen, content-addressed (by tool-call ID) replacement that evicts stale tool results without busting the cached prefix; checkpoint+restore agent/model/tool/todo config across the boundary.
   - Test reproducible frozen replacement across resume and config restore after compaction.
@@ -121,7 +121,7 @@ Only the runtime core is in scope here; deployment/infra is out of scope.
   - Implement `internal/hook`: typed lifecycle hooks (pre/post-tool, session start/end, pre/post-compaction) as a return-new middleware chain; block / rewrite-input / append-context outcomes; restrict trust-granting config to user/session layers.
   - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
 
-- [ ] 18. Subagents & fan-out
+- [x] 18. Subagents & fan-out
   - Implement `internal/subagent`: spawn a child Flight goroutine with a scoped registry and a derived permission ceiling (inherit deny); bounded fan-out (semaphore) and recursion depth; summarized result; optional backgrounding with completion notification.
   - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6_
 

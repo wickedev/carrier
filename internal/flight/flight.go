@@ -45,36 +45,56 @@ type ApprovalRequest struct {
 	Reason   string
 }
 
+// Summarizer condenses conversation history into a single carry-forward note,
+// used by compaction. A real implementation calls a (cheap) model.
+type Summarizer interface {
+	Summarize(ctx context.Context, history []agent.Message) (string, error)
+}
+
 // Config constructs a Flight.
 type Config struct {
-	ID          string
-	System      string
+	ID     string
+	System string
+	// Memory is durable instruction/context (e.g. AGENTS.md) injected ahead of
+	// the conversation but outside the mutable history, so it is never
+	// compacted. See internal/memory.
+	Memory      string
 	Engine      engine.Engine
 	Store       store.Store
 	Tools       *tool.Registry
 	Policy      perm.Policy // nil → permissive (allow all); a server sets this
 	Exec        tool.ExecContext
 	Approver    Approver
+	Summarizer  Summarizer // nil → placeholder compaction summary
 	MaxSteps    int
 	IdleTimeout time.Duration
 	MaxParallel int
-	SQCap       int
-	EQCap       int
+	// ContextBudget triggers proactive compaction once a turn's input tokens
+	// reach this threshold (0 → disabled).
+	ContextBudget int
+	// PlanMode restricts the Flight to read-only tools (no mutating actions).
+	PlanMode bool
+	SQCap    int
+	EQCap    int
 }
 
 // Flight holds everything one session needs to run.
 type Flight struct {
 	id          string
 	system      string
+	memory      string
 	engine      engine.Engine
 	store       store.Store
 	tools       *tool.Registry
 	policy      perm.Policy
 	exec        tool.ExecContext
 	approver    Approver
+	summarizer  Summarizer
 	maxSteps    int
 	idleTimeout time.Duration
 	maxParallel int
+	budget      int
+	planMode    bool
 
 	queues *sq.Queues
 
@@ -89,15 +109,19 @@ func New(cfg Config) *Flight {
 	f := &Flight{
 		id:          cfg.ID,
 		system:      cfg.System,
+		memory:      cfg.Memory,
 		engine:      cfg.Engine,
 		store:       cfg.Store,
 		tools:       cfg.Tools,
 		policy:      cfg.Policy,
 		exec:        cfg.Exec,
 		approver:    cfg.Approver,
+		summarizer:  cfg.Summarizer,
 		maxSteps:    orDefault(cfg.MaxSteps, defaultMaxSteps),
 		idleTimeout: orDefaultDur(cfg.IdleTimeout, defaultIdleTimeout),
 		maxParallel: orDefault(cfg.MaxParallel, defaultMaxParallel),
+		budget:      cfg.ContextBudget,
+		planMode:    cfg.PlanMode,
 	}
 	f.queues = sq.New(orDefault(cfg.SQCap, defaultSQCap), orDefault(cfg.EQCap, defaultEQCap), sq.Shed)
 	return f
@@ -158,9 +182,17 @@ func (f *Flight) foldPending(ctx context.Context) error {
 // runUntilIdle runs turns until the model finishes with no pending input, the
 // step budget is exhausted, or a recoverable interruption occurs.
 func (f *Flight) runUntilIdle(ctx context.Context) error {
+	var lastInputTokens int
 	for step := 0; step < f.maxSteps; step++ {
 		if err := ctx.Err(); err != nil {
 			return err
+		}
+		// Proactive compaction: condense history before the provider forces it.
+		if f.budget > 0 && lastInputTokens >= f.budget {
+			if err := f.compact(ctx); err != nil {
+				return err
+			}
+			lastInputTokens = 0
 		}
 		msgs, err := f.store.Messages(ctx, f.sid())
 		if err != nil {
@@ -188,6 +220,8 @@ func (f *Flight) runUntilIdle(ctx context.Context) error {
 			}
 			return terr
 		}
+
+		lastInputTokens = res.Usage.InputTokens
 
 		// Persist the assistant turn (text + any tool-call requests).
 		arec := store.Record{Kind: store.KindTurn, Role: agent.RoleAssistant, Text: res.Text, ToolCalls: res.ToolCalls}
@@ -222,9 +256,9 @@ func (f *Flight) runTurn(ctx context.Context, msgs []agent.Message) (agent.StepR
 
 	activity := make(chan struct{}, 64)
 	in := agent.StepInput{
-		System:   f.system,
+		System:   f.effectiveSystem(),
 		Messages: msgs,
-		Tools:    visibleToolDefs(f.tools),
+		Tools:    f.visibleTools(),
 		OnEvent: func(ev agent.StreamEvent) {
 			select {
 			case activity <- struct{}{}:
@@ -318,9 +352,12 @@ func (f *Flight) gatedDispatch(ctx context.Context, calls []agent.ToolCall) []ag
 	return results
 }
 
-// decide resolves the permission effect for a tool call, consulting the policy
-// and (for Ask) the Approver.
+// decide resolves the permission effect for a tool call, consulting plan mode,
+// the policy, and (for Ask) the Approver.
 func (f *Flight) decide(ctx context.Context, c agent.ToolCall) perm.Effect {
+	if f.planMode && !f.toolReadOnly(c) {
+		return perm.Deny // plan mode forbids mutating actions
+	}
 	if f.policy == nil {
 		return perm.Allow // permissive default; a server installs a policy
 	}
@@ -338,15 +375,23 @@ func (f *Flight) decide(ctx context.Context, c agent.ToolCall) perm.Effect {
 	return perm.Allow
 }
 
-// compact records a checkpoint marker so history replay trims older turns. A
-// real summarizer (Phase 4, task 13) replaces the placeholder summary.
+// compact writes a checkpoint record summarizing prior history, so subsequent
+// history replay starts from the summary. With a Summarizer it produces a real
+// model-written note; otherwise a placeholder marker.
 func (f *Flight) compact(ctx context.Context) error {
-	rec := store.Record{
+	summary := "[context compacted]"
+	if f.summarizer != nil {
+		if msgs, err := f.store.Messages(ctx, f.sid()); err == nil {
+			if s, serr := f.summarizer.Summarize(ctx, msgs); serr == nil && s != "" {
+				summary = s
+			}
+		}
+	}
+	return f.store.Append(ctx, f.sid(), store.Record{
 		Kind: store.KindCheckpoint,
 		Role: agent.RoleAssistant,
-		Text: "[context compacted]",
-	}
-	return f.store.Append(ctx, f.sid(), rec)
+		Text: summary,
+	})
 }
 
 func (f *Flight) emit(ctx context.Context, ev agent.StreamEvent) {
@@ -362,12 +407,30 @@ func resourceFor(c agent.ToolCall) string {
 	return ""
 }
 
-func visibleToolDefs(reg *tool.Registry) []agent.Tool {
-	if reg == nil {
+// effectiveSystem prepends durable memory (never compacted) to the system
+// prompt.
+func (f *Flight) effectiveSystem() string {
+	switch {
+	case f.memory == "":
+		return f.system
+	case f.system == "":
+		return f.memory
+	default:
+		return f.memory + "\n\n" + f.system
+	}
+}
+
+// visibleTools returns the model-visible tool definitions, filtered to
+// read-only tools in plan mode.
+func (f *Flight) visibleTools() []agent.Tool {
+	if f.tools == nil {
 		return nil
 	}
 	var defs []agent.Tool
-	for _, t := range reg.Visible() {
+	for _, t := range f.tools.Visible() {
+		if f.planMode && !t.IsReadOnly(nil) {
+			continue
+		}
 		defs = append(defs, agent.Tool{
 			Name:        t.Name(),
 			Description: t.Description(),
@@ -375,6 +438,39 @@ func visibleToolDefs(reg *tool.Registry) []agent.Tool {
 		})
 	}
 	return defs
+}
+
+func (f *Flight) toolReadOnly(c agent.ToolCall) bool {
+	if f.tools == nil {
+		return false
+	}
+	t, ok := f.tools.Get(c.Name)
+	if !ok {
+		return false
+	}
+	return t.IsReadOnly(c.Input)
+}
+
+// EngineSummarizer summarizes history by asking an Engine for a concise note.
+// It is the default Summarizer for compaction.
+type EngineSummarizer struct {
+	Engine engine.Engine
+	System string
+}
+
+// Summarize implements Summarizer.
+func (s EngineSummarizer) Summarize(ctx context.Context, history []agent.Message) (string, error) {
+	sys := s.System
+	if sys == "" {
+		sys = "Summarize the conversation so far into a concise note preserving key decisions, file paths, and open tasks. Output only the summary."
+	}
+	msgs := append(append([]agent.Message{}, history...),
+		agent.Message{Role: agent.RoleUser, Text: "Produce the summary now."})
+	res, err := s.Engine.RunStep(ctx, agent.StepInput{System: sys, Messages: msgs})
+	if err != nil {
+		return "", err
+	}
+	return res.Text, nil
 }
 
 func orDefault(v, def int) int {
