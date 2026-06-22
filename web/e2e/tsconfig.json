@@ -3,7 +3,7 @@
   "compilerOptions": {
     "noEmit": true,
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "types": ["node"]
+    "types": []
   },
-  "include": ["tests", "playwright.config.ts"]
+  "include": ["tests", "playwright.config.ts", "types"]
 }
