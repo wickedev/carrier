@@ -125,12 +125,12 @@ Only the runtime core is in scope here; deployment/infra is out of scope.
   - Implement `internal/subagent`: spawn a child Flight goroutine with a scoped registry and a derived permission ceiling (inherit deny); bounded fan-out (semaphore) and recursion depth; summarized result; optional backgrounding with completion notification.
   - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6_
 
-- [ ] 19. Plan mode & constrained review
+- [x] 19. Plan mode & constrained review
   - Plan mode = a permission mode + read-only/plan tool filter; persist the plan to a file; exit never restores into auto-approval (escalation circuit-breaker).
   - Review sub-agent = a constrained sub-conversation (no network, local-only writes, optional cheaper model).
   - _Requirements: 14.1, 14.2, 14.3, 14.4_
 
-- [ ] 20. Long-term memory
+- [x] 20. Long-term memory
   - Walk-up instruction-file (AGENTS.md/CLAUDE.md) discovery + injection outside mutable history, with per-session de-dupe; optional off-loop session extraction (forked sub-agent on a token/turn threshold).
   - _Requirements: 15.1, 15.2, 15.3, 15.4_
 
