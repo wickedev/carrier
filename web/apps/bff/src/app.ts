@@ -10,6 +10,8 @@ import { createDb } from "./db/client.js";
 import { OctokitGithubProvider } from "./auth/github-provider.js";
 import { createCarrierClient } from "./carrier.js";
 import { Workspace } from "./workspace/workspace.js";
+import { UsageStore } from "./usage.js";
+import { requestLogger } from "./logging.js";
 import { authRoutes, meRoute, requireAuth } from "./auth/index.js";
 import { orgRoutes } from "./routes/orgs.js";
 import { projectRoutes } from "./routes/projects.js";
@@ -26,7 +28,8 @@ export async function createDeps(
   const workspace =
     overrides.workspace ?? new Workspace(config.workspaceRoot, github);
   const carrier = overrides.carrier ?? (() => createCarrierClient(config));
-  return { db, config, github, workspace, carrier };
+  const usage = overrides.usage ?? new UsageStore();
+  return { db, config, github, workspace, carrier, usage, logSink: overrides.logSink };
 }
 
 export function createApp(deps: AppDeps): Hono<AppEnv> {
@@ -37,6 +40,10 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
     c.set("deps", deps);
     await next();
   });
+
+  // Structured request logging (secrets redacted). A custom sink can be injected
+  // for tests via deps.logSink.
+  app.use("*", requestLogger(deps.logSink));
 
   app.get("/health", (c) => c.json({ ok: true, service: "carrier-bff" }));
 

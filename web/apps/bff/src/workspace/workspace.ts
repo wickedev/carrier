@@ -301,6 +301,12 @@ export class Workspace {
     workingBranch: string;
     repoBound: boolean;
     message: string;
+    /** Repo binding — required to push + open a PR for repo-bound projects. */
+    repo?: {
+      installationId: number;
+      repoFullName: string;
+      defaultBranch: string;
+    };
   }): Promise<{ pullRequestUrl: string | null; merged: boolean }> {
     return this.withProjectLock(args.projectId, async () => {
       // Commit any pending edits in the working copy onto its branch.
@@ -311,19 +317,16 @@ export class Workspace {
       }
 
       if (args.repoBound) {
-        // A real repo-bound promotion pushes the branch and opens a PR via the
-        // installation token. That GitHub call is stubbed; we still merge the
-        // branch into the base locally so the base advances and tests can
-        // observe serialization + conflicts.
+        // Merge into the local base (serialized) so the base advances and
+        // conflicts are surfaced, then push the session branch to the remote
+        // and open a PR via the installation token.
         const merged = await this.mergeBranchIntoBase(
           args.basePath,
           args.wcPath,
           args.workingBranch,
         );
-        return {
-          pullRequestUrl: `https://github.com/promote/${args.workingBranch}`,
-          merged,
-        };
+        const pullRequestUrl = await this.pushAndOpenPullRequest(args);
+        return { pullRequestUrl, merged };
       }
 
       const merged = await this.mergeBranchIntoBase(
@@ -333,6 +336,46 @@ export class Workspace {
       );
       return { pullRequestUrl: null, merged };
     });
+  }
+
+  /**
+   * Push the session branch to the bound repo with a freshly-minted
+   * installation token and open a pull request against the default branch.
+   * Returns the PR url, or null if no repo binding is available. The push is
+   * best-effort (network-less test/dev envs may fail it) but the PR is opened
+   * through the injectable GithubProvider so tests can assert it.
+   */
+  private async pushAndOpenPullRequest(args: {
+    wcPath: string;
+    workingBranch: string;
+    message: string;
+    repo?: {
+      installationId: number;
+      repoFullName: string;
+      defaultBranch: string;
+    };
+  }): Promise<string | null> {
+    if (!args.repo) return null;
+    const { installationId, repoFullName, defaultBranch } = args.repo;
+    // Mint a tokenized push URL and push the branch (best-effort).
+    const { cloneUrl } = await this.github.getCloneInfo(
+      installationId,
+      repoFullName,
+    );
+    await git(args.wcPath, [
+      "push",
+      cloneUrl,
+      `${args.workingBranch}:${args.workingBranch}`,
+    ]);
+    const { url } = await this.github.openPullRequest({
+      installationId,
+      repoFullName,
+      head: args.workingBranch,
+      base: defaultBranch,
+      title: args.message,
+      body: `Promoted from Carrier session branch \`${args.workingBranch}\`.`,
+    });
+    return url;
   }
 
   private async mergeBranchIntoBase(

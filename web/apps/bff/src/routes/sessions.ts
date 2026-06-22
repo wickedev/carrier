@@ -12,6 +12,7 @@ import {
   SendInputSchema,
   SessionSchema,
   TreeEntrySchema,
+  UsageSchema,
   type SessionEvent,
 } from "@carrier/contract";
 import { z } from "zod";
@@ -20,6 +21,7 @@ import { session as sessionTable } from "../db/schema.js";
 import { resolveSession } from "./authz.js";
 import { toSessionDto } from "./projects.js";
 import { normalizeEvent } from "../carrier.js";
+import { usageDeltaFromRaw } from "../usage.js";
 import {
   PathTraversalError,
   PromoteConflictError,
@@ -114,12 +116,13 @@ export function sessionRoutes(): Hono<AppEnv> {
 
   // ── SSE relay (history replay then live) ───────────────────────────────────
   app.get("/:id/events", async (c) => {
-    const { db, carrier } = c.var.deps;
+    const { db, carrier, usage } = c.var.deps;
     const ctx = await resolveSession(db, c.var.account.id, c.req.param("id"));
     if (!ctx) return c.json({ error: "not_found" }, 404);
     const cid = ctx.session.carrierSessionId;
     if (!cid) return c.json({ error: "no_carrier_session" }, 409);
 
+    const sessionId = ctx.session.id;
     const client = carrier();
     return streamSSE(c, async (stream) => {
       const ac = new AbortController();
@@ -130,6 +133,10 @@ export function sessionRoutes(): Hono<AppEnv> {
         // streamEvents yields history first (with seq) then live frames; the BFF
         // normalizes each and forwards in order, deduping by seq.
         for await (const raw of client.streamEvents(cid, ac.signal)) {
+          // Accumulate per-session usage from usage/step_finish frames (task 20).
+          const delta = usageDeltaFromRaw(raw);
+          if (delta) usage.add(sessionId, delta);
+
           const ev: SessionEvent | null = normalizeEvent(raw);
           if (!ev) continue;
           if (ev.seq <= lastSeq) continue; // dedupe / ordering guard
@@ -146,18 +153,34 @@ export function sessionRoutes(): Hono<AppEnv> {
     });
   });
 
+  // ── usage (per-session) ────────────────────────────────────────────────────
+  app.get("/:id/usage", async (c) => {
+    const { db, usage } = c.var.deps;
+    const ctx = await resolveSession(db, c.var.account.id, c.req.param("id"));
+    if (!ctx) return c.json({ error: "not_found" }, 404);
+    return c.json(UsageSchema.parse(usage.forSession(ctx.session.id)));
+  });
+
   // ── approvals ──────────────────────────────────────────────────────────────
   app.post("/:id/approvals/:reqId", async (c) => {
-    const { db } = c.var.deps;
+    const { db, carrier } = c.var.deps;
     const ctx = await resolveSession(db, c.var.account.id, c.req.param("id"));
     if (!ctx) return c.json({ error: "not_found" }, 404);
     const body = ApprovalDecisionSchema.safeParse(
       await c.req.json().catch(() => ({})),
     );
     if (!body.success) return c.json({ error: "invalid_body" }, 400);
-    // Carrier's approval control channel is delivered out-of-band; recorded and
-    // acknowledged here (Carrier decision-delivery endpoint is stubbed).
-    return c.json({ ok: true, reqId: c.req.param("reqId"), allow: body.data.allow });
+    if (!ctx.session.carrierSessionId) {
+      return c.json({ error: "no_carrier_session" }, 409);
+    }
+    const reqId = c.req.param("reqId");
+    // Deliver the human approve/deny decision to Carrier, correlated by reqId.
+    await carrier().resolveApproval(
+      ctx.session.carrierSessionId,
+      reqId,
+      body.data.allow,
+    );
+    return c.json({ ok: true, reqId, allow: body.data.allow });
   });
 
   // ── promote ────────────────────────────────────────────────────────────────
@@ -176,6 +199,17 @@ export function sessionRoutes(): Hono<AppEnv> {
         workingBranch: ctx.session.workingBranch,
         repoBound: ctx.project.repoBound,
         message: `Promote session ${ctx.session.id}`,
+        repo:
+          ctx.project.repoBound &&
+          ctx.project.repoFullName &&
+          ctx.project.repoDefaultBranch &&
+          ctx.project.installationId
+            ? {
+                installationId: ctx.project.installationId,
+                repoFullName: ctx.project.repoFullName,
+                defaultBranch: ctx.project.repoDefaultBranch,
+              }
+            : undefined,
       });
       return c.json({
         ok: true,

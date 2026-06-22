@@ -16,6 +16,7 @@ import {
   PermissionRuleSchema,
   ProjectSchema,
   SessionSchema,
+  UsageSchema,
   type Project,
   type Session,
 } from "@carrier/contract";
@@ -275,6 +276,18 @@ export function projectRoutes(): Hono<AppEnv> {
       .workingCopyState(row.workingCopyPath, row.workingBranch)
       .catch(() => null);
     return c.json(SessionSchema.parse(await toSessionDto(row, wc)), 201);
+  });
+
+  // ── usage rollup (sum across the project's sessions) ───────────────────────
+  app.get("/projects/:id/usage", async (c) => {
+    const { db, usage } = c.var.deps;
+    const ctx = await resolveProject(db, c.var.account.id, c.req.param("id"));
+    if (!ctx) return c.json({ error: "not_found" }, 404);
+    const rows = await db
+      .select({ id: sessionTable.id })
+      .from(sessionTable)
+      .where(eq(sessionTable.projectId, ctx.project.id));
+    return c.json(UsageSchema.parse(usage.rollup(rows.map((r) => r.id))));
   });
 
   // ── permissions ───────────────────────────────────────────────────────────

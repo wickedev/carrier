@@ -8,6 +8,8 @@ import type { Config } from "./config.js";
 import type { GithubProvider } from "./auth/github-provider.js";
 import type { AccountRow } from "./db/schema.js";
 import type { Workspace } from "./workspace/workspace.js";
+import type { UsageStore } from "./usage.js";
+import type { LogLine } from "./logging.js";
 
 export interface AppDeps {
   db: Db;
@@ -16,6 +18,10 @@ export interface AppDeps {
   workspace: Workspace;
   /** Factory so tests can inject a fake-fetch-backed CarrierClient. */
   carrier: () => CarrierClient;
+  /** In-memory per-session usage/cost tally (accumulated by the SSE relay). */
+  usage: UsageStore;
+  /** Optional structured-log sink (tests capture lines; prod uses console). */
+  logSink?: (line: LogLine) => void;
 }
 
 export interface AppEnv {

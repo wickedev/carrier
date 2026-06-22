@@ -3,6 +3,7 @@
 // @octokit/oauth-app + octokit; tests inject a fake.
 
 import { OAuthApp } from "@octokit/oauth-app";
+import { createAppAuth } from "@octokit/auth-app";
 import { Octokit } from "octokit";
 import type { Config } from "../config.js";
 
@@ -46,6 +47,22 @@ export interface GithubProvider {
     installationId: number,
     repoFullName: string,
   ): Promise<{ token: string; cloneUrl: string }>;
+  /**
+   * Open a pull request for a freshly-pushed branch on a repo-bound project's
+   * repository, via the installation token. Returns the PR's html URL.
+   */
+  openPullRequest(input: OpenPullRequestInput): Promise<{ url: string }>;
+}
+
+export interface OpenPullRequestInput {
+  installationId: number;
+  repoFullName: string;
+  /** Source branch (e.g. carrier/<session>) — must already exist on the remote. */
+  head: string;
+  /** Target branch (the repo's default branch). */
+  base: string;
+  title: string;
+  body?: string;
 }
 
 export class OctokitGithubProvider implements GithubProvider {
@@ -88,24 +105,98 @@ export class OctokitGithubProvider implements GithubProvider {
     };
   }
 
-  async listInstallations(): Promise<GithubInstallationRef[]> {
-    // Requires app auth; stubbed thin for the default impl (mocked in tests).
-    return [];
+  /** App-authenticated Octokit (JWT) — used to enumerate installations. */
+  private appOctokit(): Octokit {
+    return new Octokit({
+      authStrategy: createAppAuth,
+      auth: {
+        appId: this.cfg.githubAppId,
+        privateKey: normalizePrivateKey(this.cfg.githubPrivateKey),
+      },
+    });
   }
 
-  async listInstallationRepos(): Promise<GithubRepoRef[]> {
-    return [];
+  /** Installation-scoped Octokit (acts as the App on a specific installation). */
+  private installationOctokit(installationId: number): Octokit {
+    return new Octokit({
+      authStrategy: createAppAuth,
+      auth: {
+        appId: this.cfg.githubAppId,
+        privateKey: normalizePrivateKey(this.cfg.githubPrivateKey),
+        installationId,
+      },
+    });
+  }
+
+  async listInstallations(): Promise<GithubInstallationRef[]> {
+    const octokit = this.appOctokit();
+    const installs = await octokit.paginate(
+      octokit.rest.apps.listInstallations,
+      { per_page: 100 },
+    );
+    return installs.map((i) => {
+      // account is a union (User | Enterprise | null); both carry a name, users
+      // carry a login. Read defensively.
+      const acct = i.account as { login?: string; name?: string } | null;
+      return {
+        installationId: i.id,
+        accountLogin: acct?.login ?? acct?.name ?? "",
+      };
+    });
+  }
+
+  async listInstallationRepos(installationId: number): Promise<GithubRepoRef[]> {
+    const octokit = this.installationOctokit(installationId);
+    const repos = await octokit.paginate(
+      octokit.rest.apps.listReposAccessibleToInstallation,
+      { per_page: 100 },
+    );
+    return repos.map((r) => ({
+      fullName: r.full_name,
+      defaultBranch: r.default_branch,
+      private: r.private,
+    }));
   }
 
   async getCloneInfo(
-    _installationId: number,
+    installationId: number,
     repoFullName: string,
   ): Promise<{ token: string; cloneUrl: string }> {
-    // Real impl would mint an installation token via @octokit/auth-app and
-    // build https://x-access-token:<token>@github.com/<repo>.git. Stubbed here.
+    // Mint a short-lived installation access token and embed it in the https
+    // clone URL: https://x-access-token:<token>@github.com/<repo>.git
+    const auth = createAppAuth({
+      appId: this.cfg.githubAppId,
+      privateKey: normalizePrivateKey(this.cfg.githubPrivateKey),
+    });
+    const { token } = await auth({ type: "installation", installationId });
     return {
-      token: "stub-installation-token",
-      cloneUrl: `https://github.com/${repoFullName}.git`,
+      token,
+      cloneUrl: `https://x-access-token:${token}@github.com/${repoFullName}.git`,
     };
   }
+
+  async openPullRequest(
+    input: OpenPullRequestInput,
+  ): Promise<{ url: string }> {
+    const octokit = this.installationOctokit(input.installationId);
+    const [owner, repo] = input.repoFullName.split("/");
+    const { data } = await octokit.rest.pulls.create({
+      owner: owner ?? "",
+      repo: repo ?? "",
+      head: input.head,
+      base: input.base,
+      title: input.title,
+      body: input.body,
+    });
+    return { url: data.html_url };
+  }
+}
+
+/**
+ * GitHub private keys are PEM blocks; when carried through an env var the
+ * newlines are commonly escaped as "\n". Restore them so @octokit/auth-app can
+ * parse the key.
+ */
+function normalizePrivateKey(key: string): string {
+  return key.includes("\\n") ? key.replace(/\\n/g, "\n") : key;
 }

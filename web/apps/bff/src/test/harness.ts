@@ -19,8 +19,11 @@ import type {
   GithubOrgRef,
   GithubInstallationRef,
   GithubRepoRef,
+  OpenPullRequestInput,
 } from "../auth/github-provider.js";
 import { account, membership, org } from "../db/schema.js";
+import { UsageStore } from "../usage.js";
+import type { LogLine } from "../logging.js";
 import { randomUUID } from "node:crypto";
 import { Hono } from "hono";
 
@@ -29,9 +32,15 @@ export interface FakeGithubState {
   installations: GithubInstallationRef[];
   reposByInstallation: Record<number, GithubRepoRef[]>;
   lastAuthorizeState?: string;
+  /** Recorded getCloneInfo calls (asserts the installation-token clone path). */
+  cloneInfoCalls?: Array<{ installationId: number; repoFullName: string }>;
+  /** Recorded openPullRequest calls (asserts PR-on-promote). */
+  pullRequests?: OpenPullRequestInput[];
 }
 
 export function makeFakeGithub(state: FakeGithubState): GithubProvider {
+  state.cloneInfoCalls ??= [];
+  state.pullRequests ??= [];
   return {
     getAuthorizeUrl(s) {
       state.lastAuthorizeState = s;
@@ -46,10 +55,18 @@ export function makeFakeGithub(state: FakeGithubState): GithubProvider {
     async listInstallationRepos(id) {
       return state.reposByInstallation[id] ?? [];
     },
-    async getCloneInfo(_id, repoFullName) {
+    async getCloneInfo(installationId, repoFullName) {
+      state.cloneInfoCalls!.push({ installationId, repoFullName });
+      // Mimic the real impl's tokenized clone URL shape.
       return {
-        token: "fake-token",
-        cloneUrl: `https://github.com/${repoFullName}.git`,
+        token: "fake-installation-token",
+        cloneUrl: `https://x-access-token:fake-installation-token@github.com/${repoFullName}.git`,
+      };
+    },
+    async openPullRequest(input) {
+      state.pullRequests!.push(input);
+      return {
+        url: `https://github.com/${input.repoFullName}/pull/1`,
       };
     },
   };
@@ -60,6 +77,7 @@ export class FakeCarrier {
   createdWith: Array<{ cwd?: string; planMode?: boolean }> = [];
   inputs: Array<{ id: string; text: string; steer: boolean }> = [];
   interrupts: string[] = [];
+  approvals: Array<{ id: string; reqId: string; allow: boolean }> = [];
   nextSessionId = "carrier-session-1";
   /** Raw events the SSE stream will emit, in order. */
   events: RawCarrierEvent[] = [];
@@ -81,6 +99,14 @@ export class FakeCarrier {
     if (url.includes("/interrupt") && method === "POST") {
       const id = url.split("/v1/sessions/")[1]!.split("/")[0]!;
       this.interrupts.push(id);
+      return jsonResponse({ ok: true });
+    }
+    if (url.includes("/approvals/") && method === "POST") {
+      const rest = url.split("/v1/sessions/")[1]!;
+      const id = rest.split("/")[0]!;
+      const reqId = rest.split("/approvals/")[1]!;
+      const body = JSON.parse(String(init?.body ?? "{}"));
+      this.approvals.push({ id, reqId, allow: !!body.allow });
       return jsonResponse({ ok: true });
     }
     if (url.includes("/events")) {
@@ -130,7 +156,11 @@ export interface Harness {
   config: Config;
   workspace: Workspace;
   github: GithubProvider;
+  githubState: FakeGithubState;
   carrier: FakeCarrier;
+  usage: UsageStore;
+  /** Captured structured log lines (task 24). */
+  logLines: LogLine[];
   workspaceRoot: string;
   /** Mint a signed session cookie header for an existing account. */
   cookieFor(accountId: string): Promise<string>;
@@ -146,21 +176,27 @@ export interface Harness {
 export async function makeHarness(
   opts: {
     github?: GithubProvider;
+    githubState?: FakeGithubState;
     carrier?: FakeCarrier;
   } = {},
 ): Promise<Harness> {
   const workspaceRoot = await mkdtemp(join(tmpdir(), "carrier-ws-"));
   const config = loadConfig({ workspaceRoot });
   const db = await createDb();
-  const github = opts.github ?? makeFakeGithub(defaultGithubState());
+  const githubState = opts.githubState ?? defaultGithubState();
+  const github = opts.github ?? makeFakeGithub(githubState);
   const workspace = new Workspace(workspaceRoot, github);
   const carrier = opts.carrier ?? new FakeCarrier();
+  const usage = new UsageStore();
+  const logLines: LogLine[] = [];
   const deps = await createDeps({
     config,
     db,
     github,
     workspace,
     carrier: () => carrier.client(),
+    usage,
+    logSink: (line) => logLines.push(line),
   });
   const app = createApp(deps);
 
@@ -170,7 +206,10 @@ export async function makeHarness(
     config,
     workspace,
     github,
+    githubState,
     carrier,
+    usage,
+    logLines,
     workspaceRoot,
     async cookieFor(accountId: string) {
       // Build a tiny app just to seal a cookie via setSession.
