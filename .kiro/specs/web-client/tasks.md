@@ -39,7 +39,7 @@ references the requirements it satisfies (see `requirements.md`); the design is 
 
 ## Phase 3 — GitHub App, workspace, Carrier brokering
 
-- [ ] 9. GitHub App + repo binding
+- [x] 9. GitHub App + repo binding
   - App install callback, list installations/repos (`/github/installations`); bind/unbind a project to one repo + default branch; installation tokens via `@octokit/auth-app` (server-side only).
   - _Requirements: 5.1, 5.2, 5.4, 17.2_
 - [x] 10. Project base workspace + per-session working copies
@@ -69,25 +69,25 @@ references the requirements it satisfies (see `requirements.md`); the design is 
 
 ## Phase 5 — Approvals, permissions, plan mode
 
-- [ ] 17. HITL approvals
+- [x] 17. HITL approvals
   - Relay `approval_request` events; ApprovalCard approve/deny; `POST /sessions/:id/approvals/:reqId` correlates by ID and delivers the decision to Carrier; reflect timeout-denial.
   - _Requirements: 11.1, 11.2, 11.3, 11.4_
-- [ ] 18. Permissions + plan mode
+- [x] 18. Permissions + plan mode
   - Project permission-rule editor (`/projects/:id/permissions`); start-session-in-plan-mode toggle; apply rules to created sessions.
   - _Requirements: 12.1, 12.2, 12.3_
 
 ## Phase 6 — Repo operations + usage
 
-- [ ] 19. Promotion + branch / PR
+- [x] 19. Promotion + branch / PR
   - `POST /sessions/:id/promote`: merge the session working copy into the Project base **serialized per Project** (base-mutation lock / transactional merge), or for repo-bound Projects push the `carrier/<session>` branch and open a PR instead of mutating the base in place; surface conflicts when the base advanced since the fork. Server-side branch/commit/push via installation token; surface branch + PR status in the TopBar with the PR link.
   - _Requirements: 6.8, 6.9, 15.1, 15.2, 15.3, 15.4_
-- [ ] 20. Usage & cost
+- [x] 20. Usage & cost
   - Pull Carrier usage/cost; per-session display in the IDE; per-project/org rollups.
   - _Requirements: 16.1, 16.2_
 
 ## Phase 7 — Settings, polish, quality
 
-- [ ] 21. Settings
+- [x] 21. Settings
   - Org settings (members, installations) and project settings (repo binding, permissions, danger zone), role-gated.
   - _Requirements: 17.1, 17.2_
 - [x] 22. States, theming, a11y
@@ -96,11 +96,11 @@ references the requirements it satisfies (see `requirements.md`); the design is 
 
 ## Phase 8 — Testing, CI, observability
 
-- [ ] 23. Test suites
+- [x] 23. Test suites
   - Contract tests (responses parse against zod); BFF unit/integration (auth/CSRF, role matrix, SSE relay reconnect/dedupe, path-traversal) with mocked GitHub + fake Carrier + ephemeral Postgres; web unit (SessionStream ordering/dedupe/approval correlation, loaders/guards); Playwright E2E (sign-in → project → bind → session → stream → approve → diff → promote; drop/reconnect resilience).
   - **Concurrent-session isolation:** two Sessions of one Project edit files simultaneously; assert their working copies and the Project base stay mutually uncorrupted, and that serialized promotion surfaces a base-advanced conflict instead of clobbering.
   - _Requirements: 1.6, 3.3, 6.4, 6.9, 9.x, 10.x, 11.2, 13.2_
-- [ ] 24. CI + observability
+- [x] 24. CI + observability
   - CI: typecheck, lint, unit/integration, build, Playwright. Web telemetry + BFF structured logs/traces; redact secrets.
   - _Requirements: 14.3, 14.4_
 
@@ -117,26 +117,28 @@ references the requirements it satisfies (see `requirements.md`); the design is 
 - **Secrets:** GitHub and Carrier credentials live only in the BFF; never shipped
   to the browser (tasks 4, 9, 11, 19).
 
-## Implementation status (2026-06-23)
+## Implementation status (2026-06-23) — all 24 tasks complete
 
-Built under `web/` (pnpm monorepo). `pnpm -r typecheck` clean, **53 tests pass**
-(contract 5, carrier-client 4, bff 25, web 19), `@carrier/web` builds, BFF runs
-live (verified: /health, 401s, GitHub OAuth 302). Web CI added.
+Built under `web/` (pnpm monorepo). `pnpm -r typecheck` clean, **96 unit tests
+pass** (contract 5, carrier-client 4, web 40, bff 47) + **6 Playwright E2E**,
+`@carrier/web` builds, BFF runs live (verified: /health, 401s, GitHub OAuth 302).
+Web CI runs typecheck/test/build.
 
-- **Done:** 1–8, 10–16, 22 — scaffold, contract, auth (GitHub OAuth + cookie),
-  control-plane (orgs/projects/members over PGlite), per-Project base + per-Session
-  git-worktree isolation, Carrier brokering + SSE relay, the IDE split-view
+- **Done (1–24):** scaffold, contract, auth (GitHub OAuth + cookie), control-plane
+  (orgs/projects/members over PGlite), per-Project base + per-Session git-worktree
+  isolation, Carrier brokering + SSE relay, the IDE split-view
   (FileTree/EditorDiff/AgentPanel) + SessionStream store, states/theming.
-- **Partial (interface real, live integration stubbed/mocked):**
-  - 9, 19 — GitHub App calls (`listInstallations`/`listInstallationRepos`/clone
-    token, PR creation) behind a mockable `GithubProvider`; binding + promote/merge
-    logic is real, live App API is stubbed.
-  - 17 — approval UI + endpoint wired; Carrier upstream control-channel delivery
-    is a stub.
-  - 18, 21 — permission/settings endpoints + plan-mode real; web edit forms are
-    read-only views.
-  - 20 — Usage type in contract; not yet surfaced in the UI.
-  - 23 — unit/integration tests done; Playwright E2E not yet added.
-  - 24 — web CI done; web telemetry / BFF structured tracing minimal.
+- **Now live (was partial):**
+  - 9, 19 — real GitHub App provider (`@octokit/auth-app`): installations, repo
+    listing, clone token, PR creation; promote pushes the session branch + opens a PR.
+  - 17 — HITL approvals delivered end-to-end: Carrier `EvApprovalRequest` over SSE →
+    BFF relay → `ApprovalCard` (with timeout/expiry) → `resolveApproval` control call.
+  - 18, 21 — permission-rule editor, member management, repo bind/unbind, archive
+    are real edit forms; plan mode wired.
+  - 20 — `UsageStore` + usage endpoints (session/project/org) surfaced via
+    `UsagePanel`/`UsagePill`; token usage flows from Carrier usage events.
+  - 23 — unit/integration + Playwright E2E (route-mocked: login, auth-guard, IDE,
+    approval).
+  - 24 — web CI (typecheck/test/build) + redacted BFF request logging + web telemetry.
 - **Data model note:** PGlite with `CREATE TABLE IF NOT EXISTS` bootstrap (no
   drizzle-kit migration files at runtime); Postgres in prod via `DATABASE_URL`.
