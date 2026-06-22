@@ -90,7 +90,7 @@ GitHub repository, so that the agent can work on real code.
 
 1. THE SYSTEM SHALL support installing a GitHub App on an org/account and listing the repositories the installation grants.
 2. THE SYSTEM SHALL let an authorized user bind a Project to at most one repository and choose a default branch, or leave the Project unbound (scratch).
-3. WHEN a Project is bound to a repo THE SYSTEM SHALL clone it into the Project workspace using an installation token.
+3. WHEN a Project is bound to a repo THE SYSTEM SHALL clone it into the Project **base** workspace using an installation token.
 4. THE SYSTEM SHALL keep GitHub installation tokens server-side only and SHALL NOT expose them to the browser.
 5. WHERE a Project is unbound THE SYSTEM SHALL still provide a usable empty workspace.
 

@@ -106,8 +106,10 @@ The BFF is the only Carrier client. Mapping concerns:
   Project). (Per-org Carrier tokens are an alternative if Carrier later supports
   token minting.)
 - **Session create.** `POST /v1/sessions` on Carrier, configured with the
-  Project workspace path as the session's working directory and the Project's
-  permission rules; the returned `carrier_session_id` is stored on `session`.
+  session's own isolated **working-copy** path (forked from the base — see
+  Workspace & concurrency model), never the shared base, as the working directory,
+  plus the Project's permission rules; the returned `carrier_session_id` is stored
+  on `session`.
 - **Workspace.** The **BFF owns the workspace filesystem** on a shared volume,
   structured as a canonical **base** per Project plus a **per-Session working
   copy** (see Workspace & concurrency model below). Each Carrier session runs with
@@ -261,9 +263,10 @@ FileTree for high-volume streams/large repos (Requirement 18.4).
   enforced server-side (Carrier service token is privileged, so the BFF is the
   trust boundary).
 - Installation tokens minted on demand, short-lived, never logged or returned.
-- File/tree/diff APIs validate `path` against the project workspace root (no
-  traversal). Workspace volume is per-Project; cross-project access is impossible
-  via the API.
+- File/tree/diff APIs are **session-scoped** and validate `path` against that
+  session's working-copy root (no traversal). Working copies are per-Session and
+  the base is never served as a live `cwd`, so neither cross-project nor
+  cross-session access is possible via the API.
 - SSE relay drops the upstream connection when the client disconnects.
 
 ## Testing strategy
