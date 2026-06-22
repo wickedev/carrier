@@ -16,14 +16,14 @@ Only the runtime core is in scope here; deployment/infra is out of scope.
   - Unit-test event construction and error classification.
   - _Requirements: 1.1, 1.2, 1.5, 1.6_
 
-- [ ] 2. Append-only Store + replacement records
+- [x] 2. Append-only Store + replacement records
   - [ ] 2.1 Define the `Store` interface (`Append`, `History`, `PutReplacement`, `Index`) and `Record`/`Replacement`/`SessionMeta` models in `internal/store`.
     - _Requirements: 8.1, 8.2, 8.4, 8.6_
   - [ ] 2.2 Implement a JSONL append-only log store with a SQLite metadata index; reconstruct history by backward-replay to the last checkpoint.
     - Test append→reload reproduces identical records and byte-identical previews.
     - _Requirements: 8.1, 8.2, 8.3, 8.4_
 
-- [ ] 3. Session queues (SQ/EQ) and wake
+- [x] 3. Session queues (SQ/EQ) and wake
   - Implement `internal/sq`: bounded SQ inbound, bounded EQ outbound, coalesced `Wake`, `Submit` with backpressure, `Emit` with bounded overflow policy.
   - Implement steer-vs-queue `Input` and the idempotent idleness re-check helper.
   - Race-test concurrent Submit/Emit/Wake and the queued-input-between-idle-and-start race.
