@@ -1,0 +1,26 @@
+# Binaries
+/bin/
+/carrier
+/carrierd
+*.exe
+*.test
+
+# Test & coverage output
+*.out
+coverage.*
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Go workspace files
+go.work
+go.work.sum
+
+# Vendored deps (opt in if needed)
+/vendor/
+
+# OS / editor noise
+.DS_Store
+*.swp
