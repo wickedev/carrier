@@ -140,14 +140,14 @@ Only the runtime core is in scope here; deployment/infra is out of scope.
   - Per-session cost accounting (cache tokens separated), aggregated per session/tenant; OTel span tree (session → turn → tool → hook) via `context.Context` with a hot-path enable guard; record decision source per tool call.
   - _Requirements: 16.1, 16.2, 16.3, 16.4, 16.5_
 
-- [ ] 22. HTTP + SSE server surface
-  - [ ] 22.1 HTTP endpoints to create a session, send input, and stream events (SSE) by reading the Flight's EQ; decouple transport from core via the channel boundary.
+- [x] 22. HTTP + SSE server surface
+  - [x] 22.1 HTTP endpoints to create a session, send input, and stream events (SSE) by reading the Flight's EQ; decouple transport from core via the channel boundary.
     - _Requirements: 17.1, 17.2_
-  - [ ] 22.2 Many-clients-per-session and one-client-many-sessions via the Tower registry with per-session fan-out.
+  - [x] 22.2 Many-clients-per-session and one-client-many-sessions via the Tower registry with per-session fan-out.
     - _Requirements: 17.3_
-  - [ ] 22.3 Reconnect: history fetch from the Store + dedupe by event ID; no event loss across reconnect.
+  - [x] 22.3 Reconnect: history fetch from the Store + dedupe by event ID; no event loss across reconnect.
     - _Requirements: 17.4_
-  - [ ] 22.4 Tenant authentication and per-tenant session isolation.
+  - [x] 22.4 Tenant authentication and per-tenant session isolation.
     - _Requirements: 17.5_
 
 - [ ] 23. End-to-end integration & race-gated CI
