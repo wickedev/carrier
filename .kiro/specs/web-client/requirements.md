@@ -94,18 +94,29 @@ GitHub repository, so that the agent can work on real code.
 4. THE SYSTEM SHALL keep GitHub installation tokens server-side only and SHALL NOT expose them to the browser.
 5. WHERE a Project is unbound THE SYSTEM SHALL still provide a usable empty workspace.
 
-### Requirement 6 — Persistent project workspace
+### Requirement 6 — Project workspace and concurrent-session isolation
 
-**User Story:** As a user, I want a project's files to persist across sessions, so
-that work accumulates rather than resetting each run.
+**User Story:** As a user, I want a project's files to persist across sessions
+**and** multiple sessions to run at once without corrupting each other or the
+project, so that work accumulates safely under concurrency.
+
+> Resolves the concurrent-session data-loss risk: because one Project has many
+> Sessions (Req 7) and a Project has one persistent workspace, simultaneously
+> running Sessions must NOT share a single mutable working tree. The model is a
+> canonical **base workspace** plus a **per-Session isolated working copy**, with
+> explicit promotion back to the base.
 
 #### Acceptance Criteria
 
-1. THE SYSTEM SHALL maintain one persistent workspace per Project whose files survive across Sessions.
-2. WHEN a Session edits files THE SYSTEM SHALL persist those edits to the Project workspace.
-3. THE SYSTEM SHALL expose the workspace to Carrier Sessions as their working directory.
-4. WHERE the Project is repo-bound THE SYSTEM SHALL track git state (branch, dirty/clean, ahead/behind) for the workspace.
-5. THE SYSTEM SHALL provide a way to reset or re-sync a repo-bound workspace to a clean checkout.
+1. THE SYSTEM SHALL maintain one persistent **base workspace** per Project (the canonical state) whose files survive across Sessions.
+2. WHEN a Session starts THE SYSTEM SHALL provision an **isolated working copy** derived from the Project base — a git worktree on its own branch when repo-bound, an isolated copy/overlay when unbound — distinct from every other Session's working copy.
+3. THE SYSTEM SHALL expose a Session's own isolated working copy (not the shared base) as that Carrier session's working directory.
+4. WHILE multiple Sessions of the same Project run concurrently THE SYSTEM SHALL guarantee that one Session's file or git operations cannot mutate, corrupt, or lose another Session's working copy or the Project base.
+5. THE SYSTEM SHALL persist a Session's edits durably in that Session's working copy across disconnects and reopens.
+6. WHERE the Project is repo-bound THE SYSTEM SHALL track per-working-copy git state (branch, dirty/clean, ahead/behind).
+7. THE SYSTEM SHALL provide a way to reset or re-sync a working copy to a clean checkout of its base branch.
+8. THE SYSTEM SHALL let a user explicitly **promote** a Session's changes back to the Project base — and, for repo-bound Projects, open a pull request — surfacing conflicts when the base advanced since the working copy was forked.
+9. THE SYSTEM SHALL serialize or transactionally guard mutations to the shared Project base (during promotion) so concurrent promotions cannot corrupt it.
 
 ### Requirement 7 — Sessions
 
@@ -114,7 +125,7 @@ project, so that I can drive multiple lines of work.
 
 #### Acceptance Criteria
 
-1. THE SYSTEM SHALL let a user create a Session within a Project, which provisions a corresponding Carrier session bound to the Project workspace.
+1. THE SYSTEM SHALL let a user create a Session within a Project, which provisions a corresponding Carrier session bound to the Session's own isolated working copy (Requirement 6), not the shared base.
 2. THE SYSTEM SHALL support many Sessions per Project (1:N).
 3. THE SYSTEM SHALL list a Project's Sessions with title, status (idle/running/terminated), and last activity, and allow resuming one.
 4. WHEN a Session is reopened THE SYSTEM SHALL replay its prior event history before streaming live events.
@@ -127,8 +138,8 @@ and navigate the codebase the agent works on.
 
 #### Acceptance Criteria
 
-1. THE SYSTEM SHALL render a navigable file tree of the active Project workspace.
-2. WHERE the Project is repo-bound THE SYSTEM SHALL annotate entries with git status (added/modified/deleted/untracked).
+1. THE SYSTEM SHALL render a navigable file tree of the active Session's working copy (Requirement 6).
+2. WHERE the Project is repo-bound THE SYSTEM SHALL annotate entries with git status (added/modified/deleted/untracked) relative to the working copy's branch.
 3. WHEN the agent creates, edits, or deletes files THE SYSTEM SHALL reflect those changes in the tree in near-real-time.
 4. WHEN a user selects a file THE SYSTEM SHALL open it in the editor/diff view.
 
@@ -139,8 +150,8 @@ so that I can follow and review what the agent does.
 
 #### Acceptance Criteria
 
-1. THE SYSTEM SHALL display the contents of a selected file with syntax highlighting.
-2. WHEN the agent modifies a file THE SYSTEM SHALL show a diff (before/after) for that change.
+1. THE SYSTEM SHALL display the contents of a selected file (from the Session's working copy) with syntax highlighting.
+2. WHEN the agent modifies a file THE SYSTEM SHALL show a diff (working copy vs the working copy's base branch) for that change.
 3. THE SYSTEM SHALL update the open file/diff view in near-real-time as the agent edits it.
 4. THE SYSTEM SHALL handle large files and binary files gracefully (truncation/placeholder), without freezing the UI.
 

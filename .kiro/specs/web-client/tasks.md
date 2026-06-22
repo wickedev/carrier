@@ -42,12 +42,12 @@ references the requirements it satisfies (see `requirements.md`); the design is 
 - [ ] 9. GitHub App + repo binding
   - App install callback, list installations/repos (`/github/installations`); bind/unbind a project to one repo + default branch; installation tokens via `@octokit/auth-app` (server-side only).
   - _Requirements: 5.1, 5.2, 5.4, 17.2_
-- [ ] 10. Persistent workspace
-  - Per-project workspace directory on the shared volume; clone repo-bound projects with an installation token; unbound = empty workspace; track git state (branch, dirty, ahead/behind); reset/re-sync.
-  - _Requirements: 5.3, 5.5, 6.1, 6.4, 6.5_
+- [ ] 10. Project base workspace + per-session working copies
+  - Provision the canonical **base** per Project on the shared volume (clone repo-bound with an installation token; unbound = git-init'd dir). On session start, fork an **isolated working copy**: `git worktree add` on a `carrier/<session>` branch (repo-bound) or a CoW / `cp -a` snapshot (unbound). Track per-working-copy git state; reset/re-sync; prune the worktree/overlay on session close. Guarantee concurrent working copies are mutually isolated and never mutate the base directly (closes the concurrent-session data-loss risk).
+  - _Requirements: 5.3, 5.5, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7_
 - [ ] 11. Carrier client + session brokering
-  - `packages/carrier-client`; BFF creates a Carrier session bound to the project workspace `cwd` + project permission rules; records `carrier_session_id`; session list/detail/archive.
-  - _Requirements: 6.2, 6.3, 7.1, 7.2, 7.3, 7.5, 12.3_
+  - `packages/carrier-client`; on session create the BFF forks the working copy (task 10) and creates a Carrier session whose `cwd` is **that session's working copy** (not the base), with the Project permission rules; records `carrier_session_id`; session list/detail/archive (archive prunes the worktree).
+  - _Requirements: 6.3, 7.1, 7.2, 7.3, 7.5, 12.3_
 
 ## Phase 4 — IDE shell + live streaming
 
@@ -58,10 +58,10 @@ references the requirements it satisfies (see `requirements.md`); the design is 
   - Streamed event log with structured tool-call/result cards; composer with steer/queue toggle; interrupt; running indicator. `POST /sessions/:id/input`, `/interrupt`.
   - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
 - [ ] 14. File tree
-  - `GET /projects/:id/tree` (+ git status); navigable virtualized tree; refresh on `file_changed` events; select-to-open.
+  - `GET /sessions/:id/tree` over the session working copy (+ git status vs its branch); navigable virtualized tree; refresh on `file_changed` events; select-to-open.
   - _Requirements: 8.1, 8.2, 8.3, 8.4_
 - [ ] 15. Editor / diff
-  - `GET /file` + `GET /diff`; CodeMirror 6 view with syntax highlighting + `@codemirror/merge` diff; live update on `file_changed`; large/binary file handling.
+  - `GET /sessions/:id/file` + `GET /sessions/:id/diff` (working copy vs base branch); CodeMirror 6 view with syntax highlighting + `@codemirror/merge` diff; live update on `file_changed`; large/binary file handling.
   - _Requirements: 9.1, 9.2, 9.3, 9.4_
 - [ ] 16. IDE split-view assembly
   - Resizable three-pane layout (FileTree | EditorDiff | AgentPanel) with the TopBar breadcrumb and run controls; wire selection ↔ editor ↔ stream.
@@ -78,9 +78,9 @@ references the requirements it satisfies (see `requirements.md`); the design is 
 
 ## Phase 6 — Repo operations + usage
 
-- [ ] 19. Branch / PR surfacing
-  - Server-side branch/commit/push and PR creation via installation token; surface branch + PR status in the TopBar; PR link.
-  - _Requirements: 15.1, 15.2, 15.3, 15.4_
+- [ ] 19. Promotion + branch / PR
+  - `POST /sessions/:id/promote`: merge the session working copy into the Project base **serialized per Project** (base-mutation lock / transactional merge), or for repo-bound Projects push the `carrier/<session>` branch and open a PR instead of mutating the base in place; surface conflicts when the base advanced since the fork. Server-side branch/commit/push via installation token; surface branch + PR status in the TopBar with the PR link.
+  - _Requirements: 6.8, 6.9, 15.1, 15.2, 15.3, 15.4_
 - [ ] 20. Usage & cost
   - Pull Carrier usage/cost; per-session display in the IDE; per-project/org rollups.
   - _Requirements: 16.1, 16.2_
@@ -97,17 +97,20 @@ references the requirements it satisfies (see `requirements.md`); the design is 
 ## Phase 8 — Testing, CI, observability
 
 - [ ] 23. Test suites
-  - Contract tests (responses parse against zod); BFF unit/integration (auth/CSRF, role matrix, SSE relay reconnect/dedupe, path-traversal) with mocked GitHub + fake Carrier + ephemeral Postgres; web unit (SessionStream ordering/dedupe/approval correlation, loaders/guards); Playwright E2E (sign-in → project → bind → session → stream → approve → diff; drop/reconnect resilience).
-  - _Requirements: 1.6, 3.3, 9.x, 10.x, 11.2, 13.2_
+  - Contract tests (responses parse against zod); BFF unit/integration (auth/CSRF, role matrix, SSE relay reconnect/dedupe, path-traversal) with mocked GitHub + fake Carrier + ephemeral Postgres; web unit (SessionStream ordering/dedupe/approval correlation, loaders/guards); Playwright E2E (sign-in → project → bind → session → stream → approve → diff → promote; drop/reconnect resilience).
+  - **Concurrent-session isolation:** two Sessions of one Project edit files simultaneously; assert their working copies and the Project base stay mutually uncorrupted, and that serialized promotion surfaces a base-advanced conflict instead of clobbering.
+  - _Requirements: 1.6, 3.3, 6.4, 6.9, 9.x, 10.x, 11.2, 13.2_
 - [ ] 24. CI + observability
   - CI: typecheck, lint, unit/integration, build, Playwright. Web telemetry + BFF structured logs/traces; redact secrets.
   - _Requirements: 14.3, 14.4_
 
 ## Cross-cutting dependencies / notes
 
-- **Workspace topology:** BFF and Carrier must share the per-project workspace
-  volume (chosen design). If that constraint is unacceptable, switch to a Carrier
-  file API (see design Open Questions) — affects tasks 10, 14, 15.
+- **Workspace topology:** BFF and Carrier share the workspace volume holding the
+  per-Project base and per-Session working copies (chosen design). Concurrency
+  safety comes from per-Session worktrees/overlays (task 10), not from the volume
+  choice. If sharing a volume is unacceptable, switch to a Carrier session file
+  API (see design Open Questions) — affects tasks 10, 11, 14, 15.
 - **Carrier enhancement (optional):** monotonic live event IDs through Carrier's
   `sq`/event DTO would enable exact SSE reconnect dedupe (task 12); until then,
   dedupe leans on history `seq` + content.

@@ -84,8 +84,11 @@ membership(account_id, org_id, role: 'owner'|'admin'|'member')
 github_installation(id, installation_id, org_id, account_login, suspended, created_at)
 project(id, org_id, slug, name, archived, workspace_id,
         repo_full_name?, repo_default_branch?, installation_id?, created_at)
-workspace(id, project_id, root_path, repo_bound bool, status, last_synced_at)
-session(id, project_id, carrier_session_id, title, status, created_by, created_at, archived)
+workspace(id, project_id, base_path, repo_bound bool, base_branch?, status, last_synced_at)
+        -- the canonical Project BASE (never a live session cwd)
+session(id, project_id, carrier_session_id, title, status, created_by, created_at, archived,
+        working_copy_path, working_branch?, forked_from_rev?)
+        -- per-session ISOLATED working copy forked from the base
 permission_rule(id, project_id, action, pattern, effect: 'allow'|'deny'|'ask', source)
 usage_rollup(scope: 'session'|'project'|'org', scope_id, input, output, cache_read, cache_write, cost)
 ```
@@ -105,13 +108,15 @@ The BFF is the only Carrier client. Mapping concerns:
 - **Session create.** `POST /v1/sessions` on Carrier, configured with the
   Project workspace path as the session's working directory and the Project's
   permission rules; the returned `carrier_session_id` is stored on `session`.
-- **Workspace.** The **BFF owns the workspace filesystem** (a per-Project
-  directory on a shared volume): it provisions/clones it and serves the
-  file-tree/file/diff APIs by reading it directly. Carrier sessions run with that
-  directory as their sandbox `cwd`, so edits land in the same place. **Deployment
-  constraint:** BFF and Carrier share the workspace volume (co-located host or
-  network filesystem). *Open decision:* alternatively Carrier exposes file APIs
-  and owns the workspace — see Open Questions.
+- **Workspace.** The **BFF owns the workspace filesystem** on a shared volume,
+  structured as a canonical **base** per Project plus a **per-Session working
+  copy** (see Workspace & concurrency model below). Each Carrier session runs with
+  its own working-copy directory as the sandbox `cwd` — never the shared base —
+  so concurrent sessions never collide. The BFF serves session-scoped
+  tree/file/diff APIs by reading the session's working copy. **Deployment
+  constraint:** BFF and Carrier share the volume (co-located host or network
+  filesystem). *Open decision:* alternatively Carrier exposes file APIs and owns
+  the working copies — see Open Questions.
 - **Streaming.** The web app opens `GET /bff/sessions/:id/events` (SSE); the BFF
   holds the upstream Carrier SSE (`GET /v1/sessions/:cid/events`), normalizes each
   event into the contract DTO, and relays. Input/steer/interrupt POST to the BFF,
@@ -120,6 +125,43 @@ The BFF is the only Carrier client. Mapping concerns:
   relays them as `approval_request` events and exposes
   `POST /bff/sessions/:id/approvals/:reqId` to deliver the decision back to
   Carrier's control channel.
+
+## Workspace & concurrency model
+
+The risk: one Project has many Sessions and one persistent workspace, so naively
+pointing every concurrent Carrier session at one shared working tree lets
+sessions clobber each other's files and git state (data loss). Resolution
+(Requirement 6):
+
+- **Base (canonical).** Per Project, one base workspace at
+  `…/projects/<id>/base`. For a repo-bound Project it is a clone (the base
+  branch); for an unbound Project it is a plain directory under git init. The base
+  is **never** used as a live session `cwd`.
+- **Per-Session working copy.** On session create, the BFF forks an isolated
+  working copy from the base:
+  - *repo-bound* → `git worktree add …/projects/<id>/wc/<session> -b carrier/<session>`
+    (a real, cheap, isolated checkout on its own branch off the base HEAD), record
+    `forked_from_rev`.
+  - *unbound* → an isolated copy/overlay (copy-on-write where the filesystem
+    supports it; otherwise a `cp -a` snapshot under git).
+  Each session's Carrier `cwd` is its own working copy. Worktrees/overlays are
+  mutually isolated by construction, so concurrent sessions cannot corrupt one
+  another or the base (Req 6.4).
+- **Live edits** persist in the session's working copy and survive
+  disconnect/reopen (Req 6.5). The IDE's tree/file/diff read that working copy;
+  diff is `working copy vs its base branch` (Req 8/9).
+- **Promotion (explicit).** `POST /sessions/:id/promote` fast-forwards/merges the
+  session branch into the Project base; for repo-bound Projects it pushes and
+  opens a PR instead of mutating the base in place. Promotions to the base are
+  **serialized per Project** (a base-mutation lock / transactional merge) so two
+  promotions can't corrupt the base; conflicts (base advanced since the fork) are
+  surfaced for resolution (Req 6.8, 6.9).
+- **Cleanup.** Archiving/closing a session prunes its worktree
+  (`git worktree remove`) or overlay; its branch is retained until promoted or
+  discarded.
+
+This makes "1 Project : N concurrent Sessions" safe while keeping the persistent,
+accumulating Project workspace.
 
 ## BFF API (contract)
 
@@ -133,12 +175,13 @@ POST   /orgs/:org/projects                 create project (+ provision workspace
 GET    /projects/:id                       project detail (+ repo/workspace status)
 POST   /projects/:id/bind                  bind repo (installation + repo + branch)
 DELETE /projects/:id/bind                  unbind
-GET    /projects/:id/tree?path=            workspace file tree (+ git status)
-GET    /projects/:id/file?path=            file contents
-GET    /projects/:id/diff?path=            diff vs base (for agent edits)
 GET    /projects/:id/sessions              list sessions
-POST   /projects/:id/sessions              create session (planMode?, title)
-GET    /sessions/:id                       session detail
+POST   /projects/:id/sessions              create session (planMode?, title) → forks a working copy
+GET    /sessions/:id                       session detail (+ working-copy git state)
+GET    /sessions/:id/tree?path=            working-copy file tree (+ git status)
+GET    /sessions/:id/file?path=            working-copy file contents
+GET    /sessions/:id/diff?path=            diff: working copy vs its base branch
+POST   /sessions/:id/promote               merge working copy → Project base (PR if repo-bound)
 POST   /sessions/:id/input                 { text, steer }
 POST   /sessions/:id/interrupt
 GET    /sessions/:id/events                SSE stream (history replay + live)
@@ -201,8 +244,9 @@ State management:
   ordered event list deduped by `seq`, the derived run status, and pending
   approvals. On reconnect it relies on BFF history replay + `seq` dedupe
   (Requirement 13).
-- **File/diff:** TanStack Query keyed by `(project, path, rev)`; invalidated by
-  `file_changed` stream events so the open file/tree refresh near-real-time.
+- **File/diff:** TanStack Query keyed by `(session, path, rev)` against the
+  session's working copy; invalidated by `file_changed` stream events so the open
+  file/tree refresh near-real-time.
 - **Optimistic input:** sending a message appends a local user event immediately;
   reconciled when the BFF echoes it.
 
@@ -242,9 +286,12 @@ FileTree for high-volume streams/large repos (Requirement 18.4).
 
 ## Open questions / decisions to make
 
-- **Workspace ownership:** BFF-owns-filesystem + shared volume (chosen) vs Carrier
-  exposes file/tree/diff APIs (removes the shared-volume constraint, adds Carrier
-  surface). Affects deployment topology.
+- **Workspace ownership (topology only — concurrency is resolved):** the
+  concurrent-session data-loss risk is closed by per-Session working copies (see
+  Workspace & concurrency model). What remains open is *who owns the working-copy
+  filesystem*: BFF-owns-filesystem + shared volume (chosen) vs Carrier exposes
+  session file/tree/diff APIs (removes the shared-volume constraint, adds Carrier
+  surface). Affects deployment topology, not correctness.
 - **Live event IDs:** Carrier history records carry a `seq`; live events do not
   yet. Exact reconnect dedupe wants a monotonic per-session live event ID plumbed
   through Carrier's `sq`/event DTO (a small Carrier enhancement).
