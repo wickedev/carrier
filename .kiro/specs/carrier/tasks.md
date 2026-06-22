@@ -77,9 +77,9 @@ Only the runtime core is in scope here; deployment/infra is out of scope.
     - _Requirements: 5.2, 5.5_
   - [ ] 10.3 Linux confinement: bubblewrap FS/namespaces + seccomp/Landlock for network and blocked syscalls (`ptrace`, `process_vm_*`, `io_uring`).
     - _Requirements: 5.3_
-  - [ ] 10.4 macOS confinement: generated Seatbelt `.sbpl` with readable/writable roots as params.
+  - [x] 10.4 macOS confinement: generated Seatbelt `.sbpl` with readable/writable roots as params.
     - _Requirements: 5.4_
-  - [ ] 10.5 Enforce output cap, timeout, and SIGTERM→SIGKILL process-group kill; detect sandbox-denial signatures and surface them for escalation.
+  - [x] 10.5 Enforce output cap, timeout, and SIGTERM→SIGKILL process-group kill; detect sandbox-denial signatures and surface them for escalation.
     - Platform-gated escape tests: out-of-tree write denied, network denied, blocked syscalls, PATH-injection resistance, output-cap, timeout.
     - _Requirements: 5.6, 5.7_
 
@@ -105,19 +105,19 @@ Only the runtime core is in scope here; deployment/infra is out of scope.
   - Test reproducible frozen replacement across resume and config restore after compaction.
   - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6_
 
-- [ ] 14. Workspace checkpointing
+- [x] 14. Workspace checkpointing
   - Implement `internal/checkpoint`: per-session bare git repo, commit on tool exec, `Restore(hash)`, structured `Diff(hash)`, `Revert`.
   - _Requirements: 8.5_
 
-- [ ] 15. Skills
+- [x] 15. Skills
   - Discover skill packages (metadata + body) across scopes; surface metadata only; single gateway tool loads a body on demand under permission + per-skill agent/tool restriction.
   - _Requirements: 10.1, 10.2, 10.3, 10.4_
 
-- [ ] 16. MCP client
+- [x] 16. MCP client
   - Implement `internal/mcp`: client over stdio, streamable-HTTP, and in-process transports; `mcp__<server>__<tool>` namespacing into the registry; per-session connection scoping with idle disconnect; OAuth where required; large-output offload.
   - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
 
-- [ ] 17. Hooks (typed middleware)
+- [x] 17. Hooks (typed middleware)
   - Implement `internal/hook`: typed lifecycle hooks (pre/post-tool, session start/end, pre/post-compaction) as a return-new middleware chain; block / rewrite-input / append-context outcomes; restrict trust-granting config to user/session layers.
   - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
 
@@ -136,7 +136,7 @@ Only the runtime core is in scope here; deployment/infra is out of scope.
 
 ## Phase 5 — Server & observability
 
-- [ ] 21. Observability: cost, spans, decision audit
+- [x] 21. Observability: cost, spans, decision audit
   - Per-session cost accounting (cache tokens separated), aggregated per session/tenant; OTel span tree (session → turn → tool → hook) via `context.Context` with a hot-path enable guard; record decision source per tool call.
   - _Requirements: 16.1, 16.2, 16.3, 16.4, 16.5_
 
