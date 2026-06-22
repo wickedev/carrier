@@ -1,0 +1,21 @@
+{
+  "name": "carrier-web",
+  "private": true,
+  "packageManager": "pnpm@11.5.1",
+  "engines": { "node": ">=22" },
+  "type": "module",
+  "scripts": {
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "dev": "turbo run dev",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2",
+    "prettier": "^3.4.2",
+    "vitest": "^3.2.0"
+  }
+}

@@ -1,0 +1,7 @@
+/* @carrier/ui shared design tokens, consumed by the web app's Tailwind v4 entry. */
+:root {
+  color-scheme: light;
+}
+.dark {
+  color-scheme: dark;
+}
