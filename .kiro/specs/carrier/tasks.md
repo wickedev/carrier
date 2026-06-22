@@ -150,7 +150,7 @@ Only the runtime core is in scope here; deployment/infra is out of scope.
   - [x] 22.4 Tenant authentication and per-tenant session isolation.
     - _Requirements: 17.5_
 
-- [ ] 23. End-to-end integration & race-gated CI
+- [x] 23. End-to-end integration & race-gated CI
   - Integration tests: create/send/stream, reconnect-with-dedupe, multi-client fan-out, tenant isolation; many concurrent Flights under the cap.
   - Run all concurrency-touching tests under `-race` in CI.
   - _Requirements: 2.1, 2.2, 17.1, 17.3, 17.4_
