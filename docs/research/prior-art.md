@@ -9,6 +9,11 @@ This document records what each project does, where they converge (strong
 signals worth adopting), where they diverge (notably sandboxing), and the
 concrete design implications for Carrier mapped onto Go primitives.
 
+> **See also** [`primitives-matrix.md`](./primitives-matrix.md) — a companion
+> 14-axis inventory of agent-harness primitives (tools, MCP, skills, hooks,
+> memory, permissions, …) across the same four codebases, with a best-in-class
+> reference per axis and a primitive build-order for Carrier.
+
 ## Sources
 
 | Project | Language | Identity | Reference value |
