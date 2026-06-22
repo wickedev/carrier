@@ -30,7 +30,7 @@ export const qk = {
   diff: (sessionId: string, path: string) => ["diff", sessionId, path] as const,
   permissions: (projectId: string) => ["permissions", projectId] as const,
   members: (org: string) => ["members", org] as const,
-  installations: ["installations"] as const,
+  installations: (org: string) => ["installations", org] as const,
   sessionUsage: (id: string) => ["usage", "session", id] as const,
   projectUsage: (id: string) => ["usage", "project", id] as const,
 };
@@ -195,10 +195,14 @@ export function useRemoveMember(orgSlug: string) {
 
 // ── GitHub installations (Req 21) ────────────────────────────────────────────
 
-export function useInstallations(opts?: Partial<UseQueryOptions<Installation[]>>) {
+export function useInstallations(
+  org: string,
+  opts?: Partial<UseQueryOptions<Installation[]>>,
+) {
   return useQuery({
-    queryKey: qk.installations,
-    queryFn: ({ signal }) => api.installations(signal),
+    queryKey: qk.installations(org),
+    queryFn: ({ signal }) => api.installations(org, signal),
+    enabled: !!org,
     ...opts,
   });
 }

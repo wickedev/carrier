@@ -51,6 +51,12 @@ export async function resolveOrg(
   return { org: row, role };
 }
 
+/** Fetch an org row by id (no membership check — callers gate access first). */
+export async function orgById(db: Db, orgId: string): Promise<OrgRow | null> {
+  const rows = await db.select().from(org).where(eq(org.id, orgId)).limit(1);
+  return rows[0] ?? null;
+}
+
 export async function resolveProject(
   db: Db,
   accountId: string,

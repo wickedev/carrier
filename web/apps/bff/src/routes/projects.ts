@@ -30,9 +30,11 @@ import {
 import type { ProjectRow, SessionRow } from "../db/schema.js";
 import {
   isManager,
+  orgById,
   resolveOrg,
   resolveProject,
 } from "./authz.js";
+import { orgInstallations } from "./github.js";
 import { randomSlug } from "../workspace/workspace.js";
 
 export function toProjectDto(p: ProjectRow): Project {
@@ -145,12 +147,27 @@ export function projectRoutes(): Hono<AppEnv> {
 
   // ── repo bind / unbind ────────────────────────────────────────────────────
   app.post("/projects/:id/bind", async (c) => {
-    const { db, workspace } = c.var.deps;
+    const { db, workspace, github } = c.var.deps;
     const ctx = await resolveProject(db, c.var.account.id, c.req.param("id"));
     if (!ctx) return c.json({ error: "not_found" }, 404);
     if (!isManager(ctx.role)) return c.json({ error: "forbidden" }, 403);
     const body = BindRepoSchema.safeParse(await c.req.json().catch(() => ({})));
     if (!body.success) return c.json({ error: "invalid_body" }, 400);
+
+    // SECURITY: the installation + repo must belong to THIS project's org —
+    // confirmed against GitHub, not trusted from the request — so a project can't
+    // be bound to another tenant's installation to clone its private repos.
+    const orgRow = await orgById(db, ctx.project.orgId);
+    if (!orgRow) return c.json({ error: "not_found" }, 404);
+    const owned = await orgInstallations(github, orgRow);
+    const inst = owned.find(
+      (i) => i.installationId === body.data.installationId,
+    );
+    if (!inst) return c.json({ error: "installation_not_owned" }, 403);
+    const repos = await github.listInstallationRepos(inst.installationId);
+    if (!repos.some((r) => r.fullName === body.data.repoFullName)) {
+      return c.json({ error: "repo_not_accessible" }, 403);
+    }
 
     const defaultBranch = body.data.defaultBranch ?? "main";
     // Re-provision the base as a clone of the bound repo.

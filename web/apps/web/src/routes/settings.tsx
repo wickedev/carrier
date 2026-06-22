@@ -61,7 +61,7 @@ export function OrgSettingsPage() {
       </Card>
 
       <MembersSection orgSlug={org} current={current} />
-      <InstallationsSection />
+      <InstallationsSection orgSlug={org} />
     </div>
   );
 }
@@ -144,8 +144,8 @@ function MembersSection({ orgSlug, current }: { orgSlug: string; current?: Org }
   );
 }
 
-function InstallationsSection() {
-  const installs = useInstallations();
+function InstallationsSection({ orgSlug }: { orgSlug: string }) {
+  const installs = useInstallations(orgSlug);
   return (
     <Card className="p-4" data-testid="installations-section">
       <h2 className="mb-2 flex items-center gap-1.5 text-sm font-medium">
@@ -195,7 +195,7 @@ export function ProjectSettingsPage() {
       </div>
       <h1 className="mb-4 text-lg font-semibold">Project settings</h1>
 
-      <RepoBindingSection projectId={project} manage={manage} />
+      <RepoBindingSection orgSlug={currentOrg?.slug ?? org} projectId={project} manage={manage} />
       <PermissionsSection projectId={project} manage={manage} />
       <UsageSection projectId={project} />
       <DangerZone orgSlug={org} projectId={project} manage={manage} />
@@ -203,9 +203,9 @@ export function ProjectSettingsPage() {
   );
 }
 
-function RepoBindingSection({ projectId, manage }: { projectId: string; manage: boolean }) {
+function RepoBindingSection({ orgSlug, projectId, manage }: { orgSlug: string; projectId: string; manage: boolean }) {
   const projectQ = useProject(projectId);
-  const installs = useInstallations();
+  const installs = useInstallations(orgSlug);
   const bind = useBindRepo(projectId);
   const unbind = useUnbindRepo(projectId);
 

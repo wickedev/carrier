@@ -13,7 +13,12 @@ async function setupRepoBound(h: Harness) {
       body: JSON.stringify({ name: "App" }),
     })
   ).json();
-  await h.app.request(`/projects/${project.id}/bind`, {
+  // Org "dev" owns installation 99 (accountLogin === slug) which grants acme/app.
+  h.githubState.installations = [{ installationId: 99, accountLogin: "dev" }];
+  h.githubState.reposByInstallation = {
+    99: [{ fullName: "acme/app", defaultBranch: "main", private: true }],
+  };
+  const bindRes = await h.app.request(`/projects/${project.id}/bind`, {
     method: "POST",
     headers: { cookie, "content-type": "application/json" },
     body: JSON.stringify({
@@ -22,6 +27,9 @@ async function setupRepoBound(h: Harness) {
       defaultBranch: "main",
     }),
   });
+  if (bindRes.status !== 200) {
+    throw new Error(`bind failed: ${bindRes.status} ${await bindRes.text()}`);
+  }
   return { cookie, project };
 }
 

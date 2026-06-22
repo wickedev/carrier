@@ -292,9 +292,13 @@ export const api = {
     );
   },
 
-  // ── GitHub installations (Req 9/21) ─────────────────────────────────────
-  installations(signal?: AbortSignal): Promise<Installation[]> {
-    return request(`/github/installations`, InstallationListSchema, { signal });
+  // ── GitHub installations (Req 9/21) — scoped to the caller's org ─────────
+  installations(org: string, signal?: AbortSignal): Promise<Installation[]> {
+    return request(
+      `/github/orgs/${encodeURIComponent(org)}/installations`,
+      InstallationListSchema,
+      { signal },
+    );
   },
 
   // ── Sessions ───────────────────────────────────────────────────────────
