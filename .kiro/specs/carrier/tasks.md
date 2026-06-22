@@ -83,16 +83,16 @@ Only the runtime core is in scope here; deployment/infra is out of scope.
     - Platform-gated escape tests: out-of-tree write denied, network denied, blocked syscalls, PATH-injection resistance, output-cap, timeout.
     - _Requirements: 5.6, 5.7_
 
-- [ ] 11. Permissions & approval
+- [x] 11. Permissions & approval
   - [x] 11.1 Implement `internal/perm`: `{action, pattern, effect}` rules, wildcard matching, `findLast` wins, default `ask`, source precedence (managed > project > user > session).
     - Test precedence and wildcard matching.
     - _Requirements: 6.1, 6.2_
   - [x] 11.2 Wire the permission gate into tool dispatch: `ask` blocks the tool on a reply channel; `always` persists a rule; categories independently gateable; independent of the Bay (confined reads auto-allowed).
     - _Requirements: 6.3, 6.4, 6.7_
-  - [ ] 11.3 Off-loop classifier: run on a sanitized input projection via a child goroutine; consecutive-denial fallback to human approval; record decision source.
+  - [x] 11.3 Off-loop classifier: run on a sanitized input projection via a child goroutine; consecutive-denial fallback to human approval; record decision source.
     - _Requirements: 6.5, 6.6, 16.4_
 
-- [ ] 12. Human-in-the-loop approval round-trip
+- [x] 12. Human-in-the-loop approval round-trip
   - Implement a transport-agnostic `control_request`/`control_response` keyed by request ID, plumbed from the permission gate to the EQ and back via the SQ.
   - Enforce a blocked-on-human timeout policy.
   - _Requirements: 7.5, 7.6_

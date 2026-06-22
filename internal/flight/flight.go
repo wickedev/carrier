@@ -65,7 +65,8 @@ type Config struct {
 	Policy      perm.Policy // nil → permissive (allow all); a server sets this
 	Exec        tool.ExecContext
 	Approver    Approver
-	Summarizer  Summarizer // nil → placeholder compaction summary
+	Classifier  perm.Classifier // nil → Ask falls straight to the Approver
+	Summarizer  Summarizer      // nil → placeholder compaction summary
 	MaxSteps    int
 	IdleTimeout time.Duration
 	MaxParallel int
@@ -89,6 +90,8 @@ type Flight struct {
 	policy      perm.Policy
 	exec        tool.ExecContext
 	approver    Approver
+	classifier  perm.Classifier
+	denials     *perm.DenialTracker
 	summarizer  Summarizer
 	maxSteps    int
 	idleTimeout time.Duration
@@ -116,6 +119,8 @@ func New(cfg Config) *Flight {
 		policy:      cfg.Policy,
 		exec:        cfg.Exec,
 		approver:    cfg.Approver,
+		classifier:  cfg.Classifier,
+		denials:     perm.NewDenialTracker(5),
 		summarizer:  cfg.Summarizer,
 		maxSteps:    orDefault(cfg.MaxSteps, defaultMaxSteps),
 		idleTimeout: orDefaultDur(cfg.IdleTimeout, defaultIdleTimeout),
@@ -364,6 +369,16 @@ func (f *Flight) decide(ctx context.Context, c agent.ToolCall) perm.Effect {
 	d := f.policy.Evaluate(c.Name, resourceFor(c))
 	if d.Effect != perm.Ask {
 		return d.Effect
+	}
+	// Ask: consult the off-loop classifier first on a sanitized projection
+	// (action + resource only), tracking consecutive denials so a noisy
+	// classifier falls back to human approval instead of silently blocking.
+	if f.classifier != nil {
+		if eff, err := f.classifier.Classify(ctx, c.Name, resourceFor(c)); err == nil && eff != perm.Ask {
+			if !f.denials.Record(eff == perm.Deny) {
+				return eff
+			}
+		}
 	}
 	if f.approver == nil {
 		return perm.Deny
