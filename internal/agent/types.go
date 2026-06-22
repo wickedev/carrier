@@ -54,8 +54,10 @@ type StepInput struct {
 	Messages []Message
 	Tools    []Tool
 
-	// OnToken, if set, receives assistant text deltas as they stream.
-	OnToken func(string)
+	// OnEvent, if set, receives canonical StreamEvents as the turn streams.
+	// The Engine emits events through this callback; the aggregated outcome is
+	// still returned as a StepResult.
+	OnEvent func(StreamEvent)
 }
 
 // StepResult is the normalized outcome of one model turn.
@@ -74,8 +76,25 @@ type StepResult struct {
 }
 
 // Usage reports token consumption for a single step, normalized across
-// providers for unified cost tracking.
+// providers for unified cost tracking. Cache tokens are tracked separately from
+// input/output because they are priced differently and matter for prompt-cache
+// economics.
 type Usage struct {
-	InputTokens  int
-	OutputTokens int
+	InputTokens      int
+	OutputTokens     int
+	CacheReadTokens  int
+	CacheWriteTokens int
+	ReasoningTokens  int
+}
+
+// Add returns the element-wise sum of two Usage values, for accumulating a
+// turn's usage across multiple stream events.
+func (u Usage) Add(o Usage) Usage {
+	return Usage{
+		InputTokens:      u.InputTokens + o.InputTokens,
+		OutputTokens:     u.OutputTokens + o.OutputTokens,
+		CacheReadTokens:  u.CacheReadTokens + o.CacheReadTokens,
+		CacheWriteTokens: u.CacheWriteTokens + o.CacheWriteTokens,
+		ReasoningTokens:  u.ReasoningTokens + o.ReasoningTokens,
+	}
 }

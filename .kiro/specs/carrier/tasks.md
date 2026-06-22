@@ -9,7 +9,7 @@ Only the runtime core is in scope here; deployment/infra is out of scope.
 
 ## Phase 1 — Core loop foundation
 
-- [ ] 1. Canonical streaming-event model
+- [x] 1. Canonical streaming-event model
   - Add `StreamEvent`, `EventKind`, and extend `Usage` (cache-read/write/reasoning) in `internal/agent`.
   - Add `OnEvent func(StreamEvent)` to `StepInput`; keep `StepResult` as the aggregated turn outcome.
   - Add a typed `EngineError` with classes `{RateLimited, ContextOverflow, Retryable, QuotaExceeded, Refusal, Fatal}` and optional `RetryAfter`.
