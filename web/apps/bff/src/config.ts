@@ -20,6 +20,8 @@ export interface Config {
   secureCookies: boolean;
   /** Secret used to derive the AES-256-GCM key for config env encryption. */
   configSecretKey: string;
+  /** Local directory for the content-addressed plugin artifact store. */
+  pluginArtifactsRoot: string;
 }
 
 function env(name: string, fallback: string): string {
@@ -48,6 +50,10 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     configSecretKey: env(
       "CONFIG_SECRET_KEY",
       "carrier-dev-config-secret-key!!32",
+    ),
+    pluginArtifactsRoot: env(
+      "PLUGIN_ARTIFACTS_ROOT",
+      join(tmpdir(), "carrier-bff-plugin-artifacts"),
     ),
   };
   return { ...base, ...overrides };

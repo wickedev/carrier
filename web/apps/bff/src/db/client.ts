@@ -145,6 +145,48 @@ CREATE TABLE IF NOT EXISTS config_model_params (
   plan_mode BOOLEAN NOT NULL DEFAULT false,
   UNIQUE (scope, owner_id)
 );
+CREATE TABLE IF NOT EXISTS plugin_publisher (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  public_key TEXT NOT NULL,
+  verified BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS plugin (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  publisher_id TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  latest_version TEXT
+);
+CREATE TABLE IF NOT EXISTS plugin_version (
+  id TEXT PRIMARY KEY,
+  plugin_id TEXT NOT NULL,
+  version TEXT NOT NULL,
+  manifest_digest TEXT NOT NULL,
+  manifest_json TEXT NOT NULL,
+  signature TEXT NOT NULL,
+  wasm_digest TEXT,
+  artifact_ref TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (plugin_id, version)
+);
+CREATE TABLE IF NOT EXISTS plugin_install (
+  id TEXT PRIMARY KEY,
+  scope TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  plugin_name TEXT NOT NULL,
+  version TEXT NOT NULL,
+  manifest_digest TEXT NOT NULL,
+  granted_caps_json TEXT NOT NULL,
+  allow_permissions BOOLEAN NOT NULL DEFAULT false,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS org_plugin_allowlist (
+  org_id TEXT NOT NULL,
+  plugin_name TEXT NOT NULL
+);
 `;
 
 export interface CreateDbOptions {

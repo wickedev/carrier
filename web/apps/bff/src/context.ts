@@ -11,6 +11,7 @@ import type { Workspace } from "./workspace/workspace.js";
 import type { UsageStore } from "./usage.js";
 import type { LogLine } from "./logging.js";
 import type { ConfigCrypto } from "./crypto.js";
+import type { PluginArtifactStore } from "./plugin-artifacts.js";
 
 export interface AppDeps {
   db: Db;
@@ -23,6 +24,8 @@ export interface AppDeps {
   usage: UsageStore;
   /** AES-256-GCM helper for config env secrets (encrypt/decrypt). */
   crypto: ConfigCrypto;
+  /** Content-addressed store for published plugin WASM artifacts. */
+  pluginArtifacts: PluginArtifactStore;
   /** Optional structured-log sink (tests capture lines; prod uses console). */
   logSink?: (line: LogLine) => void;
 }

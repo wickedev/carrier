@@ -4,7 +4,11 @@
 // concatenated, and the project's permission rules attached.
 
 import { and, eq } from "drizzle-orm";
-import type { HookEvent, SessionConfig } from "@carrier/contract";
+import {
+  PluginManifestSchema,
+  type HookEvent,
+  type SessionConfig,
+} from "@carrier/contract";
 import type { Db } from "./db/client.js";
 import type { ConfigCrypto } from "./crypto.js";
 import type { ProjectRow } from "./db/schema.js";
@@ -17,6 +21,9 @@ import {
   configModelParams,
   configSkill,
   permissionRule,
+  plugin,
+  pluginInstall,
+  pluginVersion,
 } from "./db/schema.js";
 import type {
   ConfigAgentRow,
@@ -26,6 +33,7 @@ import type {
   ConfigMcpRow,
   ConfigModelParamsRow,
   ConfigSkillRow,
+  PluginInstallRow,
 } from "./db/schema.js";
 
 function parseJsonArray(s: string | null): string[] {
@@ -194,5 +202,168 @@ export async function assembleSessionConfig(
   if (hookSpecs.length > 0) out.hooks = hookSpecs;
   if (permissions.length > 0) out.permissions = permissions;
 
+  // ── plugins: declarative merge + active refs ──────────────────────────────
+  // Load enabled installs for the org layer (scope=org, owner=orgId) then the
+  // project layer (scope=project, owner=projectId). Each plugin's declarative
+  // layer is merged into the assembled config (org plugins first, project
+  // plugins second); explicit per-scope config still wins on name collisions.
+  // Active (WASM) plugins are appended to SessionConfig.plugins as refs.
+  await mergePlugins(db, orgId, projectId, out);
+
   return out;
+}
+
+/** Fetch the published version row for an install by name+version, parse its
+ *  manifest. Returns null if the version is missing or the manifest is invalid. */
+async function manifestForInstall(
+  db: Db,
+  install: PluginInstallRow,
+): Promise<ReturnType<typeof PluginManifestSchema.parse> | null> {
+  const pRows = await db
+    .select()
+    .from(plugin)
+    .where(eq(plugin.name, install.pluginName))
+    .limit(1);
+  const p = pRows[0];
+  if (!p) return null;
+  const vRows = await db
+    .select()
+    .from(pluginVersion)
+    .where(
+      and(
+        eq(pluginVersion.pluginId, p.id),
+        eq(pluginVersion.version, install.version),
+      ),
+    )
+    .limit(1);
+  const v = vRows[0];
+  if (!v) return null;
+  const parsed = PluginManifestSchema.safeParse(JSON.parse(v.manifestJson));
+  return parsed.success ? parsed.data : null;
+}
+
+/** Append items from `incoming` that don't collide (by `keyOf`) with anything
+ *  already present in `existing`. Explicit config + earlier plugins win. */
+function appendNew<T>(
+  existing: T[] | undefined,
+  incoming: T[],
+  keyOf: (row: T) => string,
+): T[] {
+  const seen = new Set((existing ?? []).map(keyOf));
+  const out = [...(existing ?? [])];
+  for (const row of incoming) {
+    const k = keyOf(row);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(row);
+  }
+  return out;
+}
+
+async function mergePlugins(
+  db: Db,
+  orgId: string,
+  projectId: string,
+  out: SessionConfig,
+): Promise<void> {
+  const orgInstalls = (await db
+    .select()
+    .from(pluginInstall)
+    .where(
+      and(
+        eq(pluginInstall.scope, "org"),
+        eq(pluginInstall.ownerId, orgId),
+        eq(pluginInstall.enabled, true),
+      ),
+    )) as PluginInstallRow[];
+  const projectInstalls = (await db
+    .select()
+    .from(pluginInstall)
+    .where(
+      and(
+        eq(pluginInstall.scope, "project"),
+        eq(pluginInstall.ownerId, projectId),
+        eq(pluginInstall.enabled, true),
+      ),
+    )) as PluginInstallRow[];
+
+  // Org layer first, then project layer (project plugins override org plugins
+  // on collision because the org layer is applied before them).
+  for (const install of [...orgInstalls, ...projectInstalls]) {
+    const manifest = await manifestForInstall(db, install);
+    if (!manifest) continue;
+
+    // ── declarative merge (explicit config + earlier layers win) ────────────
+    const decl = manifest.declarative;
+    if (decl) {
+      if (decl.context && decl.context.length > 0) {
+        out.context = out.context
+          ? `${out.context}\n\n${decl.context}`
+          : decl.context;
+      }
+      if (decl.skills?.length) {
+        out.skills = appendNew(out.skills, decl.skills, (s) => s.name);
+      }
+      if (decl.subagents?.length) {
+        out.subagents = appendNew(
+          out.subagents,
+          decl.subagents,
+          (a) => a.name,
+        );
+      }
+      if (decl.mcpServers?.length) {
+        out.mcpServers = appendNew(
+          out.mcpServers,
+          decl.mcpServers,
+          (m) => m.name,
+        );
+      }
+      if (decl.hooks?.length) {
+        out.hooks = appendNew(
+          out.hooks,
+          decl.hooks,
+          (h) => `${h.event}:${h.name}`,
+        );
+      }
+      if (decl.permissions?.length) {
+        // Conservative: append plugin rules after explicit ones (explicit rules
+        // are consulted first by the runtime's ordered policy).
+        out.permissions = [...(out.permissions ?? []), ...decl.permissions];
+      }
+      if (decl.env) {
+        const merged: Record<string, string> = { ...decl.env, ...(out.env ?? {}) };
+        out.env = merged; // explicit env wins on key collision
+      }
+      // model/effort/etc.: only fill when not already set explicitly.
+      if (decl.model && !out.model) out.model = decl.model;
+      if (decl.effort && out.effort === undefined) out.effort = decl.effort;
+      if (decl.maxSteps !== undefined && out.maxSteps === undefined) {
+        out.maxSteps = decl.maxSteps;
+      }
+      if (
+        decl.contextBudget !== undefined &&
+        out.contextBudget === undefined
+      ) {
+        out.contextBudget = decl.contextBudget;
+      }
+    }
+
+    // ── active (WASM) ref ───────────────────────────────────────────────────
+    const wasm = manifest.artifacts.wasm;
+    if (wasm) {
+      const ref = {
+        name: manifest.name,
+        version: install.version,
+        manifestDigest: install.manifestDigest,
+        wasmDigest: wasm.digest,
+        grantedCaps: parseJsonArray(install.grantedCapsJson),
+        allowPermissions: install.allowPermissions,
+      };
+      const existing = out.plugins ?? [];
+      // A later layer (project) replaces an earlier same-named plugin ref.
+      const filtered = existing.filter((p) => p.name !== ref.name);
+      filtered.push(ref);
+      out.plugins = filtered;
+    }
+  }
 }

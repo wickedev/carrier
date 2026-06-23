@@ -12,6 +12,7 @@ import { createCarrierClient } from "./carrier.js";
 import { Workspace } from "./workspace/workspace.js";
 import { UsageStore } from "./usage.js";
 import { createConfigCrypto } from "./crypto.js";
+import { PluginArtifactStore } from "./plugin-artifacts.js";
 import { requestLogger } from "./logging.js";
 import { authRoutes, meRoute, requireAuth } from "./auth/index.js";
 import { orgRoutes } from "./routes/orgs.js";
@@ -19,6 +20,8 @@ import { projectRoutes } from "./routes/projects.js";
 import { sessionRoutes } from "./routes/sessions.js";
 import { githubRoutes } from "./routes/github.js";
 import { configRoutes } from "./routes/config.js";
+import { marketplaceRoutes } from "./routes/marketplace.js";
+import { pluginInstallRoutes } from "./routes/plugin-install.js";
 
 /** Build the full set of app dependencies for production/dev startup. */
 export async function createDeps(
@@ -32,6 +35,9 @@ export async function createDeps(
   const carrier = overrides.carrier ?? (() => createCarrierClient(config));
   const usage = overrides.usage ?? new UsageStore();
   const crypto = overrides.crypto ?? createConfigCrypto(config);
+  const pluginArtifacts =
+    overrides.pluginArtifacts ??
+    new PluginArtifactStore(config.pluginArtifactsRoot);
   return {
     db,
     config,
@@ -40,6 +46,7 @@ export async function createDeps(
     carrier,
     usage,
     crypto,
+    pluginArtifacts,
     logSink: overrides.logSink,
   };
 }
@@ -70,6 +77,8 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   authed.route("/orgs", orgRoutes());
   authed.route("/", projectRoutes()); // /orgs/:org/projects, /projects/*
   authed.route("/", configRoutes()); // /orgs/:org/config/*, /projects/:id/config/*
+  authed.route("/", marketplaceRoutes()); // /marketplace/plugins*
+  authed.route("/", pluginInstallRoutes()); // /orgs/:org/plugins*, /projects/:id/plugins*
   authed.route("/sessions", sessionRoutes());
   authed.route("/github", githubRoutes());
   app.route("/", authed);

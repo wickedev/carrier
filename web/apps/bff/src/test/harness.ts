@@ -21,11 +21,30 @@ import type {
   GithubRepoRef,
   OpenPullRequestInput,
 } from "../auth/github-provider.js";
-import { account, membership, org } from "../db/schema.js";
+import {
+  account,
+  membership,
+  org,
+  plugin,
+  pluginPublisher,
+  pluginVersion,
+} from "../db/schema.js";
 import { UsageStore } from "../usage.js";
 import type { LogLine } from "../logging.js";
-import { randomUUID } from "node:crypto";
+import { generateKeyPairSync, randomUUID } from "node:crypto";
 import { Hono } from "hono";
+import {
+  PluginManifestSchema,
+  type PluginCapabilities,
+  type PluginManifest,
+  type SeamKind,
+  type SessionConfig,
+} from "@carrier/contract";
+import {
+  artifactDigest,
+  manifestDigest as computeManifestDigest,
+  signDetached,
+} from "../plugin-attest.js";
 
 export interface FakeGithubState {
   exchange: { user: GithubUser; orgs: GithubOrgRef[] };
@@ -174,6 +193,43 @@ export interface Harness {
     accountId: string,
     role: "owner" | "admin" | "member",
   ): Promise<void>;
+  /** Seed a verified publisher with a freshly-generated ed25519 keypair. */
+  seedPublisher(
+    name: string,
+    opts?: { verified?: boolean },
+  ): Promise<{ id: string; name: string; publicKeyPem: string; privateKeyPem: string }>;
+  /** Build a sample manifest + its detached signature (no DB writes). */
+  buildSamplePlugin(opts: {
+    name: string;
+    version: string;
+    publisher: string;
+    privateKeyPem: string;
+    declarative?: Partial<SessionConfig>;
+    capabilities?: Partial<PluginCapabilities>;
+    seams?: SeamKind[];
+    wasmBytes?: Buffer;
+  }): {
+    manifest: PluginManifest;
+    manifestDigest: string;
+    signature: string;
+    wasmBase64?: string;
+  };
+  /** Seed a verified publisher and directly publish a version into the DB. */
+  publishSamplePlugin(opts: {
+    name: string;
+    version: string;
+    publisher?: string;
+    declarative?: Partial<SessionConfig>;
+    capabilities?: Partial<PluginCapabilities>;
+    seams?: SeamKind[];
+    wasmBytes?: Buffer;
+  }): Promise<{
+    manifest: PluginManifest;
+    manifestDigest: string;
+    signature: string;
+    publicKeyPem: string;
+    privateKeyPem: string;
+  }>;
 }
 
 export async function makeHarness(
@@ -184,7 +240,10 @@ export async function makeHarness(
   } = {},
 ): Promise<Harness> {
   const workspaceRoot = await mkdtemp(join(tmpdir(), "carrier-ws-"));
-  const config = loadConfig({ workspaceRoot });
+  const config = loadConfig({
+    workspaceRoot,
+    pluginArtifactsRoot: join(workspaceRoot, "plugin-artifacts"),
+  });
   const db = await createDb();
   const githubState = opts.githubState ?? defaultGithubState();
   const github = opts.github ?? makeFakeGithub(githubState);
@@ -202,6 +261,56 @@ export async function makeHarness(
     logSink: (line) => logLines.push(line),
   });
   const app = createApp(deps);
+
+  // Standalone closures so publishSamplePlugin can reuse them without `this`.
+  const seedPublisher: Harness["seedPublisher"] = async (name, pubOpts = {}) => {
+    const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+    const publicKeyPem = publicKey
+      .export({ type: "spki", format: "pem" })
+      .toString();
+    const privateKeyPem = privateKey
+      .export({ type: "pkcs8", format: "pem" })
+      .toString();
+    const id = randomUUID();
+    await db.insert(pluginPublisher).values({
+      id,
+      name,
+      publicKey: publicKeyPem,
+      verified: pubOpts.verified ?? true,
+    });
+    return { id, name, publicKeyPem, privateKeyPem };
+  };
+
+  const buildSamplePlugin: Harness["buildSamplePlugin"] = (pOpts) => {
+    const wasmBytes = pOpts.wasmBytes;
+    const capabilities: PluginCapabilities = {
+      network: pOpts.capabilities?.network ?? [],
+      secrets: pOpts.capabilities?.secrets ?? [],
+      kv: pOpts.capabilities?.kv ?? false,
+      permissionsAllow: pOpts.capabilities?.permissionsAllow ?? false,
+    };
+    const manifest = PluginManifestSchema.parse({
+      name: pOpts.name,
+      version: pOpts.version,
+      publisher: pOpts.publisher,
+      api: "carrier.plugin/v1",
+      description: `sample ${pOpts.name}`,
+      seams: pOpts.seams ?? [],
+      capabilities,
+      ...(pOpts.declarative ? { declarative: pOpts.declarative } : {}),
+      artifacts: wasmBytes
+        ? { wasm: { path: "plugin.wasm", digest: artifactDigest(wasmBytes) } }
+        : {},
+    });
+    const digest = computeManifestDigest(manifest);
+    const signature = signDetached(digest, pOpts.privateKeyPem);
+    return {
+      manifest,
+      manifestDigest: digest,
+      signature,
+      ...(wasmBytes ? { wasmBase64: wasmBytes.toString("base64") } : {}),
+    };
+  };
 
   return {
     app,
@@ -253,6 +362,55 @@ export async function makeHarness(
     },
     async addOrgMember(orgId, accountId, role) {
       await db.insert(membership).values({ accountId, orgId, role });
+    },
+    seedPublisher,
+    buildSamplePlugin,
+    async publishSamplePlugin(pOpts) {
+      const publisherName = pOpts.publisher ?? `pub-${pOpts.name}`;
+      const pub = await seedPublisher(publisherName, { verified: true });
+      const built = buildSamplePlugin({
+        name: pOpts.name,
+        version: pOpts.version,
+        publisher: publisherName,
+        privateKeyPem: pub.privateKeyPem,
+        declarative: pOpts.declarative,
+        capabilities: pOpts.capabilities,
+        seams: pOpts.seams,
+        wasmBytes: pOpts.wasmBytes,
+      });
+      const pluginId = randomUUID();
+      await db.insert(plugin).values({
+        id: pluginId,
+        name: pOpts.name,
+        publisherId: pub.id,
+        description: built.manifest.description,
+        latestVersion: pOpts.version,
+      });
+      const wasm = built.manifest.artifacts.wasm;
+      let artifactRef: string | null = null;
+      if (wasm && pOpts.wasmBytes) {
+        artifactRef = await deps.pluginArtifacts.put(
+          wasm.digest,
+          pOpts.wasmBytes,
+        );
+      }
+      await db.insert(pluginVersion).values({
+        id: randomUUID(),
+        pluginId,
+        version: pOpts.version,
+        manifestDigest: built.manifestDigest,
+        manifestJson: JSON.stringify(built.manifest),
+        signature: built.signature,
+        wasmDigest: wasm?.digest ?? null,
+        artifactRef,
+      });
+      return {
+        manifest: built.manifest,
+        manifestDigest: built.manifestDigest,
+        signature: built.signature,
+        publicKeyPem: pub.publicKeyPem,
+        privateKeyPem: pub.privateKeyPem,
+      };
     },
   };
 }

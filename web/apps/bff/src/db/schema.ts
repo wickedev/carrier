@@ -173,6 +173,65 @@ export const configModelParams = pgTable("config_model_params", {
   planMode: boolean("plan_mode").notNull().default(false),
 });
 
+// ── Plugin marketplace tables ───────────────────────────────────────────────
+// A plugin is a signed bundle; integrity is a detached attestation over the
+// manifest digest (the manifest is never self-hashed/-signed). Publishers carry
+// a registered ed25519 public key + a `verified` flag (only verified publishers
+// may publish at launch). Each version is pinned by its immutable
+// manifest_digest, which transitively commits to every artifact by digest.
+
+export const pluginPublisher = pgTable("plugin_publisher", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  publicKey: text("public_key").notNull(), // PEM-encoded ed25519 public key
+  verified: boolean("verified").notNull().default(false),
+  createdAt: timestamp("created_at", { mode: "string", withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const plugin = pgTable("plugin", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  publisherId: text("publisher_id").notNull(),
+  description: text("description").notNull().default(""),
+  latestVersion: text("latest_version"),
+});
+
+export const pluginVersion = pgTable("plugin_version", {
+  id: text("id").primaryKey(),
+  pluginId: text("plugin_id").notNull(),
+  version: text("version").notNull(),
+  manifestDigest: text("manifest_digest").notNull(), // version identity
+  manifestJson: text("manifest_json").notNull(), // canonical-ish manifest bytes
+  signature: text("signature").notNull(), // detached publisher sig over digest
+  wasmDigest: text("wasm_digest"), // mirrors manifest.artifacts.wasm.digest
+  artifactRef: text("artifact_ref"), // local artifact-store key for the wasm bytes
+  createdAt: timestamp("created_at", { mode: "string", withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const pluginInstall = pgTable("plugin_install", {
+  id: text("id").primaryKey(),
+  scope: text("scope").notNull(), // 'org' | 'project'
+  ownerId: text("owner_id").notNull(), // org id (scope=org) or project id (scope=project)
+  pluginName: text("plugin_name").notNull(),
+  version: text("version").notNull(),
+  manifestDigest: text("manifest_digest").notNull(), // lockfile pin
+  grantedCapsJson: text("granted_caps_json").notNull(), // JSON-encoded string[]
+  allowPermissions: boolean("allow_permissions").notNull().default(false),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { mode: "string", withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const orgPluginAllowlist = pgTable("org_plugin_allowlist", {
+  orgId: text("org_id").notNull(),
+  pluginName: text("plugin_name").notNull(),
+});
+
 export type AccountRow = typeof account.$inferSelect;
 export type OrgRow = typeof org.$inferSelect;
 export type MembershipRow = typeof membership.$inferSelect;
@@ -187,3 +246,8 @@ export type ConfigContextRow = typeof configContext.$inferSelect;
 export type ConfigHookRow = typeof configHook.$inferSelect;
 export type ConfigEnvRow = typeof configEnv.$inferSelect;
 export type ConfigModelParamsRow = typeof configModelParams.$inferSelect;
+export type PluginPublisherRow = typeof pluginPublisher.$inferSelect;
+export type PluginRow = typeof plugin.$inferSelect;
+export type PluginVersionRow = typeof pluginVersion.$inferSelect;
+export type PluginInstallRow = typeof pluginInstall.$inferSelect;
+export type OrgPluginAllowlistRow = typeof orgPluginAllowlist.$inferSelect;
