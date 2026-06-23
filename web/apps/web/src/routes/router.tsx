@@ -6,7 +6,6 @@ import { ShellRoute } from "./ShellRoute";
 import { LoginPage } from "./login";
 import { OrgPage } from "./org";
 import { ProjectPage } from "./project";
-import { SessionPage } from "./session";
 import { OrgSettingsPage, ProjectSettingsPage } from "./settings";
 import { MarketplacePage, PluginDetailPage } from "./marketplace";
 import { RouteError } from "./RouteError";
@@ -45,7 +44,14 @@ export function createRouter(queryClient: QueryClient) {
         { path: ":org/marketplace/:name", element: <PluginDetailPage /> },
         { path: ":org/:project", element: <ProjectPage /> },
         { path: ":org/:project/settings", element: <ProjectSettingsPage /> },
-        { path: ":org/:project/s/:session", element: <SessionPage /> },
+        {
+          path: ":org/:project/s/:session",
+          // Lazy-load the IDE route so the CodeMirror (@codemirror/*) bundle is
+          // code-split out of the entry chunk — login/list/settings/marketplace
+          // no longer download the editor. RR v7 `lazy` resolves the module and
+          // keeps the previous UI mounted while the chunk loads (no blank flash).
+          lazy: () => import("./session").then((m) => ({ Component: m.SessionPage })),
+        },
       ],
     },
     { path: "*", loader: () => redirect("/") },
