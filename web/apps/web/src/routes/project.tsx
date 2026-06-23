@@ -73,7 +73,10 @@ export function ProjectPage() {
             placeholder="Session title (optional)"
             aria-label="Session title"
           />
-          <label className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-sm">
+          <label
+            className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-sm"
+            title="Agent drafts a plan before editing code"
+          >
             <input
               type="checkbox"
               checked={planMode}

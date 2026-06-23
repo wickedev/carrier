@@ -312,6 +312,11 @@ export function McpServersSection({ scope, ownerKey, manage }: SectionProps) {
   return (
     <ConfigSection
       title="MCP servers"
+      subtitle={
+        <p className="-mt-1 mb-2 text-xs text-fg-muted">
+          Model Context Protocol — external tool servers
+        </p>
+      }
       testId="mcp-section"
       query={list}
       emptyText="No MCP servers configured."
@@ -748,7 +753,10 @@ export function ModelParamsSection({ scope, ownerKey, manage }: SectionProps) {
               className="mt-1"
             />
           </label>
-          <label className="flex items-center gap-1 text-sm text-fg-muted">
+          <label
+            className="flex items-center gap-1 text-sm text-fg-muted"
+            title="Agent drafts a plan before editing code"
+          >
             <input
               type="checkbox"
               checked={form.planMode}

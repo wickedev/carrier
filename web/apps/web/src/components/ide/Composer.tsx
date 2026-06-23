@@ -82,6 +82,9 @@ export function Composer({
           </Button>
         ) : null}
       </div>
+      <p className="mb-2 text-xs text-fg-muted">
+        Queue: send after the current step · Steer: interrupt and redirect now
+      </p>
       <div className="flex items-end gap-2">
         <textarea
           aria-label="Message to agent"

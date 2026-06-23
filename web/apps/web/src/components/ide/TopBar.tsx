@@ -5,6 +5,7 @@ import { cn } from "@carrier/ui";
 import {
   GitBranch,
   GitPullRequest,
+  GitMerge,
   CircleDot,
   Circle,
   Loader2,
@@ -52,6 +53,7 @@ export function TopBar({
   orgSlug,
   projectId,
   session,
+  repoBound,
   status,
   connection,
   onPromote,
@@ -64,6 +66,9 @@ export function TopBar({
   orgSlug: string;
   projectId: string;
   session: Session | undefined;
+  /** Whether the project is bound to a repo. Bound → promote opens a PR;
+   *  unbound → promote merges directly into the base workspace. */
+  repoBound?: boolean;
   status: SessionStatus;
   connection: ConnectionState;
   onPromote: () => void;
@@ -75,6 +80,9 @@ export function TopBar({
   usageLoading?: boolean;
 }) {
   const branch = session?.workingCopy?.branch ?? null;
+  // Unbound projects merge directly to base — gate that destructive-ish action
+  // behind a two-step confirm (mirrors the settings.tsx DangerZone pattern).
+  const [confirmingMerge, setConfirmingMerge] = React.useState(false);
   return (
     <div className="flex items-center gap-3 border-b border-neutral-200 px-3 py-1.5 text-sm dark:border-neutral-800">
       <nav className="flex items-center gap-1 text-fg-muted" aria-label="Breadcrumb">
@@ -95,7 +103,11 @@ export function TopBar({
         <span className="inline-flex items-center gap-1 rounded border border-neutral-200 px-1.5 py-0.5 text-xs text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
           <GitBranch className="h-3 w-3" aria-hidden />
           {branch}
-          {session?.workingCopy?.dirty ? <span className="text-amber-500">•</span> : null}
+          {session?.workingCopy?.dirty ? (
+            <span className="text-amber-500" title="Uncommitted changes">
+              •
+            </span>
+          ) : null}
         </span>
       ) : null}
 
@@ -123,10 +135,48 @@ export function TopBar({
             <GitPullRequest className="h-3.5 w-3.5" aria-hidden /> PR
           </a>
         ) : null}
-        <Button size="sm" variant="outline" onClick={onPromote} disabled={promoting}>
-          {promoting ? <Spinner /> : <GitPullRequest className="h-3.5 w-3.5" aria-hidden />}
-          Promote
-        </Button>
+        {repoBound ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onPromote}
+            disabled={promoting}
+            title="Open a pull request from this session's branch"
+          >
+            {promoting ? <Spinner /> : <GitPullRequest className="h-3.5 w-3.5" aria-hidden />}
+            Open PR
+          </Button>
+        ) : confirmingMerge ? (
+          <div className="flex items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setConfirmingMerge(false);
+                onPromote();
+              }}
+              disabled={promoting}
+              title="Merge this session's changes into the base workspace"
+            >
+              {promoting ? <Spinner /> : <GitMerge className="h-3.5 w-3.5" aria-hidden />}
+              Confirm merge
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setConfirmingMerge(false)}>
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setConfirmingMerge(true)}
+            disabled={promoting}
+            title="Merge this session's changes into the base workspace"
+          >
+            {promoting ? <Spinner /> : <GitMerge className="h-3.5 w-3.5" aria-hidden />}
+            Merge to base
+          </Button>
+        )}
       </div>
     </div>
   );

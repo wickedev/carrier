@@ -21,6 +21,14 @@ const gitBadge: Record<GitStatus, string> = {
   clean: "",
 };
 
+const gitTitle: Record<GitStatus, string> = {
+  A: "Added",
+  M: "Modified",
+  D: "Deleted",
+  U: "Untracked",
+  clean: "",
+};
+
 interface DirState {
   loading: boolean;
   error: string | null;
@@ -154,7 +162,10 @@ export function FileTree({
           <File className="h-3.5 w-3.5 shrink-0 text-neutral-400" aria-hidden />
           <span className={cn("truncate", git && gitColor[git])}>{entry.name}</span>
           {git && git !== "clean" ? (
-            <span className={cn("ml-auto text-[10px] font-bold", gitColor[git])}>
+            <span
+              className={cn("ml-auto text-[10px] font-bold", gitColor[git])}
+              title={gitTitle[git]}
+            >
               {gitBadge[git]}
             </span>
           ) : null}

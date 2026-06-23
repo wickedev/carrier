@@ -6,7 +6,7 @@ import { Files, GitCompareArrows } from "lucide-react";
 import { cn } from "@carrier/ui";
 
 import { api, eventsUrl } from "../api/client";
-import { useSession, useSessionUsage, qk } from "../api/queries";
+import { useSession, useSessionUsage, useProject, qk } from "../api/queries";
 import {
   useSessionStream,
   connectSessionStream,
@@ -23,6 +23,10 @@ export function SessionPage() {
   const { org = "", project = "", session: sessionId = "" } = useParams();
   const qc = useQueryClient();
   const sessionQ = useSession(sessionId);
+  // The repo binding lives on the Project (Project.repo), not the Session.
+  // When bound, promote OPENS A PR; when unbound, it MERGES directly to base.
+  const projectQ = useProject(project);
+  const repoBound = !!projectQ.data?.repo;
   // Per-session usage/cost (Req 20). Poll while the session is running; tolerate
   // the endpoint being unavailable (don't surface a hard error in the IDE).
   const usageQ = useSessionUsage(sessionId, {
@@ -131,6 +135,7 @@ export function SessionPage() {
         orgSlug={org}
         projectId={project}
         session={sessionQ.data}
+        repoBound={repoBound}
         status={status}
         connection={connection}
         onPromote={onPromote}
