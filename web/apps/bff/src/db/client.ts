@@ -76,6 +76,75 @@ CREATE TABLE IF NOT EXISTS permission_rule (
   effect TEXT NOT NULL,
   source TEXT
 );
+CREATE TABLE IF NOT EXISTS config_agent (
+  id TEXT PRIMARY KEY,
+  scope TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  model TEXT
+);
+CREATE TABLE IF NOT EXISTS config_skill (
+  id TEXT PRIMARY KEY,
+  scope TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  body TEXT NOT NULL,
+  agent TEXT,
+  allowed_tools TEXT
+);
+CREATE TABLE IF NOT EXISTS config_mcp (
+  id TEXT PRIMARY KEY,
+  scope TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  name TEXT NOT NULL,
+  command TEXT NOT NULL,
+  args TEXT NOT NULL,
+  env_keys TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS config_context (
+  id TEXT PRIMARY KEY,
+  scope TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  name TEXT NOT NULL,
+  body TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS config_hook (
+  id TEXT PRIMARY KEY,
+  scope TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  name TEXT NOT NULL,
+  event TEXT NOT NULL,
+  command TEXT NOT NULL,
+  matcher TEXT
+);
+CREATE TABLE IF NOT EXISTS config_env (
+  id TEXT PRIMARY KEY,
+  scope TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT true,
+  key TEXT NOT NULL,
+  value_enc TEXT NOT NULL,
+  secret BOOLEAN NOT NULL DEFAULT false
+);
+CREATE TABLE IF NOT EXISTS config_model_params (
+  id TEXT PRIMARY KEY,
+  scope TEXT NOT NULL,
+  owner_id TEXT NOT NULL,
+  model TEXT NOT NULL,
+  effort TEXT NOT NULL,
+  max_steps INTEGER NOT NULL DEFAULT 0,
+  context_budget INTEGER NOT NULL DEFAULT 0,
+  plan_mode BOOLEAN NOT NULL DEFAULT false,
+  UNIQUE (scope, owner_id)
+);
 `;
 
 export interface CreateDbOptions {

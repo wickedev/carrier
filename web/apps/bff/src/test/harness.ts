@@ -75,6 +75,8 @@ export function makeFakeGithub(state: FakeGithubState): GithubProvider {
 /** A fake Carrier: canned create/input/interrupt + a scripted SSE stream. */
 export class FakeCarrier {
   createdWith: Array<{ cwd?: string; planMode?: boolean }> = [];
+  /** Full parsed create-session wire bodies (snake_cased), in order. */
+  createBodies: Array<Record<string, unknown>> = [];
   inputs: Array<{ id: string; text: string; steer: boolean }> = [];
   interrupts: string[] = [];
   approvals: Array<{ id: string; reqId: string; allow: boolean }> = [];
@@ -88,6 +90,7 @@ export class FakeCarrier {
     if (url.endsWith("/v1/sessions") && method === "POST") {
       const body = JSON.parse(String(init?.body ?? "{}"));
       this.createdWith.push({ cwd: body.cwd, planMode: body.plan_mode });
+      this.createBodies.push(body);
       return jsonResponse({ session_id: this.nextSessionId });
     }
     if (url.includes("/input") && method === "POST") {

@@ -36,6 +36,7 @@ import {
 } from "./authz.js";
 import { orgInstallations } from "./github.js";
 import { randomSlug } from "../workspace/workspace.js";
+import { assembleSessionConfig } from "../config-assembly.js";
 
 export function toProjectDto(p: ProjectRow): Project {
   return {
@@ -243,7 +244,7 @@ export function projectRoutes(): Hono<AppEnv> {
   });
 
   app.post("/projects/:id/sessions", async (c) => {
-    const { db, workspace, carrier } = c.var.deps;
+    const { db, workspace, carrier, crypto } = c.var.deps;
     const ctx = await resolveProject(db, c.var.account.id, c.req.param("id"));
     if (!ctx) return c.json({ error: "not_found" }, 404);
     if (ctx.project.archived) {
@@ -263,12 +264,18 @@ export function projectRoutes(): Hono<AppEnv> {
       repoBound: ctx.project.repoBound,
     });
 
+    // Assemble the effective per-session config (org⊕project, secrets resolved).
+    const sessionConfig = await assembleSessionConfig(db, crypto, ctx.project);
+    // planMode is the project model-params planMode OR the request body planMode.
+    const planMode = (sessionConfig.planMode ?? false) || (body.data.planMode ?? false);
+
     // Create the Carrier session with cwd = the per-session working copy.
     let carrierSessionId: string | null = null;
     try {
       carrierSessionId = await carrier().createSession({
         cwd: fork.workingCopyPath,
-        planMode: body.data.planMode ?? false,
+        ...sessionConfig,
+        planMode,
       });
     } catch {
       carrierSessionId = null;
@@ -280,7 +287,7 @@ export function projectRoutes(): Hono<AppEnv> {
       carrierSessionId,
       title: body.data.title ?? "Untitled session",
       status: "idle",
-      planMode: body.data.planMode ?? false,
+      planMode,
       createdBy: c.var.account.id,
       archived: false,
       workingCopyPath: fork.workingCopyPath,

@@ -93,6 +93,86 @@ export const permissionRule = pgTable("permission_rule", {
   source: text("source"),
 });
 
+// ── Configuration tables (org+project-scoped) ───────────────────────────────
+// Each config table carries scope ('org'|'project') + owner_id (the org id when
+// scope=org, the project id when scope=project) + an enabled flag. The effective
+// session config is the org layer merged with the project layer (project wins).
+
+export const configAgent = pgTable("config_agent", {
+  id: text("id").primaryKey(),
+  scope: text("scope").notNull(),
+  ownerId: text("owner_id").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  prompt: text("prompt").notNull(),
+  model: text("model"),
+});
+
+export const configSkill = pgTable("config_skill", {
+  id: text("id").primaryKey(),
+  scope: text("scope").notNull(),
+  ownerId: text("owner_id").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  body: text("body").notNull(),
+  agent: text("agent"),
+  allowedTools: text("allowed_tools"), // JSON-encoded string[]
+});
+
+export const configMcp = pgTable("config_mcp", {
+  id: text("id").primaryKey(),
+  scope: text("scope").notNull(),
+  ownerId: text("owner_id").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  name: text("name").notNull(),
+  command: text("command").notNull(),
+  args: text("args").notNull(), // JSON-encoded string[]
+  envKeys: text("env_keys").notNull(), // JSON-encoded string[]
+});
+
+export const configContext = pgTable("config_context", {
+  id: text("id").primaryKey(),
+  scope: text("scope").notNull(),
+  ownerId: text("owner_id").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  name: text("name").notNull(),
+  body: text("body").notNull(),
+});
+
+export const configHook = pgTable("config_hook", {
+  id: text("id").primaryKey(),
+  scope: text("scope").notNull(),
+  ownerId: text("owner_id").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  name: text("name").notNull(),
+  event: text("event").notNull(),
+  command: text("command").notNull(),
+  matcher: text("matcher"),
+});
+
+export const configEnv = pgTable("config_env", {
+  id: text("id").primaryKey(),
+  scope: text("scope").notNull(),
+  ownerId: text("owner_id").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  key: text("key").notNull(),
+  valueEnc: text("value_enc").notNull(), // ciphertext (secret) or plaintext
+  secret: boolean("secret").notNull().default(false),
+});
+
+export const configModelParams = pgTable("config_model_params", {
+  id: text("id").primaryKey(),
+  scope: text("scope").notNull(),
+  ownerId: text("owner_id").notNull(), // UNIQUE per (scope, owner_id)
+  model: text("model").notNull(),
+  effort: text("effort").notNull(),
+  maxSteps: integer("max_steps").notNull().default(0),
+  contextBudget: integer("context_budget").notNull().default(0),
+  planMode: boolean("plan_mode").notNull().default(false),
+});
+
 export type AccountRow = typeof account.$inferSelect;
 export type OrgRow = typeof org.$inferSelect;
 export type MembershipRow = typeof membership.$inferSelect;
@@ -100,3 +180,10 @@ export type ProjectRow = typeof project.$inferSelect;
 export type SessionRow = typeof session.$inferSelect;
 export type PermissionRuleRow = typeof permissionRule.$inferSelect;
 export type GithubInstallationRow = typeof githubInstallation.$inferSelect;
+export type ConfigAgentRow = typeof configAgent.$inferSelect;
+export type ConfigSkillRow = typeof configSkill.$inferSelect;
+export type ConfigMcpRow = typeof configMcp.$inferSelect;
+export type ConfigContextRow = typeof configContext.$inferSelect;
+export type ConfigHookRow = typeof configHook.$inferSelect;
+export type ConfigEnvRow = typeof configEnv.$inferSelect;
+export type ConfigModelParamsRow = typeof configModelParams.$inferSelect;

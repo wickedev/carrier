@@ -18,6 +18,8 @@ export interface Config {
   workspaceRoot: string;
   /** When true the session cookie is marked Secure (https only). */
   secureCookies: boolean;
+  /** Secret used to derive the AES-256-GCM key for config env encryption. */
+  configSecretKey: string;
 }
 
 function env(name: string, fallback: string): string {
@@ -42,6 +44,11 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     ),
     workspaceRoot: env("WORKSPACE_ROOT", join(tmpdir(), "carrier-bff-workspace")),
     secureCookies: env("NODE_ENV", "test") === "production",
+    // Dev default is a fixed 32-byte string; production must override this.
+    configSecretKey: env(
+      "CONFIG_SECRET_KEY",
+      "carrier-dev-config-secret-key!!32",
+    ),
   };
   return { ...base, ...overrides };
 }

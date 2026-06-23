@@ -11,12 +11,14 @@ import { OctokitGithubProvider } from "./auth/github-provider.js";
 import { createCarrierClient } from "./carrier.js";
 import { Workspace } from "./workspace/workspace.js";
 import { UsageStore } from "./usage.js";
+import { createConfigCrypto } from "./crypto.js";
 import { requestLogger } from "./logging.js";
 import { authRoutes, meRoute, requireAuth } from "./auth/index.js";
 import { orgRoutes } from "./routes/orgs.js";
 import { projectRoutes } from "./routes/projects.js";
 import { sessionRoutes } from "./routes/sessions.js";
 import { githubRoutes } from "./routes/github.js";
+import { configRoutes } from "./routes/config.js";
 
 /** Build the full set of app dependencies for production/dev startup. */
 export async function createDeps(
@@ -29,7 +31,17 @@ export async function createDeps(
     overrides.workspace ?? new Workspace(config.workspaceRoot, github);
   const carrier = overrides.carrier ?? (() => createCarrierClient(config));
   const usage = overrides.usage ?? new UsageStore();
-  return { db, config, github, workspace, carrier, usage, logSink: overrides.logSink };
+  const crypto = overrides.crypto ?? createConfigCrypto(config);
+  return {
+    db,
+    config,
+    github,
+    workspace,
+    carrier,
+    usage,
+    crypto,
+    logSink: overrides.logSink,
+  };
 }
 
 export function createApp(deps: AppDeps): Hono<AppEnv> {
@@ -57,6 +69,7 @@ export function createApp(deps: AppDeps): Hono<AppEnv> {
   authed.use("*", requireAuth());
   authed.route("/orgs", orgRoutes());
   authed.route("/", projectRoutes()); // /orgs/:org/projects, /projects/*
+  authed.route("/", configRoutes()); // /orgs/:org/config/*, /projects/:id/config/*
   authed.route("/sessions", sessionRoutes());
   authed.route("/github", githubRoutes());
   app.route("/", authed);
