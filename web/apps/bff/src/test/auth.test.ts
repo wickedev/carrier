@@ -107,3 +107,115 @@ describe("auth: OAuth state/CSRF + cookie session", () => {
     );
   });
 });
+
+describe("auth: email/password", () => {
+  it("register provisions an account + personal org and sets a session", async () => {
+    const h = await makeHarness();
+    const res = await h.app.request("/auth/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "Alice@Example.com",
+        password: "correct horse battery",
+        name: "Alice",
+      }),
+    });
+    expect(res.status).toBe(201);
+    const cookie = extractSessionCookie(res.headers.get("set-cookie"));
+    expect(cookie).toContain("carrier_session=");
+
+    // The session works against /me.
+    const me = await h.app.request("/me", { headers: { cookie } });
+    expect(me.status).toBe(200);
+    const body = await me.json();
+    expect(body.account.name).toBe("Alice");
+    expect(body.orgs).toHaveLength(1);
+    expect(body.orgs[0].kind).toBe("personal");
+
+    // Email is normalized to lowercase.
+    const rows = await h.db.select().from(account);
+    expect(rows[0]?.email).toBe("alice@example.com");
+    expect(rows[0]?.githubUserId).toBeNull();
+    expect(rows[0]?.passwordHash).toMatch(/^scrypt\$/);
+  });
+
+  it("login succeeds with the right password and rejects a wrong one", async () => {
+    const h = await makeHarness();
+    await h.app.request("/auth/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "bob@example.com", password: "supersecret1" }),
+    });
+
+    const ok = await h.app.request("/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "bob@example.com", password: "supersecret1" }),
+    });
+    expect(ok.status).toBe(200);
+    expect(extractSessionCookie(ok.headers.get("set-cookie"))).toContain(
+      "carrier_session=",
+    );
+
+    const bad = await h.app.request("/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "bob@example.com", password: "wrong" }),
+    });
+    expect(bad.status).toBe(401);
+    expect((await bad.json()).error).toBe("invalid_credentials");
+
+    // Unknown email yields the same 401 (no account enumeration).
+    const unknown = await h.app.request("/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "nobody@example.com", password: "x" }),
+    });
+    expect(unknown.status).toBe(401);
+  });
+
+  it("register rejects a duplicate email (409) and a weak password (400)", async () => {
+    const h = await makeHarness();
+    const body = JSON.stringify({ email: "dup@example.com", password: "longenough1" });
+    const first = await h.app.request("/auth/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body,
+    });
+    expect(first.status).toBe(201);
+    const dup = await h.app.request("/auth/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body,
+    });
+    expect(dup.status).toBe(409);
+    expect((await dup.json()).error).toBe("email_taken");
+
+    const weak = await h.app.request("/auth/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "weak@example.com", password: "short" }),
+    });
+    expect(weak.status).toBe(400);
+  });
+
+  it("seedDevUser provisions a known account idempotently", async () => {
+    const h = await makeHarness();
+    const { seedDevUser } = await import("../auth/index.js");
+    const cfg = { ...h.config, devUserEmail: "dev@carrier.local", devUserPassword: "carrierdev" };
+    await seedDevUser(h.db, cfg);
+    await seedDevUser(h.db, cfg); // idempotent — no duplicate
+    const rows = await h.db
+      .select()
+      .from(account)
+      .where(eq(account.email, "dev@carrier.local"));
+    expect(rows).toHaveLength(1);
+
+    const login = await h.app.request("/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "dev@carrier.local", password: "carrierdev" }),
+    });
+    expect(login.status).toBe(200);
+  });
+});

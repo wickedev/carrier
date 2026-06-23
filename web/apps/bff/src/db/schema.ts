@@ -12,11 +12,14 @@ import {
 
 export const account = pgTable("account", {
   id: text("id").primaryKey(),
-  githubUserId: text("github_user_id").notNull().unique(),
+  // Null for email/password accounts (GitHub accounts carry their user id).
+  githubUserId: text("github_user_id").unique(),
   login: text("login").notNull(),
   name: text("name"),
   avatarUrl: text("avatar_url").notNull(),
   email: text("email"),
+  // scrypt hash for email/password accounts; null for GitHub-only accounts.
+  passwordHash: text("password_hash"),
   createdAt: timestamp("created_at", { mode: "string", withTimezone: true })
     .notNull()
     .defaultNow(),

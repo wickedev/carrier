@@ -22,6 +22,10 @@ export interface Config {
   configSecretKey: string;
   /** Local directory for the content-addressed plugin artifact store. */
   pluginArtifactsRoot: string;
+  /** Seed a known dev account on boot so local login works out of the box. */
+  seedDevUser: boolean;
+  devUserEmail: string;
+  devUserPassword: string;
 }
 
 function env(name: string, fallback: string): string {
@@ -55,6 +59,13 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
       "PLUGIN_ARTIFACTS_ROOT",
       join(tmpdir(), "carrier-bff-plugin-artifacts"),
     ),
+    // Seed a dev account outside production, unless explicitly disabled. This is
+    // applied at server boot (index.ts), never in tests.
+    seedDevUser:
+      env("NODE_ENV", "test") !== "production" &&
+      env("SEED_DEV_USER", "true") !== "false",
+    devUserEmail: env("DEV_USER_EMAIL", "dev@carrier.local"),
+    devUserPassword: env("DEV_USER_PASSWORD", "carrierdev"),
   };
   return { ...base, ...overrides };
 }

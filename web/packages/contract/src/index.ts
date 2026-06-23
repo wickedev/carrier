@@ -31,6 +31,21 @@ export const MeSchema = z.object({
 });
 export type Me = z.infer<typeof MeSchema>;
 
+// ── Email/password auth ───────────────────────────────────────────────────────
+
+export const LoginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+export type LoginInput = z.infer<typeof LoginSchema>;
+
+export const RegisterSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  name: z.string().optional(),
+});
+export type RegisterInput = z.infer<typeof RegisterSchema>;
+
 // ── Projects, workspace, sessions ─────────────────────────────────────────────
 
 export const RepoBindingSchema = z.object({

@@ -12,11 +12,12 @@ export type Db = ReturnType<typeof drizzle<typeof schema>>;
 const DDL = `
 CREATE TABLE IF NOT EXISTS account (
   id TEXT PRIMARY KEY,
-  github_user_id TEXT NOT NULL UNIQUE,
+  github_user_id TEXT UNIQUE,
   login TEXT NOT NULL,
   name TEXT,
   avatar_url TEXT NOT NULL,
   email TEXT,
+  password_hash TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS org (
