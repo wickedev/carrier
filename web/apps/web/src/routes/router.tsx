@@ -8,6 +8,7 @@ import { OrgPage } from "./org";
 import { ProjectPage } from "./project";
 import { SessionPage } from "./session";
 import { OrgSettingsPage, ProjectSettingsPage } from "./settings";
+import { MarketplacePage, PluginDetailPage } from "./marketplace";
 import { RouteError } from "./RouteError";
 
 /**
@@ -18,6 +19,8 @@ import { RouteError } from "./RouteError";
  *   index                      → redirect to active org
  *   /:org                      project list
  *   /:org/settings             org settings
+ *   /:org/marketplace          plugin marketplace (browse/search)
+ *   /:org/marketplace/:name    plugin detail + install consent
  *   /:org/:project             session list + overview
  *   /:org/:project/settings    repo binding, permissions, danger zone
  *   /:org/:project/s/:session  the IDE split-view
@@ -38,6 +41,8 @@ export function createRouter(queryClient: QueryClient) {
         { index: true, loader: indexLoader, element: null },
         { path: ":org", element: <OrgPage /> },
         { path: ":org/settings", element: <OrgSettingsPage /> },
+        { path: ":org/marketplace", element: <MarketplacePage /> },
+        { path: ":org/marketplace/:name", element: <PluginDetailPage /> },
         { path: ":org/:project", element: <ProjectPage /> },
         { path: ":org/:project/settings", element: <ProjectSettingsPage /> },
         { path: ":org/:project/s/:session", element: <SessionPage /> },

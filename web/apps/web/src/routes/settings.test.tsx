@@ -28,6 +28,15 @@ vi.mock("../api/client", () => ({
       getModel: vi.fn(),
       putModel: vi.fn(),
     },
+    marketplace: {
+      search: vi.fn(),
+      versions: vi.fn(),
+      version: vi.fn(),
+      listInstalls: vi.fn(),
+      install: vi.fn(),
+      updateInstall: vi.fn(),
+      uninstall: vi.fn(),
+    },
   },
 }));
 
@@ -86,6 +95,8 @@ beforeEach(() => {
   // Config sections rendered by both settings pages — empty defaults.
   (api.config.list as ReturnType<typeof vi.fn>).mockResolvedValue([]);
   (api.config.getModel as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("no model"));
+  // Installed-plugins section rendered by both settings pages — empty default.
+  (api.marketplace.listInstalls as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 });
 
 // ── Members (Req 21) ──────────────────────────────────────────────────────────

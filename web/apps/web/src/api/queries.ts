@@ -10,6 +10,7 @@ import {
   type Installation,
   type ConfigKind,
   type ConfigKindMap,
+  type PluginVersionDetail,
 } from "./client";
 import type {
   Me,
@@ -23,6 +24,10 @@ import type {
   PermissionRule,
   ConfigScope,
   ModelParams,
+  MarketplacePlugin,
+  PluginVersion,
+  PluginInstall,
+  InstallPlugin,
 } from "@carrier/contract";
 
 /** Centralized query keys so invalidation stays consistent. */
@@ -45,6 +50,12 @@ export const qk = {
     ["config", scope, owner, kind] as const,
   modelParams: (scope: ConfigScope, owner: string) =>
     ["config", scope, owner, "model"] as const,
+  marketplaceSearch: (q: string) => ["marketplace", "search", q] as const,
+  pluginVersions: (name: string) => ["marketplace", "versions", name] as const,
+  pluginVersion: (name: string, version: string) =>
+    ["marketplace", "version", name, version] as const,
+  installedPlugins: (scope: ConfigScope, owner: string) =>
+    ["plugins", scope, owner] as const,
 };
 
 export function useMe(opts?: Partial<UseQueryOptions<Me>>) {
@@ -345,6 +356,85 @@ export function usePutModelParams(scope: ConfigScope, ownerKey: string) {
     mutationFn: (params: ModelParams) => api.config.putModel(scope, ownerKey, params),
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: qk.modelParams(scope, ownerKey) }),
+  });
+}
+
+// ── Plugin marketplace (Req 4/5) ──────────────────────────────────────────────
+
+export function useMarketplaceSearch(
+  q: string,
+  opts?: Partial<UseQueryOptions<MarketplacePlugin[]>>,
+) {
+  return useQuery({
+    queryKey: qk.marketplaceSearch(q),
+    queryFn: ({ signal }) => api.marketplace.search(q, signal),
+    ...opts,
+  });
+}
+
+export function usePluginVersions(
+  name: string,
+  opts?: Partial<UseQueryOptions<PluginVersion[]>>,
+) {
+  return useQuery({
+    queryKey: qk.pluginVersions(name),
+    queryFn: ({ signal }) => api.marketplace.versions(name, signal),
+    enabled: !!name,
+    ...opts,
+  });
+}
+
+export function usePluginVersion(
+  name: string,
+  version: string | null,
+  opts?: Partial<UseQueryOptions<PluginVersionDetail>>,
+) {
+  return useQuery({
+    queryKey: qk.pluginVersion(name, version ?? ""),
+    queryFn: ({ signal }) => api.marketplace.version(name, version as string, signal),
+    enabled: !!name && !!version,
+    ...opts,
+  });
+}
+
+export function useInstalledPlugins(
+  scope: ConfigScope,
+  ownerKey: string,
+  opts?: Partial<UseQueryOptions<PluginInstall[]>>,
+) {
+  return useQuery({
+    queryKey: qk.installedPlugins(scope, ownerKey),
+    queryFn: ({ signal }) => api.marketplace.listInstalls(scope, ownerKey, signal),
+    enabled: !!ownerKey,
+    ...opts,
+  });
+}
+
+export function useInstallPlugin(scope: ConfigScope, ownerKey: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: InstallPlugin) => api.marketplace.install(scope, ownerKey, body),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: qk.installedPlugins(scope, ownerKey) }),
+  });
+}
+
+export function useUpdateInstall(scope: ConfigScope, ownerKey: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { id: string; patch: { enabled?: boolean; version?: string } }) =>
+      api.marketplace.updateInstall(scope, ownerKey, vars.id, vars.patch),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: qk.installedPlugins(scope, ownerKey) }),
+  });
+}
+
+export function useUninstall(scope: ConfigScope, ownerKey: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.marketplace.uninstall(scope, ownerKey, id),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: qk.installedPlugins(scope, ownerKey) }),
   });
 }
 

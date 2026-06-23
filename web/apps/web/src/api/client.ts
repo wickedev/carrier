@@ -15,6 +15,10 @@ import {
   HookDefSchema,
   EnvVarSchema,
   ModelParamsSchema,
+  MarketplacePluginSchema,
+  PluginVersionSchema,
+  PluginManifestSchema,
+  PluginInstallSchema,
   type Me,
   type Org,
   type Project,
@@ -32,6 +36,11 @@ import {
   type EnvVar,
   type ModelParams,
   type ConfigScope,
+  type MarketplacePlugin,
+  type PluginVersion,
+  type PluginManifest,
+  type PluginInstall,
+  type InstallPlugin,
 } from "@carrier/contract";
 
 /**
@@ -257,6 +266,45 @@ const CONFIG_SCHEMAS: { [K in ConfigKind]: Parser<ConfigKindMap[K]["entity"]> } 
 function configBase(scope: ConfigScope, ownerKey: string): string {
   const seg = scope === "org" ? "orgs" : "projects";
   return `/${seg}/${encodeURIComponent(ownerKey)}/config`;
+}
+
+// ── Plugin marketplace (Req 4/5) ──────────────────────────────────────────────
+//
+// The registry is reachable ONLY through the BFF (browser↔BFF); the browser never
+// talks to the registry or fetches unverified artifacts directly. Listings,
+// versions and version-detail are public (read) endpoints; installs live at org
+// or project scope and reuse the manager-gating that config mutations use.
+
+const MarketplacePluginListSchema = arrayOf(MarketplacePluginSchema);
+const PluginVersionListSchema = arrayOf(PluginVersionSchema);
+const PluginInstallListSchema = arrayOf(PluginInstallSchema);
+
+/** Response of `GET /marketplace/plugins/:name/:version` — the resolved, signed
+ *  manifest plus the detached attestation the BFF verified on the operator's
+ *  behalf (digest + signature + the wasm artifact digest, when present). */
+export interface PluginVersionDetail {
+  manifest: PluginManifest;
+  manifestDigest: string;
+  signature: string;
+  wasmDigest: string;
+}
+
+const PluginVersionDetailSchema: Parser<PluginVersionDetail> = {
+  parse(input: unknown): PluginVersionDetail {
+    const o = (input ?? {}) as Record<string, unknown>;
+    return {
+      manifest: PluginManifestSchema.parse(o.manifest),
+      manifestDigest: typeof o.manifestDigest === "string" ? o.manifestDigest : "",
+      signature: typeof o.signature === "string" ? o.signature : "",
+      wasmDigest: typeof o.wasmDigest === "string" ? o.wasmDigest : "",
+    };
+  },
+};
+
+/** Base path for a (scope, owner) install collection (org slug or project id). */
+function pluginInstallBase(scope: ConfigScope, ownerKey: string): string {
+  const seg = scope === "org" ? "orgs" : "projects";
+  return `/${seg}/${encodeURIComponent(ownerKey)}/plugins`;
 }
 
 export const api = {
@@ -535,6 +583,74 @@ export const api = {
         method: "PUT",
         body: params as Json,
       });
+    },
+  },
+
+  // ── Plugin marketplace (Req 4/5) ─────────────────────────────────────────
+  marketplace: {
+    /** Browse / search the registry (empty `q` → full listing). */
+    search(q?: string, signal?: AbortSignal): Promise<MarketplacePlugin[]> {
+      const query = q && q.trim() ? `?q=${encodeURIComponent(q.trim())}` : "";
+      return request(`/marketplace/plugins${query}`, MarketplacePluginListSchema, { signal });
+    },
+
+    /** Published versions of a plugin (newest first, per the registry). */
+    versions(name: string, signal?: AbortSignal): Promise<PluginVersion[]> {
+      return request(
+        `/marketplace/plugins/${encodeURIComponent(name)}/versions`,
+        PluginVersionListSchema,
+        { signal },
+      );
+    },
+
+    /** Resolve a single version's signed manifest + attestation. */
+    version(name: string, version: string, signal?: AbortSignal): Promise<PluginVersionDetail> {
+      return request(
+        `/marketplace/plugins/${encodeURIComponent(name)}/${encodeURIComponent(version)}`,
+        PluginVersionDetailSchema,
+        { signal },
+      );
+    },
+
+    // ── Scoped installs (lockfile rows) ────────────────────────────────────
+    listInstalls(
+      scope: ConfigScope,
+      ownerKey: string,
+      signal?: AbortSignal,
+    ): Promise<PluginInstall[]> {
+      return request(pluginInstallBase(scope, ownerKey), PluginInstallListSchema, { signal });
+    },
+
+    install(
+      scope: ConfigScope,
+      ownerKey: string,
+      body: InstallPlugin,
+    ): Promise<PluginInstall> {
+      return request(pluginInstallBase(scope, ownerKey), PluginInstallSchema, {
+        method: "POST",
+        body: body as Json,
+      });
+    },
+
+    updateInstall(
+      scope: ConfigScope,
+      ownerKey: string,
+      installId: string,
+      patch: { enabled?: boolean; version?: string },
+    ): Promise<PluginInstall> {
+      return request(
+        `${pluginInstallBase(scope, ownerKey)}/${encodeURIComponent(installId)}`,
+        PluginInstallSchema,
+        { method: "PATCH", body: patch as Json },
+      );
+    },
+
+    uninstall(scope: ConfigScope, ownerKey: string, installId: string): Promise<void> {
+      return request(
+        `${pluginInstallBase(scope, ownerKey)}/${encodeURIComponent(installId)}`,
+        VoidSchema,
+        { method: "DELETE" },
+      );
     },
   },
 };

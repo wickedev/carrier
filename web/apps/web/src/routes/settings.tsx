@@ -20,6 +20,7 @@ import {
 } from "../api/queries";
 import { formatUsd, formatTokens } from "../components/ide/UsagePanel";
 import { ConfigSections } from "./config-sections";
+import { InstalledPluginsSection } from "./marketplace";
 
 /** Roles that may manage org members / project settings. */
 function canManage(role?: Role): boolean {
@@ -66,6 +67,7 @@ export function OrgSettingsPage() {
 
       <h2 className="mb-4 mt-8 text-lg font-semibold">Configuration</h2>
       <ConfigSections scope="org" ownerKey={org} manage={canManage(current?.role)} />
+      <InstalledPluginsSection scope="org" ownerKey={org} manage={canManage(current?.role)} />
     </div>
   );
 }
@@ -203,6 +205,7 @@ export function ProjectSettingsPage() {
 
       <h2 className="mb-4 mt-8 text-lg font-semibold">Configuration</h2>
       <ConfigSections scope="project" ownerKey={project} manage={manage} />
+      <InstalledPluginsSection scope="project" ownerKey={project} manage={manage} />
       <PermissionsSection projectId={project} manage={manage} />
 
       <UsageSection projectId={project} />
