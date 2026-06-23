@@ -190,6 +190,21 @@ CREATE TABLE IF NOT EXISTS org_plugin_allowlist (
 );
 `;
 
+// Idempotent migrations applied after the CREATE TABLE bootstrap so existing
+// databases (a persisted dev PGlite or a production Postgres) converge to the
+// current schema — CREATE TABLE IF NOT EXISTS never alters an existing table.
+// Every statement is safe to re-run.
+export const MIGRATIONS = `
+-- email/password auth: github_user_id becomes optional + a password hash column.
+ALTER TABLE account ADD COLUMN IF NOT EXISTS password_hash TEXT;
+ALTER TABLE account ALTER COLUMN github_user_id DROP NOT NULL;
+-- Enforce a single account per email FOR PASSWORD ACCOUNTS (login identity).
+-- A partial unique index leaves GitHub accounts (which may share or omit an
+-- email) unconstrained while making duplicate registrations impossible.
+CREATE UNIQUE INDEX IF NOT EXISTS account_password_email_unique
+  ON account (email) WHERE password_hash IS NOT NULL;
+`;
+
 export interface CreateDbOptions {
   /** Filesystem path / data dir for PGlite; omit for in-memory (tests). */
   dataDir?: string;
@@ -198,6 +213,7 @@ export interface CreateDbOptions {
 export async function createDb(opts: CreateDbOptions = {}): Promise<Db> {
   const pg = opts.dataDir ? new PGlite(opts.dataDir) : new PGlite();
   await pg.exec(DDL);
+  await pg.exec(MIGRATIONS);
   return drizzle(pg, { schema });
 }
 

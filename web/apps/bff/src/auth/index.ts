@@ -75,11 +75,19 @@ export function authRoutes(): Hono<AppEnv> {
       .limit(1);
     if (taken[0]) return c.json({ error: "email_taken" }, 409);
 
-    const accountId = await provisionLocalAccount(db, {
-      email,
-      password: parsed.data.password,
-      name: parsed.data.name,
-    });
+    let accountId: string;
+    try {
+      accountId = await provisionLocalAccount(db, {
+        email,
+        password: parsed.data.password,
+        name: parsed.data.name,
+      });
+    } catch (err) {
+      // The partial unique index is the real guard: a concurrent registration
+      // racing past the pre-check trips a unique violation → email_taken.
+      if (isUniqueViolation(err)) return c.json({ error: "email_taken" }, 409);
+      throw err;
+    }
     await setSession(c, config, { accountId });
     return c.json({ ok: true }, 201);
   });
@@ -178,6 +186,14 @@ export async function listOrgsForAccount(
     name: r.name,
     role: (r.role as Role) ?? "member",
   }));
+}
+
+/** Whether err is a Postgres/PGlite unique-constraint violation (SQLSTATE 23505). */
+function isUniqueViolation(err: unknown): boolean {
+  if (err && typeof err === "object" && "code" in err) {
+    return (err as { code?: unknown }).code === "23505";
+  }
+  return /unique/i.test(String(err));
 }
 
 /** A deterministic Gravatar identicon URL for an email (valid URL, no network
