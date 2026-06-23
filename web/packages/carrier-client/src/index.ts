@@ -40,6 +40,14 @@ export interface PermissionSpec {
   pattern: string;
   effect: "allow" | "deny" | "ask";
 }
+export interface PluginRef {
+  name: string;
+  version: string;
+  manifestDigest: string;
+  wasmDigest: string;
+  grantedCaps: string[];
+  allowPermissions: boolean;
+}
 
 export interface CreateSessionInput {
   /** Working directory for the session sandbox — the per-session working copy. */
@@ -58,6 +66,7 @@ export interface CreateSessionInput {
   subagents?: SubagentSpec[];
   hooks?: HookSpec[];
   permissions?: PermissionSpec[];
+  plugins?: PluginRef[];
 }
 
 /** Raw event as emitted by the Carrier SSE endpoint (snake_case wire shape). */
@@ -149,6 +158,14 @@ export class CarrierClient {
         action: p.action,
         pattern: p.pattern,
         effect: p.effect,
+      })),
+      plugins: input.plugins?.map((p) => ({
+        name: p.name,
+        version: p.version,
+        manifest_digest: p.manifestDigest,
+        wasm_digest: p.wasmDigest,
+        granted_caps: p.grantedCaps,
+        allow_permissions: p.allowPermissions,
       })),
     };
     const res = await this.fetchImpl(`${this.baseUrl}/v1/sessions`, {

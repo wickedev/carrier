@@ -369,5 +369,116 @@ export const SessionConfigSchema = z.object({
       }),
     )
     .optional(),
+  // Active (WASM) plugins the runtime should load for this session. Refs only —
+  // the runtime resolves the artifact by digest. Declarative plugin contributions
+  // are merged into the fields above by the assembly step.
+  plugins: z
+    .array(
+      z.object({
+        name: z.string(),
+        version: z.string(),
+        manifestDigest: z.string(),
+        wasmDigest: z.string(),
+        grantedCaps: z.array(z.string()),
+        allowPermissions: z.boolean(),
+      }),
+    )
+    .optional(),
 });
 export type SessionConfig = z.infer<typeof SessionConfigSchema>;
+
+// ── Plugin marketplace ────────────────────────────────────────────────────────
+//
+// A plugin is a signed bundle with an optional declarative layer (config it
+// contributes) and an optional active layer (a WASM module implementing seams).
+// Integrity is a detached attestation over the manifest digest — the manifest is
+// NEVER self-hashed/-signed (it records each artifact's digest instead).
+
+export const SeamKindSchema = z.enum([
+  "before_step",
+  "tool_before",
+  "tool_after",
+  "permission_ask",
+  "session_start",
+  "session_end",
+]);
+export type SeamKind = z.infer<typeof SeamKindSchema>;
+
+/** The capabilities a plugin requests; each must be operator-approved at install. */
+export const PluginCapabilitiesSchema = z.object({
+  /** Allowed outbound hosts for http_fetch (empty → no network). */
+  network: z.array(z.string()).default([]),
+  /** Secret keys the plugin may read via secret_get. */
+  secrets: z.array(z.string()).default([]),
+  /** Whether the plugin may use the namespaced kv store. */
+  kv: z.boolean().default(false),
+  /** Whether the plugin's permission_ask "allow" may be honored (default false). */
+  permissionsAllow: z.boolean().default(false),
+});
+export type PluginCapabilities = z.infer<typeof PluginCapabilitiesSchema>;
+
+/** A reference to a bundled artifact, pinned by its own content digest. */
+export const PluginArtifactSchema = z.object({
+  path: z.string(),
+  digest: z.string(), // sha256-...
+});
+
+/** The plugin manifest (carrier-plugin.json). Contains NO self hash/signature. */
+export const PluginManifestSchema = z.object({
+  name: z.string().min(1),
+  version: z.string().min(1),
+  publisher: z.string().min(1),
+  api: z.string(), // e.g. "carrier.plugin/v1"
+  description: z.string().default(""),
+  seams: z.array(SeamKindSchema).default([]),
+  capabilities: PluginCapabilitiesSchema,
+  /** Optional declarative layer — same shape as a SessionConfig contribution. */
+  declarative: SessionConfigSchema.partial().optional(),
+  /** Artifacts the manifest commits to by digest (e.g. the WASM module). */
+  artifacts: z
+    .object({ wasm: PluginArtifactSchema.optional() })
+    .default({}),
+});
+export type PluginManifest = z.infer<typeof PluginManifestSchema>;
+
+/** A marketplace listing (search/browse). */
+export const MarketplacePluginSchema = z.object({
+  name: z.string(),
+  publisher: z.string(),
+  verified: z.boolean(),
+  description: z.string(),
+  latestVersion: z.string(),
+});
+export type MarketplacePlugin = z.infer<typeof MarketplacePluginSchema>;
+
+/** One published version, identified by its manifest digest. */
+export const PluginVersionSchema = z.object({
+  name: z.string(),
+  version: z.string(),
+  manifestDigest: z.string(),
+  manifest: PluginManifestSchema,
+  createdAt: z.string(),
+});
+export type PluginVersion = z.infer<typeof PluginVersionSchema>;
+
+/** An installed plugin at org or project scope (the lockfile row). */
+export const PluginInstallSchema = z.object({
+  id: z.string(),
+  scope: ConfigScopeSchema,
+  name: z.string(),
+  version: z.string(),
+  manifestDigest: z.string(),
+  grantedCaps: z.array(z.string()),
+  allowPermissions: z.boolean(),
+  enabled: z.boolean(),
+});
+export type PluginInstall = z.infer<typeof PluginInstallSchema>;
+
+/** Install request: pin a version + the operator-approved capabilities. */
+export const InstallPluginSchema = z.object({
+  name: z.string().min(1),
+  version: z.string().min(1),
+  grantedCaps: z.array(z.string()).default([]),
+  allowPermissions: z.boolean().default(false),
+});
+export type InstallPlugin = z.infer<typeof InstallPluginSchema>;

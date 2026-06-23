@@ -57,6 +57,18 @@ type SessionOptions struct {
 	Subagents     []SubagentSpec
 	Hooks         []HookSpec
 	Permissions   []PermissionSpec
+	Plugins       []PluginRef
+}
+
+// PluginRef references an active (WASM) plugin the session should load. The
+// runtime resolves the artifact by digest, verifies it, and registers its seams.
+type PluginRef struct {
+	Name             string
+	Version          string
+	ManifestDigest   string
+	WasmDigest       string
+	GrantedCaps      []string
+	AllowPermissions bool
 }
 
 // MCPServerSpec is a per-session MCP (stdio) server registration.
@@ -208,6 +220,14 @@ type createRequest struct {
 		Pattern string `json:"pattern"`
 		Effect  string `json:"effect"`
 	} `json:"permissions"`
+	Plugins []struct {
+		Name             string   `json:"name"`
+		Version          string   `json:"version"`
+		ManifestDigest   string   `json:"manifest_digest"`
+		WasmDigest       string   `json:"wasm_digest"`
+		GrantedCaps      []string `json:"granted_caps"`
+		AllowPermissions bool     `json:"allow_permissions"`
+	} `json:"plugins"`
 }
 
 // toOptions projects the wire request onto the decoupled SessionOptions.
@@ -247,6 +267,13 @@ func (r *createRequest) toOptions() SessionOptions {
 	for _, p := range r.Permissions {
 		opts.Permissions = append(opts.Permissions, PermissionSpec{
 			Action: p.Action, Pattern: p.Pattern, Effect: p.Effect,
+		})
+	}
+	for _, p := range r.Plugins {
+		opts.Plugins = append(opts.Plugins, PluginRef{
+			Name: p.Name, Version: p.Version, ManifestDigest: p.ManifestDigest,
+			WasmDigest: p.WasmDigest, GrantedCaps: p.GrantedCaps,
+			AllowPermissions: p.AllowPermissions,
 		})
 	}
 	return opts
