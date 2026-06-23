@@ -168,6 +168,8 @@ export const SessionEventSchema = z.discriminatedUnion("kind", [
     kind: z.literal("status"),
     state: SessionStatusSchema,
   }),
+  // Auto-generated session title (emitted once after the first turn).
+  z.object({ seq: z.number(), kind: z.literal("title"), title: z.string() }),
   z.object({ seq: z.number(), kind: z.literal("error"), message: z.string() }),
 ]);
 export type SessionEvent = z.infer<typeof SessionEventSchema>;

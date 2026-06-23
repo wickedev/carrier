@@ -142,6 +142,14 @@ export function sessionRoutes(): Hono<AppEnv> {
           if (!ev) continue;
           if (ev.seq <= lastSeq) continue; // dedupe / ordering guard
           lastSeq = ev.seq;
+          // Persist auto-generated session titles. The runtime emits this once
+          // after the first turn; replay re-applies the same value (idempotent).
+          if (ev.kind === "title" && ev.title.length > 0) {
+            await db
+              .update(sessionTable)
+              .set({ title: ev.title })
+              .where(eq(sessionTable.id, sessionId));
+          }
           await stream.writeSSE({
             event: ev.kind,
             id: String(ev.seq),

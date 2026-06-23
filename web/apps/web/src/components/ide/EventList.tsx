@@ -113,7 +113,11 @@ export function EventCard({ event }: { event: SessionEvent }) {
 
 /** Scrollable, ordered event log. Approval requests are surfaced separately. */
 export function EventList({ events }: { events: SessionEvent[] }) {
-  const visible = events.filter((e) => e.kind !== "approval_request");
+  // approval_request is surfaced separately; title is metadata (drives the
+  // TopBar / session list, not rendered inline in the event log).
+  const visible = events.filter(
+    (e) => e.kind !== "approval_request" && e.kind !== "title",
+  );
   return (
     <div
       className="flex flex-col py-2"

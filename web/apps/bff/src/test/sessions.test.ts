@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { existsSync } from "node:fs";
 import { writeFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { eq } from "drizzle-orm";
+import { session as sessionTable } from "../db/schema.js";
 import { makeHarness, type Harness } from "./harness.js";
 
 async function setup(h: Harness, repoBound = false) {
@@ -173,6 +175,33 @@ describe("session CRUD + Carrier brokering", () => {
     });
     expect(res.status).toBe(200);
     expect(existsSync(cwd)).toBe(false);
+  });
+
+  it("a title_suggested event from Carrier updates the session row title in the DB", async () => {
+    const h = await makeHarness();
+    const { cookie, project } = await setup(h);
+    const { body } = await createSession(h, cookie, project.id);
+
+    // Carrier emits the auto-generated title once after the first turn.
+    h.carrier.events = [
+      { seq: 0, kind: "status", state: "running" },
+      { seq: 1, kind: "title_suggested", title: "Add OAuth login" },
+    ];
+
+    // Drain the SSE relay so the BFF normalizes + persists the title.
+    const res = await h.app.request(`/sessions/${body.id}/events`, {
+      headers: { cookie },
+    });
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    // The title event is still forwarded to the browser stream.
+    expect(text).toContain("Add OAuth login");
+
+    const rows = await h.db
+      .select()
+      .from(sessionTable)
+      .where(eq(sessionTable.id, body.id));
+    expect(rows[0]?.title).toBe("Add OAuth login");
   });
 });
 

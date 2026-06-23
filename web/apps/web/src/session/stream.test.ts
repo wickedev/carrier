@@ -33,6 +33,7 @@ const ev = {
     status: "M",
   }),
   error: (seq: number, message: string): SessionEvent => ({ seq, kind: "error", message }),
+  title: (seq: number, title: string): SessionEvent => ({ seq, kind: "title", title }),
 };
 
 const emptyState = (): ReducerState => ({
@@ -89,6 +90,17 @@ describe("reduce (pure reducer)", () => {
     let s = emptyState();
     s = reduce(s, ev.error(1, "boom"))!;
     expect(s.lastError).toBe("boom");
+  });
+
+  it("accepts a title event (metadata) without error and logs it in order", () => {
+    let s = emptyState();
+    s = reduce(s, ev.text(1, "a"))!;
+    s = reduce(s, ev.title(2, "Add OAuth login"))!;
+    expect(s.events.map((e) => e.seq)).toEqual([1, 2]);
+    // title carries no reducer side-effects (status/approvals/error untouched).
+    expect(s.status).toBe("idle");
+    expect(s.pendingApprovals).toEqual([]);
+    expect(s.lastError).toBeNull();
   });
 });
 

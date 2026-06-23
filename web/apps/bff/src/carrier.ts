@@ -89,6 +89,9 @@ export function normalizeEvent(raw: RawCarrierEvent): SessionEvent | null {
     case "error":
       candidate = { seq, kind: "error", message: raw.message ?? "" };
       break;
+    case "title_suggested":
+      candidate = { seq, kind: "title", title: raw.title ?? "" };
+      break;
     default:
       return null;
   }

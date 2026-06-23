@@ -74,9 +74,15 @@ export function SessionPage() {
           void qc.invalidateQueries({ queryKey: qk.file(sessionId, e.path) });
           void qc.invalidateQueries({ queryKey: qk.diff(sessionId, e.path) });
         }
+      } else if (e.kind === "title") {
+        // The runtime auto-generated a session title (the BFF has already
+        // persisted it). Refresh the session detail (drives the TopBar title)
+        // and the project's session list (renders s.title).
+        void qc.invalidateQueries({ queryKey: qk.session(sessionId) });
+        void qc.invalidateQueries({ queryKey: qk.sessions(project) });
       }
     }
-  }, [events, selectedPath, sessionId, qc]);
+  }, [events, selectedPath, sessionId, project, qc]);
 
   const onSend = async (text: string, steer: boolean) => {
     setSending(true);

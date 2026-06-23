@@ -90,6 +90,7 @@ export interface RawCarrierEvent {
   output_tokens?: number;
   cache_read_tokens?: number;
   cache_write_tokens?: number;
+  title?: string;
 }
 
 export class CarrierError extends Error {
