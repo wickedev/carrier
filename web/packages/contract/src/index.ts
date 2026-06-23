@@ -185,3 +185,189 @@ export const PermissionRuleSchema = z.object({
   effect: z.enum(["allow", "deny", "ask"]),
 });
 export type PermissionRule = z.infer<typeof PermissionRuleSchema>;
+
+// ── Configuration primitives (agents / skills / MCP / context / hooks / env) ──
+//
+// All four config families plus hooks and env live at TWO scopes: an Org-level
+// shared layer and a Project-level layer that adds to / overrides it. Every row
+// carries a `scope` discriminator + the owning id (`orgId` or `projectId`); the
+// effective config for a session is the org layer merged with the project layer
+// (project wins on name collision). These are the single source of truth shared
+// by the BFF (storage + REST) and the web UI; the BFF also assembles them into
+// the SessionConfig handed to Carrier at session creation.
+
+export const ConfigScopeSchema = z.enum(["org", "project"]);
+export type ConfigScope = z.infer<typeof ConfigScopeSchema>;
+
+/** A named subagent definition (a custom "agent" the model can delegate to). */
+export const AgentDefSchema = z.object({
+  id: z.string(),
+  scope: ConfigScopeSchema,
+  name: z.string().min(1),
+  description: z.string(),
+  prompt: z.string(),
+  model: z.string().optional(),
+  enabled: z.boolean(),
+});
+export type AgentDef = z.infer<typeof AgentDefSchema>;
+
+/** A skill: name + description (shown to the model) + body (loaded on demand). */
+export const SkillDefSchema = z.object({
+  id: z.string(),
+  scope: ConfigScopeSchema,
+  name: z.string().min(1),
+  description: z.string(),
+  body: z.string(),
+  /** Restrict to a single agent (empty → any). */
+  agent: z.string().optional(),
+  allowedTools: z.array(z.string()).optional(),
+  enabled: z.boolean(),
+});
+export type SkillDef = z.infer<typeof SkillDefSchema>;
+
+/** An MCP server registration (stdio transport). */
+export const McpServerSchema = z.object({
+  id: z.string(),
+  scope: ConfigScopeSchema,
+  name: z.string().min(1),
+  command: z.string().min(1),
+  args: z.array(z.string()),
+  /** Names of env keys this server needs; values come from the secret store. */
+  envKeys: z.array(z.string()),
+  enabled: z.boolean(),
+});
+export type McpServer = z.infer<typeof McpServerSchema>;
+
+/** A context document (AGENTS.md-like instructions injected into the session). */
+export const ContextDocSchema = z.object({
+  id: z.string(),
+  scope: ConfigScopeSchema,
+  name: z.string().min(1),
+  body: z.string(),
+  enabled: z.boolean(),
+});
+export type ContextDoc = z.infer<typeof ContextDocSchema>;
+
+export const HookEventSchema = z.enum([
+  "PreToolUse",
+  "PostToolUse",
+  "SessionStart",
+  "SessionEnd",
+  "PreCompact",
+  "PostCompact",
+]);
+export type HookEvent = z.infer<typeof HookEventSchema>;
+
+/** A command hook fired on a lifecycle event (matcher scopes tool events). */
+export const HookDefSchema = z.object({
+  id: z.string(),
+  scope: ConfigScopeSchema,
+  name: z.string().min(1),
+  event: HookEventSchema,
+  command: z.string().min(1),
+  /** Glob over the tool name for Pre/PostToolUse (empty → all). */
+  matcher: z.string().optional(),
+  enabled: z.boolean(),
+});
+export type HookDef = z.infer<typeof HookDefSchema>;
+
+/** An environment variable / secret. `secret` values are write-only (never
+ *  returned to the browser — read responses carry an empty value + `hasValue`). */
+export const EnvVarSchema = z.object({
+  id: z.string(),
+  scope: ConfigScopeSchema,
+  key: z.string().min(1),
+  value: z.string(),
+  secret: z.boolean(),
+  hasValue: z.boolean(),
+});
+export type EnvVar = z.infer<typeof EnvVarSchema>;
+
+/** Model + run parameters for a scope (a single row per scope). */
+export const ModelParamsSchema = z.object({
+  model: z.string(),
+  effort: z.enum(["", "low", "medium", "high", "xhigh", "max"]),
+  maxSteps: z.number().int().min(0),
+  contextBudget: z.number().int().min(0),
+  planMode: z.boolean(),
+});
+export type ModelParams = z.infer<typeof ModelParamsSchema>;
+
+// Input schemas (id/hasValue are server-assigned, so omitted from create bodies).
+export const CreateAgentDefSchema = AgentDefSchema.omit({ id: true, scope: true });
+export const CreateSkillDefSchema = SkillDefSchema.omit({ id: true, scope: true });
+export const CreateMcpServerSchema = McpServerSchema.omit({ id: true, scope: true });
+export const CreateContextDocSchema = ContextDocSchema.omit({ id: true, scope: true });
+export const CreateHookDefSchema = HookDefSchema.omit({ id: true, scope: true });
+export const CreateEnvVarSchema = EnvVarSchema.omit({
+  id: true,
+  scope: true,
+  hasValue: true,
+});
+
+/**
+ * The fully-resolved per-session configuration the BFF assembles (org⊕project,
+ * enabled-only, secrets resolved) and sends to Carrier on session creation. This
+ * mirrors the Carrier `POST /v1/sessions` JSON body (snake_cased on the wire by
+ * the carrier-client) — it is the contract between the BFF and the runtime.
+ */
+export const SessionConfigSchema = z.object({
+  context: z.string().optional(),
+  model: z.string().optional(),
+  effort: z.string().optional(),
+  maxSteps: z.number().optional(),
+  contextBudget: z.number().optional(),
+  planMode: z.boolean().optional(),
+  env: z.record(z.string(), z.string()).optional(),
+  mcpServers: z
+    .array(
+      z.object({
+        name: z.string(),
+        command: z.string(),
+        args: z.array(z.string()),
+        env: z.record(z.string(), z.string()),
+      }),
+    )
+    .optional(),
+  skills: z
+    .array(
+      z.object({
+        name: z.string(),
+        description: z.string(),
+        body: z.string(),
+        agent: z.string().optional(),
+        allowedTools: z.array(z.string()).optional(),
+      }),
+    )
+    .optional(),
+  subagents: z
+    .array(
+      z.object({
+        name: z.string(),
+        description: z.string(),
+        prompt: z.string(),
+        model: z.string().optional(),
+      }),
+    )
+    .optional(),
+  hooks: z
+    .array(
+      z.object({
+        name: z.string(),
+        event: HookEventSchema,
+        command: z.string(),
+        matcher: z.string().optional(),
+      }),
+    )
+    .optional(),
+  permissions: z
+    .array(
+      z.object({
+        action: z.string(),
+        pattern: z.string(),
+        effect: z.enum(["allow", "deny", "ask"]),
+      }),
+    )
+    .optional(),
+});
+export type SessionConfig = z.infer<typeof SessionConfigSchema>;

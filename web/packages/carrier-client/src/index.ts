@@ -10,11 +10,54 @@ export interface CarrierClientOptions {
   fetchImpl?: typeof fetch;
 }
 
+export interface McpServerSpec {
+  name: string;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+}
+export interface SkillSpec {
+  name: string;
+  description: string;
+  body: string;
+  agent?: string;
+  allowedTools?: string[];
+}
+export interface SubagentSpec {
+  name: string;
+  description: string;
+  prompt: string;
+  model?: string;
+}
+export interface HookSpec {
+  name: string;
+  event: string;
+  command: string;
+  matcher?: string;
+}
+export interface PermissionSpec {
+  action: string;
+  pattern: string;
+  effect: "allow" | "deny" | "ask";
+}
+
 export interface CreateSessionInput {
   /** Working directory for the session sandbox — the per-session working copy. */
   cwd?: string;
   system?: string;
   planMode?: boolean;
+  /** AGENTS.md-like instructions prepended to the session's durable memory. */
+  context?: string;
+  model?: string;
+  effort?: string;
+  maxSteps?: number;
+  contextBudget?: number;
+  env?: Record<string, string>;
+  mcpServers?: McpServerSpec[];
+  skills?: SkillSpec[];
+  subagents?: SubagentSpec[];
+  hooks?: HookSpec[];
+  permissions?: PermissionSpec[];
 }
 
 /** Raw event as emitted by the Carrier SSE endpoint (snake_case wire shape). */
@@ -66,14 +109,56 @@ export class CarrierClient {
   }
 
   async createSession(input: CreateSessionInput = {}): Promise<string> {
+    // Snake-case the wire body to match the Carrier runtime's JSON contract.
+    const body: Record<string, unknown> = {
+      cwd: input.cwd,
+      system: input.system,
+      plan_mode: input.planMode,
+      context: input.context,
+      model: input.model,
+      effort: input.effort,
+      max_steps: input.maxSteps,
+      context_budget: input.contextBudget,
+      env: input.env,
+      mcp_servers: input.mcpServers?.map((m) => ({
+        name: m.name,
+        command: m.command,
+        args: m.args,
+        env: m.env,
+      })),
+      skills: input.skills?.map((s) => ({
+        name: s.name,
+        description: s.description,
+        body: s.body,
+        agent: s.agent,
+        allowed_tools: s.allowedTools,
+      })),
+      subagents: input.subagents?.map((a) => ({
+        name: a.name,
+        description: a.description,
+        prompt: a.prompt,
+        model: a.model,
+      })),
+      hooks: input.hooks?.map((h) => ({
+        name: h.name,
+        event: h.event,
+        command: h.command,
+        matcher: h.matcher,
+      })),
+      permissions: input.permissions?.map((p) => ({
+        action: p.action,
+        pattern: p.pattern,
+        effect: p.effect,
+      })),
+    };
     const res = await this.fetchImpl(`${this.baseUrl}/v1/sessions`, {
       method: "POST",
       headers: this.headers({ "content-type": "application/json" }),
-      body: JSON.stringify({ cwd: input.cwd, system: input.system, plan_mode: input.planMode }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new CarrierError(`createSession failed`, res.status);
-    const body = (await res.json()) as { session_id: string };
-    return body.session_id;
+    const respBody = (await res.json()) as { session_id: string };
+    return respBody.session_id;
   }
 
   async sendInput(sessionId: string, text: string, steer = false): Promise<void> {
