@@ -24,7 +24,7 @@ function StatusDot({ status }: { status: SessionStatus }) {
     );
   if (status === "terminated")
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-neutral-400">
+      <span className="inline-flex items-center gap-1 text-xs text-fg-muted">
         <Circle className="h-3 w-3" aria-hidden /> terminated
       </span>
     );
@@ -37,7 +37,7 @@ function StatusDot({ status }: { status: SessionStatus }) {
 
 function ConnectionPill({ connection }: { connection: ConnectionState }) {
   const map: Record<ConnectionState, { label: string; cls: string }> = {
-    idle: { label: "idle", cls: "text-neutral-400" },
+    idle: { label: "idle", cls: "text-fg-muted" },
     connecting: { label: "connecting…", cls: "text-amber-500" },
     open: { label: "live", cls: "text-green-600 dark:text-green-400" },
     reconnecting: { label: "reconnecting…", cls: "text-amber-500" },
@@ -79,7 +79,7 @@ export function TopBar({
   const branch = session?.workingCopy?.branch ?? null;
   return (
     <div className="flex items-center gap-3 border-b border-neutral-200 px-3 py-1.5 text-sm dark:border-neutral-800">
-      <nav className="flex items-center gap-1 text-neutral-500" aria-label="Breadcrumb">
+      <nav className="flex items-center gap-1 text-fg-muted" aria-label="Breadcrumb">
         <Link to={`/${orgSlug}`} className="hover:underline">
           {orgSlug}
         </Link>

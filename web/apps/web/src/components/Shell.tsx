@@ -65,7 +65,7 @@ function OrgSwitcher({ me, activeSlug }: { me: Me; activeSlug?: string }) {
                 )}
               >
                 <span>{org.name}</span>
-                <span className="text-xs text-neutral-400">{org.kind}</span>
+                <span className="text-xs text-fg-muted">{org.kind}</span>
               </button>
             </li>
           ))}
@@ -98,7 +98,7 @@ export function Shell({ me }: { me: Me }) {
         <OrgSwitcher me={me} activeSlug={org} />
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
-          <span className="hidden text-sm text-neutral-500 sm:inline">{me.account.login}</span>
+          <span className="hidden text-sm text-fg-muted sm:inline">{me.account.login}</span>
           <img
             src={me.account.avatarUrl}
             alt=""

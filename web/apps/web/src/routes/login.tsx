@@ -61,7 +61,7 @@ export function LoginPage() {
       </div>
       <div className="flex flex-col items-center gap-2">
         <h1 className="text-2xl font-semibold">Carrier</h1>
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-fg-muted">
           {mode === "login"
             ? "Sign in to access your projects."
             : "Create your account."}
@@ -101,7 +101,7 @@ export function LoginPage() {
           autoComplete={mode === "login" ? "current-password" : "new-password"}
         />
         {error ? (
-          <p className="text-sm text-red-500" role="alert">
+          <p className="text-sm text-danger" role="alert">
             {error}
           </p>
         ) : null}
@@ -112,7 +112,7 @@ export function LoginPage() {
 
       <button
         type="button"
-        className="text-sm text-neutral-500 hover:underline"
+        className="text-sm text-fg-muted hover:underline"
         onClick={() => {
           setMode((m) => (m === "login" ? "register" : "login"));
           setError(null);
@@ -123,7 +123,7 @@ export function LoginPage() {
           : "Already have an account? Sign in"}
       </button>
 
-      <div className="flex w-72 items-center gap-3 text-xs text-neutral-400">
+      <div className="flex w-72 items-center gap-3 text-xs text-fg-muted">
         <div className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />
         or
         <div className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />

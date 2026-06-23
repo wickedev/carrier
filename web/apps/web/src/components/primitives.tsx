@@ -39,7 +39,7 @@ export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInp
   return (
     <input
       className={cn(
-        "h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm outline-none placeholder:text-neutral-400 focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950 dark:placeholder:text-neutral-600",
+        "h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm outline-none placeholder:text-fg-subtle focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950",
         className,
       )}
       {...props}
@@ -50,7 +50,7 @@ export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInp
 export function Loading({ label = "Loading…" }: { label?: string }) {
   return (
     <div
-      className="flex h-full w-full items-center justify-center gap-2 p-8 text-sm text-neutral-500"
+      className="flex h-full w-full items-center justify-center gap-2 p-8 text-sm text-fg-muted"
       role="status"
       aria-live="polite"
     >
@@ -72,7 +72,7 @@ export function EmptyState({
     <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-8 text-center">
       <p className="text-sm font-medium text-neutral-700 dark:text-neutral-200">{title}</p>
       {description ? (
-        <p className="max-w-sm text-sm text-neutral-500">{description}</p>
+        <p className="max-w-sm text-sm text-fg-muted">{description}</p>
       ) : null}
       {action ? <div className="mt-2">{action}</div> : null}
     </div>
@@ -93,9 +93,9 @@ export function ErrorState({
       className="flex h-full w-full flex-col items-center justify-center gap-2 p-8 text-center"
       role="alert"
     >
-      <AlertTriangle className="h-6 w-6 text-red-500" aria-hidden />
+      <AlertTriangle className="h-6 w-6 text-danger" aria-hidden />
       <p className="text-sm font-medium text-neutral-700 dark:text-neutral-200">{title}</p>
-      {message ? <p className="max-w-md text-sm text-neutral-500">{message}</p> : null}
+      {message ? <p className="max-w-md text-sm text-fg-muted">{message}</p> : null}
       {onRetry ? (
         <button
           onClick={onRetry}

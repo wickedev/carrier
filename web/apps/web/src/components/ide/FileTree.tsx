@@ -97,13 +97,13 @@ export function FileTree({
     if (!state) return null;
     if (state.loading && !state.entries)
       return (
-        <div style={{ paddingLeft: depth * 12 + 8 }} className="py-1 text-xs text-neutral-400">
+        <div style={{ paddingLeft: depth * 12 + 8 }} className="py-1 text-xs text-fg-muted">
           loading…
         </div>
       );
     if (state.error && !state.entries)
       return (
-        <div style={{ paddingLeft: depth * 12 + 8 }} className="py-1 text-xs text-red-500">
+        <div style={{ paddingLeft: depth * 12 + 8 }} className="py-1 text-xs text-danger">
           {state.error}
         </div>
       );

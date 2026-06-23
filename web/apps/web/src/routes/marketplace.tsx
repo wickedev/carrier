@@ -57,7 +57,7 @@ export function MarketplacePage() {
 
   return (
     <div className="mx-auto max-w-3xl p-6">
-      <div className="mb-4 text-sm text-neutral-500">
+      <div className="mb-4 text-sm text-fg-muted">
         <Link to={`/${org}`} className="hover:underline">
           {org}
         </Link>{" "}
@@ -113,7 +113,7 @@ function PluginCard({ org, plugin }: { org: string; plugin: MarketplacePlugin })
           <span className="truncate font-medium">{plugin.name}</span>
           {plugin.verified ? <VerifiedBadge /> : null}
         </div>
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-fg-muted">
           {plugin.publisher} · v{plugin.latestVersion}
         </p>
         {plugin.description ? (
@@ -154,7 +154,7 @@ export function PluginDetailPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-6">
-      <div className="mb-4 text-sm text-neutral-500">
+      <div className="mb-4 text-sm text-fg-muted">
         <Link to={`/${org}/marketplace`} className="hover:underline">
           Marketplace
         </Link>{" "}
@@ -174,7 +174,7 @@ export function PluginDetailPage() {
               <h1 className="flex items-center gap-2 text-lg font-semibold">
                 {name}
               </h1>
-              <p className="text-sm text-neutral-500">
+              <p className="text-sm text-fg-muted">
                 {manifest?.publisher}
                 {manifest?.description ? ` — ${manifest.description}` : ""}
               </p>
@@ -188,7 +188,7 @@ export function PluginDetailPage() {
             </Button>
           </div>
           {!manage ? (
-            <p className="mb-4 text-sm text-neutral-500">
+            <p className="mb-4 text-sm text-fg-muted">
               Only owners and admins can install plugins.
             </p>
           ) : null}
@@ -241,7 +241,7 @@ function VersionPicker({
               />
               <span className="font-mono">{v.version}</span>
             </label>
-            <span className="truncate font-mono text-xs text-neutral-500">{v.manifestDigest}</span>
+            <span className="truncate font-mono text-xs text-fg-muted">{v.manifestDigest}</span>
           </li>
         ))}
       </ul>
@@ -287,12 +287,12 @@ function CapabilitiesCard({ manifest }: { manifest: PluginManifest }) {
         <div className="flex items-center gap-2">
           <Database className="h-4 w-4 text-neutral-500" aria-hidden />
           <span className="font-medium">KV store</span>
-          <span className="text-neutral-500">{caps.kv ? "requested" : "not requested"}</span>
+          <span className="text-fg-muted">{caps.kv ? "requested" : "not requested"}</span>
         </div>
         <div className="flex items-center gap-2">
           <ShieldAlert className="h-4 w-4 text-amber-500" aria-hidden />
           <span className="font-medium">permissions.allow</span>
-          <span className="text-neutral-500">
+          <span className="text-fg-muted">
             {caps.permissionsAllow ? "opt-in requested" : "not requested"}
           </span>
         </div>
@@ -316,7 +316,7 @@ function CapabilitiesCard({ manifest }: { manifest: PluginManifest }) {
           ))}
         </div>
       ) : (
-        <p className="text-sm text-neutral-500">No seams implemented.</p>
+        <p className="text-sm text-fg-muted">No seams implemented.</p>
       )}
     </Card>
   );
@@ -349,7 +349,7 @@ function CapabilityRow({
             ))}
           </ul>
         ) : empty ? (
-          <span className="text-neutral-500">{empty}</span>
+          <span className="text-fg-muted">{empty}</span>
         ) : null}
       </dd>
     </div>
@@ -430,13 +430,13 @@ function InstallConsentDialog({
     >
       <Card className="max-h-[90vh] w-full max-w-lg overflow-y-auto p-5">
         <h2 className="mb-1 text-base font-semibold">Install {manifest.name}</h2>
-        <p className="mb-4 text-sm text-neutral-500">
+        <p className="mb-4 text-sm text-fg-muted">
           Pinned version <span className="font-mono">v{version}</span>. Approve the capabilities
           below — anything you leave unchecked will be denied at runtime.
         </p>
 
         {projectScope ? (
-          <label className="mb-4 block text-xs text-neutral-500">
+          <label className="mb-4 block text-xs text-fg-muted">
             Install scope
             <select
               value={scope}
@@ -525,7 +525,7 @@ function InstallConsentDialog({
         </div>
 
         {install.isError ? (
-          <p className="mt-3 text-sm text-red-500">{(install.error as Error).message}</p>
+          <p className="mt-3 text-sm text-danger">{(install.error as Error).message}</p>
         ) : null}
 
         <div className="mt-5 flex justify-end gap-2">
@@ -576,14 +576,14 @@ export function InstalledPluginsSection({
             <li key={p.id} className="flex items-center gap-2 py-2">
               <span className="flex-1 truncate">
                 <span className="font-medium">{p.name}</span>
-                <span className="ml-1 font-mono text-xs text-neutral-500">v{p.version}</span>
+                <span className="ml-1 font-mono text-xs text-fg-muted">v{p.version}</span>
                 {p.allowPermissions ? (
                   <Badge className="ml-1 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
                     permissions.allow
                   </Badge>
                 ) : null}
               </span>
-              <label className="flex items-center gap-1 text-xs text-neutral-500">
+              <label className="flex items-center gap-1 text-xs text-fg-muted">
                 <input
                   type="checkbox"
                   checked={p.enabled}
@@ -608,7 +608,7 @@ export function InstalledPluginsSection({
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-neutral-500">No plugins installed.</p>
+        <p className="text-sm text-fg-muted">No plugins installed.</p>
       )}
     </Card>
   );

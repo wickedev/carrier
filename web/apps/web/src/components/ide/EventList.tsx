@@ -37,7 +37,7 @@ export function EventCard({ event }: { event: SessionEvent }) {
       return (
         <div className="flex gap-2 px-3 py-2" data-kind="reasoning">
           <Brain className="mt-0.5 h-4 w-4 shrink-0 text-violet-400" aria-hidden />
-          <p className="whitespace-pre-wrap text-sm italic text-neutral-500">{event.text}</p>
+          <p className="whitespace-pre-wrap text-sm italic text-fg-muted">{event.text}</p>
         </div>
       );
     case "tool_call":
@@ -63,7 +63,7 @@ export function EventCard({ event }: { event: SessionEvent }) {
         >
           <div className="flex items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-1.5 text-xs font-medium dark:border-neutral-800 dark:bg-neutral-800/50">
             {event.isError ? (
-              <XCircle className="h-3.5 w-3.5 text-red-500" aria-hidden />
+              <XCircle className="h-3.5 w-3.5 text-danger" aria-hidden />
             ) : (
               <CheckCircle2 className="h-3.5 w-3.5 text-green-500" aria-hidden />
             )}
@@ -87,7 +87,7 @@ export function EventCard({ event }: { event: SessionEvent }) {
     case "status":
       return (
         <div
-          className="px-3 py-1 text-center text-[11px] uppercase tracking-wide text-neutral-400"
+          className="px-3 py-1 text-center text-[11px] uppercase tracking-wide text-fg-muted"
           data-kind="status"
         >
           {event.state}

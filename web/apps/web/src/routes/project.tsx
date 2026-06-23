@@ -40,7 +40,7 @@ export function ProjectPage() {
   return (
     <div className="mx-auto max-w-3xl p-6">
       <div className="mb-1 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-neutral-500">
+        <div className="flex items-center gap-2 text-sm text-fg-muted">
           <Link to={`/${org}`} className="hover:underline">
             {org}
           </Link>
@@ -51,17 +51,17 @@ export function ProjectPage() {
         </div>
         <Link
           to={`/${org}/${project}/settings`}
-          className="inline-flex items-center gap-1 text-sm text-neutral-500 hover:underline"
+          className="inline-flex items-center gap-1 text-sm text-fg-muted hover:underline"
         >
           <Settings className="h-4 w-4" aria-hidden /> Settings
         </Link>
       </div>
       {projectQ.data?.repo ? (
-        <p className="mb-4 text-xs text-neutral-500">
+        <p className="mb-4 text-xs text-fg-muted">
           Bound to {projectQ.data.repo.repoFullName} ({projectQ.data.repo.defaultBranch})
         </p>
       ) : (
-        <p className="mb-4 text-xs text-neutral-500">Unbound workspace</p>
+        <p className="mb-4 text-xs text-fg-muted">Unbound workspace</p>
       )}
 
       <Card className="mb-6 p-4">
@@ -87,7 +87,7 @@ export function ProjectPage() {
           </Button>
         </form>
         {create.isError ? (
-          <p className="mt-2 text-sm text-red-500">{(create.error as Error).message}</p>
+          <p className="mt-2 text-sm text-danger">{(create.error as Error).message}</p>
         ) : null}
       </Card>
 
@@ -110,12 +110,12 @@ export function ProjectPage() {
                   <MessageSquare className="h-4 w-4 text-neutral-400" aria-hidden />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{s.title}</p>
-                    <p className="truncate text-xs text-neutral-500">
+                    <p className="truncate text-xs text-fg-muted">
                       {new Date(s.createdAt).toLocaleString()}
                       {s.planMode ? " · plan mode" : ""}
                     </p>
                   </div>
-                  <span className="flex items-center gap-1 text-xs text-neutral-500">
+                  <span className="flex items-center gap-1 text-xs text-fg-muted">
                     <StatusIcon status={s.status} />
                     {s.status}
                   </span>

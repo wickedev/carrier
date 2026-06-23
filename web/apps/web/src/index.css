@@ -3,10 +3,24 @@
 @variant dark (&:where(.dark, .dark *));
 
 :root {
+  --fg:        var(--color-neutral-900);
+  --fg-muted:  var(--color-neutral-600);  /* AA on white */
+  --fg-subtle: var(--color-neutral-500);
+  --danger:    var(--color-red-600);      /* AA on white */
   color-scheme: light;
 }
 .dark {
+  --fg:        var(--color-neutral-100);
+  --fg-muted:  var(--color-neutral-400);  /* AA on neutral-950 */
+  --fg-subtle: var(--color-neutral-500);
+  --danger:    var(--color-red-400);
   color-scheme: dark;
+}
+@theme inline {
+  --color-fg:        var(--fg);
+  --color-fg-muted:  var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-danger:    var(--danger);
 }
 
 html,

@@ -32,7 +32,7 @@ export function UsagePill({
 }) {
   if (loading || !usage) {
     return loading ? (
-      <span className={cn("text-[11px] text-neutral-400", className)} data-testid="usage-pill">
+      <span className={cn("text-[11px] text-fg-muted", className)} data-testid="usage-pill">
         usage…
       </span>
     ) : null;

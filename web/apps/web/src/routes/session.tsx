@@ -162,7 +162,7 @@ export function SessionPage() {
                       "inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs",
                       mode === "file"
                         ? "bg-neutral-200 dark:bg-neutral-800"
-                        : "text-neutral-500",
+                        : "text-fg-muted",
                     )}
                   >
                     <Files className="h-3.5 w-3.5" aria-hidden /> File
@@ -174,13 +174,13 @@ export function SessionPage() {
                       "inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs",
                       mode === "diff"
                         ? "bg-neutral-200 dark:bg-neutral-800"
-                        : "text-neutral-500",
+                        : "text-fg-muted",
                     )}
                   >
                     <GitCompareArrows className="h-3.5 w-3.5" aria-hidden /> Diff
                   </button>
                   {selectedPath ? (
-                    <span className="ml-2 truncate font-mono text-xs text-neutral-500">
+                    <span className="ml-2 truncate font-mono text-xs text-fg-muted">
                       {selectedPath}
                     </span>
                   ) : null}

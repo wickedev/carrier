@@ -25,7 +25,7 @@ export function OrgPage() {
         <h1 className="text-lg font-semibold">Projects</h1>
         <Link
           to={`/${org}/settings`}
-          className="inline-flex items-center gap-1 text-sm text-neutral-500 hover:underline"
+          className="inline-flex items-center gap-1 text-sm text-fg-muted hover:underline"
         >
           <Settings className="h-4 w-4" aria-hidden /> Org settings
         </Link>
@@ -43,7 +43,7 @@ export function OrgPage() {
         </Button>
       </form>
       {create.isError ? (
-        <p className="mb-3 text-sm text-red-500">{(create.error as Error).message}</p>
+        <p className="mb-3 text-sm text-danger">{(create.error as Error).message}</p>
       ) : null}
 
       {projects.isLoading ? (
@@ -59,7 +59,7 @@ export function OrgPage() {
                   <FolderGit2 className="h-5 w-5 text-blue-500" aria-hidden />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{p.name}</p>
-                    <p className="truncate text-xs text-neutral-500">
+                    <p className="truncate text-xs text-fg-muted">
                       {p.repo ? p.repo.repoFullName : "Unbound workspace"}
                       {p.archived ? " · archived" : ""}
                     </p>

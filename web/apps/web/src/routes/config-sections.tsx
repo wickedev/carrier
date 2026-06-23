@@ -31,7 +31,7 @@ export interface SectionProps {
 const SELECT_CLASS =
   "h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm dark:border-neutral-700 dark:bg-neutral-950";
 const TEXTAREA_CLASS =
-  "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm outline-none placeholder:text-neutral-400 focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950 dark:placeholder:text-neutral-600";
+  "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm outline-none placeholder:text-fg-subtle focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950";
 
 /** Toggle switch for the `enabled` flag, shown on every list row. */
 function EnableToggle({
@@ -46,7 +46,7 @@ function EnableToggle({
   label: string;
 }) {
   return (
-    <label className="flex items-center gap-1 text-xs text-neutral-500">
+    <label className="flex items-center gap-1 text-xs text-fg-muted">
       <input
         type="checkbox"
         checked={enabled}
@@ -168,7 +168,7 @@ export function AgentsSection({ scope, ownerKey, manage }: SectionProps) {
         </form>
       ) : null}
       {create.isError ? (
-        <p className="mb-2 text-sm text-red-500">{(create.error as Error).message}</p>
+        <p className="mb-2 text-sm text-danger">{(create.error as Error).message}</p>
       ) : null}
 
       {list.isLoading ? (
@@ -181,9 +181,9 @@ export function AgentsSection({ scope, ownerKey, manage }: SectionProps) {
             <li key={a.id} className="flex items-center gap-2 py-2">
               <span className="flex-1 truncate">
                 <span className="font-medium">{a.name}</span>
-                {a.model ? <span className="ml-1 font-mono text-xs text-neutral-500">{a.model}</span> : null}
+                {a.model ? <span className="ml-1 font-mono text-xs text-fg-muted">{a.model}</span> : null}
                 {a.description ? (
-                  <span className="block truncate text-xs text-neutral-500">{a.description}</span>
+                  <span className="block truncate text-xs text-fg-muted">{a.description}</span>
                 ) : null}
               </span>
               <EnableToggle
@@ -203,7 +203,7 @@ export function AgentsSection({ scope, ownerKey, manage }: SectionProps) {
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-neutral-500">No agents configured.</p>
+        <p className="text-sm text-fg-muted">No agents configured.</p>
       )}
     </Card>
   );
@@ -289,7 +289,7 @@ export function SkillsSection({ scope, ownerKey, manage }: SectionProps) {
         </form>
       ) : null}
       {create.isError ? (
-        <p className="mb-2 text-sm text-red-500">{(create.error as Error).message}</p>
+        <p className="mb-2 text-sm text-danger">{(create.error as Error).message}</p>
       ) : null}
 
       {list.isLoading ? (
@@ -302,9 +302,9 @@ export function SkillsSection({ scope, ownerKey, manage }: SectionProps) {
             <li key={s.id} className="flex items-center gap-2 py-2">
               <span className="flex-1 truncate">
                 <span className="font-medium">{s.name}</span>
-                {s.agent ? <span className="ml-1 font-mono text-xs text-neutral-500">@{s.agent}</span> : null}
+                {s.agent ? <span className="ml-1 font-mono text-xs text-fg-muted">@{s.agent}</span> : null}
                 {s.description ? (
-                  <span className="block truncate text-xs text-neutral-500">{s.description}</span>
+                  <span className="block truncate text-xs text-fg-muted">{s.description}</span>
                 ) : null}
               </span>
               <EnableToggle
@@ -324,7 +324,7 @@ export function SkillsSection({ scope, ownerKey, manage }: SectionProps) {
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-neutral-500">No skills configured.</p>
+        <p className="text-sm text-fg-muted">No skills configured.</p>
       )}
     </Card>
   );
@@ -399,7 +399,7 @@ export function McpServersSection({ scope, ownerKey, manage }: SectionProps) {
         </form>
       ) : null}
       {create.isError ? (
-        <p className="mb-2 text-sm text-red-500">{(create.error as Error).message}</p>
+        <p className="mb-2 text-sm text-danger">{(create.error as Error).message}</p>
       ) : null}
 
       {list.isLoading ? (
@@ -412,7 +412,7 @@ export function McpServersSection({ scope, ownerKey, manage }: SectionProps) {
             <li key={m.id} className="flex items-center gap-2 py-2">
               <span className="flex-1 truncate">
                 <span className="font-medium">{m.name}</span>
-                <span className="block truncate font-mono text-xs text-neutral-500">
+                <span className="block truncate font-mono text-xs text-fg-muted">
                   {m.command} {m.args.join(" ")}
                 </span>
               </span>
@@ -433,7 +433,7 @@ export function McpServersSection({ scope, ownerKey, manage }: SectionProps) {
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-neutral-500">No MCP servers configured.</p>
+        <p className="text-sm text-fg-muted">No MCP servers configured.</p>
       )}
     </Card>
   );
@@ -487,7 +487,7 @@ export function ContextSection({ scope, ownerKey, manage }: SectionProps) {
         </form>
       ) : null}
       {create.isError ? (
-        <p className="mb-2 text-sm text-red-500">{(create.error as Error).message}</p>
+        <p className="mb-2 text-sm text-danger">{(create.error as Error).message}</p>
       ) : null}
 
       {list.isLoading ? (
@@ -516,7 +516,7 @@ export function ContextSection({ scope, ownerKey, manage }: SectionProps) {
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-neutral-500">No context documents configured.</p>
+        <p className="text-sm text-fg-muted">No context documents configured.</p>
       )}
     </Card>
   );
@@ -605,7 +605,7 @@ export function HooksSection({ scope, ownerKey, manage }: SectionProps) {
         </form>
       ) : null}
       {create.isError ? (
-        <p className="mb-2 text-sm text-red-500">{(create.error as Error).message}</p>
+        <p className="mb-2 text-sm text-danger">{(create.error as Error).message}</p>
       ) : null}
 
       {list.isLoading ? (
@@ -618,8 +618,8 @@ export function HooksSection({ scope, ownerKey, manage }: SectionProps) {
             <li key={h.id} className="flex items-center gap-2 py-2">
               <span className="flex-1 truncate">
                 <span className="font-medium">{h.name}</span>
-                <span className="ml-1 text-xs text-neutral-500">{h.event}</span>
-                <span className="block truncate font-mono text-xs text-neutral-500">{h.command}</span>
+                <span className="ml-1 text-xs text-fg-muted">{h.event}</span>
+                <span className="block truncate font-mono text-xs text-fg-muted">{h.command}</span>
               </span>
               <EnableToggle
                 enabled={h.enabled}
@@ -638,7 +638,7 @@ export function HooksSection({ scope, ownerKey, manage }: SectionProps) {
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-neutral-500">No hooks configured.</p>
+        <p className="text-sm text-fg-muted">No hooks configured.</p>
       )}
     </Card>
   );
@@ -685,7 +685,7 @@ export function EnvVarsSection({ scope, ownerKey, manage }: SectionProps) {
             placeholder="Value"
             aria-label="Env value"
           />
-          <label className="flex shrink-0 items-center gap-1 text-sm text-neutral-500">
+          <label className="flex shrink-0 items-center gap-1 text-sm text-fg-muted">
             <input
               type="checkbox"
               checked={secret}
@@ -701,7 +701,7 @@ export function EnvVarsSection({ scope, ownerKey, manage }: SectionProps) {
         </form>
       ) : null}
       {create.isError ? (
-        <p className="mb-2 text-sm text-red-500">{(create.error as Error).message}</p>
+        <p className="mb-2 text-sm text-danger">{(create.error as Error).message}</p>
       ) : null}
 
       {list.isLoading ? (
@@ -713,7 +713,7 @@ export function EnvVarsSection({ scope, ownerKey, manage }: SectionProps) {
           {list.data.map((v) => (
             <li key={v.id} className="flex items-center gap-2 py-1.5">
               <span className="w-40 truncate font-mono text-xs">{v.key}</span>
-              <span className="flex-1 truncate font-mono text-xs text-neutral-500">
+              <span className="flex-1 truncate font-mono text-xs text-fg-muted">
                 {/* Never display stored secret values — show a mask instead. */}
                 {v.secret ? (v.hasValue ? "••••••••" : "—") : v.value}
               </span>
@@ -733,7 +733,7 @@ export function EnvVarsSection({ scope, ownerKey, manage }: SectionProps) {
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-neutral-500">No environment variables configured.</p>
+        <p className="text-sm text-fg-muted">No environment variables configured.</p>
       )}
     </Card>
   );
@@ -775,7 +775,7 @@ export function ModelParamsSection({ scope, ownerKey, manage }: SectionProps) {
         <Loading />
       ) : (
         <form onSubmit={submit} className="space-y-2">
-          <label className="block text-xs text-neutral-500">
+          <label className="block text-xs text-fg-muted">
             Model
             <Input
               value={form.model}
@@ -786,7 +786,7 @@ export function ModelParamsSection({ scope, ownerKey, manage }: SectionProps) {
               className="mt-1"
             />
           </label>
-          <label className="block text-xs text-neutral-500">
+          <label className="block text-xs text-fg-muted">
             Effort
             <select
               value={form.effort}
@@ -802,7 +802,7 @@ export function ModelParamsSection({ scope, ownerKey, manage }: SectionProps) {
               ))}
             </select>
           </label>
-          <label className="block text-xs text-neutral-500">
+          <label className="block text-xs text-fg-muted">
             Max steps
             <Input
               type="number"
@@ -814,7 +814,7 @@ export function ModelParamsSection({ scope, ownerKey, manage }: SectionProps) {
               className="mt-1"
             />
           </label>
-          <label className="block text-xs text-neutral-500">
+          <label className="block text-xs text-fg-muted">
             Context budget
             <Input
               type="number"
@@ -826,7 +826,7 @@ export function ModelParamsSection({ scope, ownerKey, manage }: SectionProps) {
               className="mt-1"
             />
           </label>
-          <label className="flex items-center gap-1 text-sm text-neutral-500">
+          <label className="flex items-center gap-1 text-sm text-fg-muted">
             <input
               type="checkbox"
               checked={form.planMode}
@@ -843,7 +843,7 @@ export function ModelParamsSection({ scope, ownerKey, manage }: SectionProps) {
             </Button>
           ) : null}
           {put.isError ? (
-            <p className="text-sm text-red-500">{(put.error as Error).message}</p>
+            <p className="text-sm text-danger">{(put.error as Error).message}</p>
           ) : null}
         </form>
       )}

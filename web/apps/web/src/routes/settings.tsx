@@ -36,7 +36,7 @@ export function OrgSettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-6">
-      <div className="mb-4 text-sm text-neutral-500">
+      <div className="mb-4 text-sm text-fg-muted">
         <Link to={`/${org}`} className="hover:underline">
           {org}
         </Link>{" "}
@@ -48,15 +48,15 @@ export function OrgSettingsPage() {
         <h2 className="mb-2 text-sm font-medium">Context</h2>
         <dl className="space-y-1 text-sm">
           <div className="flex justify-between">
-            <dt className="text-neutral-500">Name</dt>
+            <dt className="text-fg-muted">Name</dt>
             <dd>{current?.name ?? org}</dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-neutral-500">Kind</dt>
+            <dt className="text-fg-muted">Kind</dt>
             <dd>{current?.kind ?? "—"}</dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-neutral-500">Your role</dt>
+            <dt className="text-fg-muted">Your role</dt>
             <dd>{current?.role ?? "—"}</dd>
           </div>
         </dl>
@@ -116,7 +116,7 @@ function MembersSection({ orgSlug, current }: { orgSlug: string; current?: Org }
         </form>
       ) : null}
       {addMember.isError ? (
-        <p className="mb-2 text-sm text-red-500">{(addMember.error as Error).message}</p>
+        <p className="mb-2 text-sm text-danger">{(addMember.error as Error).message}</p>
       ) : null}
 
       {members.isLoading ? (
@@ -128,7 +128,7 @@ function MembersSection({ orgSlug, current }: { orgSlug: string; current?: Org }
           {members.data.map((m) => (
             <li key={m.accountId || m.login} className="flex items-center gap-2 py-2">
               <span className="flex-1 truncate font-medium">{m.login}</span>
-              <span className="text-xs text-neutral-500">{m.role}</span>
+              <span className="text-xs text-fg-muted">{m.role}</span>
               {manage ? (
                 <button
                   type="button"
@@ -166,7 +166,7 @@ function InstallationsSection({ orgSlug }: { orgSlug: string }) {
           {installs.data.map((i) => (
             <li key={i.installationId} className="rounded border border-neutral-200 p-2 dark:border-neutral-800">
               <p className="font-medium">{i.accountLogin}</p>
-              <p className="text-xs text-neutral-500">
+              <p className="text-xs text-fg-muted">
                 {i.repos.length} repo{i.repos.length === 1 ? "" : "s"} · installation #{i.installationId}
               </p>
             </li>
@@ -193,7 +193,7 @@ export function ProjectSettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl p-6">
-      <div className="mb-4 text-sm text-neutral-500">
+      <div className="mb-4 text-sm text-fg-muted">
         <Link to={`/${org}/${project}`} className="hover:underline">
           {projectQ.data?.name ?? project}
         </Link>{" "}
@@ -259,14 +259,14 @@ function RepoBindingSection({ orgSlug, projectId, manage }: { orgSlug: string; p
             </Button>
           ) : null}
           {unbind.isError ? (
-            <p className="text-sm text-red-500">{(unbind.error as Error).message}</p>
+            <p className="text-sm text-danger">{(unbind.error as Error).message}</p>
           ) : null}
         </div>
       ) : !manage ? (
-        <p className="text-sm text-neutral-500">Unbound. Ask an admin to bind a repository.</p>
+        <p className="text-sm text-fg-muted">Unbound. Ask an admin to bind a repository.</p>
       ) : (
         <form onSubmit={submit} className="space-y-2">
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-fg-muted">
             Bind a repository to let the agent work on real code.
           </p>
           {installs.isLoading ? (
@@ -320,7 +320,7 @@ function RepoBindingSection({ orgSlug, projectId, manage }: { orgSlug: string; p
             </>
           )}
           {bind.isError ? (
-            <p className="text-sm text-red-500">{(bind.error as Error).message}</p>
+            <p className="text-sm text-danger">{(bind.error as Error).message}</p>
           ) : null}
         </form>
       )}
@@ -386,7 +386,7 @@ function PermissionsSection({ projectId, manage }: { projectId: string; manage: 
         </form>
       ) : null}
       {add.isError ? (
-        <p className="mb-2 text-sm text-red-500">{(add.error as Error).message}</p>
+        <p className="mb-2 text-sm text-danger">{(add.error as Error).message}</p>
       ) : null}
 
       {perms.isLoading ? (
@@ -398,7 +398,7 @@ function PermissionsSection({ projectId, manage }: { projectId: string; manage: 
           {perms.data.map((r) => (
             <li key={r.id} className="flex items-center gap-2 py-1.5">
               <span className="w-16 font-mono text-xs">{r.action}</span>
-              <span className="flex-1 truncate font-mono text-xs text-neutral-500">{r.pattern}</span>
+              <span className="flex-1 truncate font-mono text-xs text-fg-muted">{r.pattern}</span>
               <span
                 className={
                   r.effect === "deny"
@@ -425,7 +425,7 @@ function PermissionsSection({ projectId, manage }: { projectId: string; manage: 
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-neutral-500">No rules configured (defaults apply).</p>
+        <p className="text-sm text-fg-muted">No rules configured (defaults apply).</p>
       )}
     </Card>
   );
@@ -442,13 +442,13 @@ function UsageSection({ projectId }: { projectId: string }) {
       ) : usage.data ? (
         <dl className="space-y-1 text-sm">
           <div className="flex justify-between">
-            <dt className="text-neutral-500">Tokens</dt>
+            <dt className="text-fg-muted">Tokens</dt>
             <dd className="font-mono">
               {formatTokens(usage.data.inputTokens + usage.data.outputTokens)}
             </dd>
           </div>
           <div className="flex justify-between">
-            <dt className="text-neutral-500">Cost</dt>
+            <dt className="text-fg-muted">Cost</dt>
             <dd className="font-mono">{formatUsd(usage.data.costUsd)}</dd>
           </div>
         </dl>
@@ -481,13 +481,13 @@ function DangerZone({
   return (
     <Card className="border-red-300 p-4 dark:border-red-900">
       <h2 className="mb-2 text-sm font-medium text-red-600 dark:text-red-400">Danger zone</h2>
-      <p className="mb-2 text-sm text-neutral-500">
+      <p className="mb-2 text-sm text-fg-muted">
         Archiving a project stops new sessions while preserving its workspace and history.
       </p>
       {archived ? (
-        <p className="text-sm text-neutral-500">This project is archived.</p>
+        <p className="text-sm text-fg-muted">This project is archived.</p>
       ) : !manage ? (
-        <p className="text-sm text-neutral-500">Only owners and admins can archive a project.</p>
+        <p className="text-sm text-fg-muted">Only owners and admins can archive a project.</p>
       ) : confirming ? (
         <div className="flex items-center gap-2">
           <Button
@@ -515,7 +515,7 @@ function DangerZone({
         </Button>
       )}
       {archive.isError ? (
-        <p className="mt-2 text-sm text-red-500">{(archive.error as Error).message}</p>
+        <p className="mt-2 text-sm text-danger">{(archive.error as Error).message}</p>
       ) : null}
     </Card>
   );

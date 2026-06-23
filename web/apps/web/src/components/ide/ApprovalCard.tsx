@@ -72,11 +72,11 @@ export function ApprovalCard({
       </div>
       <div className="space-y-1 px-3 py-2 text-sm">
         <p>
-          <span className="text-neutral-500">Tool:</span>{" "}
+          <span className="text-fg-muted">Tool:</span>{" "}
           <span className="font-mono">{approval.tool}</span>
         </p>
         <p className="break-all">
-          <span className="text-neutral-500">Resource:</span>{" "}
+          <span className="text-fg-muted">Resource:</span>{" "}
           <span className="font-mono">{approval.resource}</span>
         </p>
         <p className="text-neutral-600 dark:text-neutral-300">{approval.reason}</p>
