@@ -69,6 +69,9 @@ func (e *OpenAIEngine) RunStep(ctx context.Context, in agent.StepInput) (agent.S
 			IncludeUsage: openai.Bool(true),
 		},
 	}
+	if in.Effort != "" {
+		params.ReasoningEffort = shared.ReasoningEffort(in.Effort) // per-session reasoning effort
+	}
 
 	emit := in.OnEvent
 	if emit == nil {

@@ -79,6 +79,13 @@ func (e *AnthropicEngine) RunStep(ctx context.Context, in agent.StepInput) (agen
 	if in.System != "" {
 		params.System = []anthropic.TextBlockParam{{Text: in.System}}
 	}
+	if in.Effort != "" {
+		// Per-session reasoning effort (low|medium|high|xhigh|max). Adaptive
+		// thinking stays on; effort tunes its depth.
+		params.OutputConfig = anthropic.OutputConfigParam{
+			Effort: anthropic.OutputConfigEffort(in.Effort),
+		}
+	}
 
 	emit := in.OnEvent
 	if emit == nil {
