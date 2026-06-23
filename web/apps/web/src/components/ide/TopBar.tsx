@@ -135,7 +135,18 @@ export function TopBar({
             <GitPullRequest className="h-3.5 w-3.5" aria-hidden /> PR
           </a>
         ) : null}
-        {repoBound ? (
+        {repoBound === undefined ? (
+          // Binding not yet known — keep the action disabled and neutral so we
+          // never show or fire the destructive "Merge to base" prematurely.
+          <Button
+            size="sm"
+            variant="outline"
+            disabled
+            title="Checking repository binding…"
+          >
+            <Spinner /> Promote
+          </Button>
+        ) : repoBound ? (
           <Button
             size="sm"
             variant="outline"

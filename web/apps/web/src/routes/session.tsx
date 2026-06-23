@@ -25,8 +25,10 @@ export function SessionPage() {
   const sessionQ = useSession(sessionId);
   // The repo binding lives on the Project (Project.repo), not the Session.
   // When bound, promote OPENS A PR; when unbound, it MERGES directly to base.
+  // Tri-state: undefined until the project loads, so the TopBar never presents a
+  // definite (destructive) promote action before the binding is known.
   const projectQ = useProject(project);
-  const repoBound = !!projectQ.data?.repo;
+  const repoBound = projectQ.data ? Boolean(projectQ.data.repo) : undefined;
   // Per-session usage/cost (Req 20). Poll while the session is running; tolerate
   // the endpoint being unavailable (don't surface a hard error in the IDE).
   const usageQ = useSessionUsage(sessionId, {
