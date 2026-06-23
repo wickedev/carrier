@@ -69,8 +69,8 @@ func (e *OpenAIEngine) RunStep(ctx context.Context, in agent.StepInput) (agent.S
 			IncludeUsage: openai.Bool(true),
 		},
 	}
-	if in.Effort != "" {
-		params.ReasoningEffort = shared.ReasoningEffort(in.Effort) // per-session reasoning effort
+	if eff := openAIReasoningEffort(in.Effort); eff != "" {
+		params.ReasoningEffort = eff // per-session reasoning effort (supported levels only)
 	}
 
 	emit := in.OnEvent
@@ -214,6 +214,24 @@ func openAIUsage(u openai.CompletionUsage) agent.Usage {
 // "tool_calls" means the model finished its turn. Pure.
 func openAIDone(finishReason string) bool {
 	return finishReason != "tool_calls"
+}
+
+// openAIReasoningEffort maps a configured effort level onto the values OpenAI's
+// reasoning_effort accepts (low|medium|high). The shared config vocabulary also
+// allows the Anthropic-only "xhigh"/"max"; those are clamped to "high" so a
+// cross-provider effort setting never forwards a value OpenAI would reject. An
+// empty or unrecognized level returns "" (the field is omitted). Pure.
+func openAIReasoningEffort(effort string) shared.ReasoningEffort {
+	switch effort {
+	case "low":
+		return shared.ReasoningEffortLow
+	case "medium":
+		return shared.ReasoningEffortMedium
+	case "high", "xhigh", "max":
+		return shared.ReasoningEffortHigh
+	default:
+		return ""
+	}
 }
 
 // classifyOpenAIError translates an SDK/transport error into a typed,

@@ -72,9 +72,50 @@ func TestOpenAISendsEffort(t *testing.T) {
 	)
 	_, _ = eng.RunStep(context.Background(), agent.StepInput{
 		Messages: []agent.Message{{Role: agent.RoleUser, Text: "hi"}},
-		Effort:   "high",
+		Effort:   "medium",
 	})
-	if !strings.Contains(rt.body, `"reasoning_effort":"high"`) {
+	if !strings.Contains(rt.body, `"reasoning_effort":"medium"`) {
 		t.Fatalf("openai request missing reasoning_effort; body=%s", rt.body)
+	}
+}
+
+// OpenAI only supports low|medium|high; the Anthropic-only xhigh/max levels must
+// be clamped to "high" rather than forwarded (which OpenAI would reject).
+func TestOpenAIClampsUnsupportedEffort(t *testing.T) {
+	for _, level := range []string{"xhigh", "max"} {
+		rt := &captureRT{}
+		eng := NewOpenAIEngine(
+			openaiopt.WithAPIKey("test"),
+			openaiopt.WithHTTPClient(&http.Client{Transport: rt}),
+			openaiopt.WithMaxRetries(0),
+		)
+		_, _ = eng.RunStep(context.Background(), agent.StepInput{
+			Messages: []agent.Message{{Role: agent.RoleUser, Text: "hi"}},
+			Effort:   level,
+		})
+		if !strings.Contains(rt.body, `"reasoning_effort":"high"`) {
+			t.Fatalf("effort %q should clamp to high; body=%s", level, rt.body)
+		}
+		if strings.Contains(rt.body, `"reasoning_effort":"`+level+`"`) {
+			t.Fatalf("effort %q was forwarded unclamped; body=%s", level, rt.body)
+		}
+	}
+}
+
+// A pure mapping check, independent of the wire.
+func TestOpenAIReasoningEffortMapping(t *testing.T) {
+	cases := map[string]string{
+		"":       "",
+		"low":    "low",
+		"medium": "medium",
+		"high":   "high",
+		"xhigh":  "high",
+		"max":    "high",
+		"bogus":  "",
+	}
+	for in, want := range cases {
+		if got := string(openAIReasoningEffort(in)); got != want {
+			t.Fatalf("openAIReasoningEffort(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
