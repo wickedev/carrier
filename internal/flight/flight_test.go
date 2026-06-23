@@ -8,6 +8,7 @@ import (
 
 	"github.com/wickedev/carrier/internal/agent"
 	"github.com/wickedev/carrier/internal/bay"
+	"github.com/wickedev/carrier/internal/plugin"
 	"github.com/wickedev/carrier/internal/sq"
 	"github.com/wickedev/carrier/internal/store"
 	"github.com/wickedev/carrier/internal/tool"
@@ -135,6 +136,103 @@ func TestFlightToolLoop(t *testing.T) {
 	}
 	if !hasText(events, "done") {
 		t.Fatalf("missing final text 'done': %v", kinds(events))
+	}
+}
+
+// gateSeam is a test Seam that denies a named tool and overrides results.
+type gateSeam struct {
+	plugin.Base
+	denyTool string
+	override string
+}
+
+func (g *gateSeam) Supports(k plugin.SeamKind) bool {
+	return k == plugin.SeamToolBefore || k == plugin.SeamToolAfter
+}
+func (g *gateSeam) ToolBefore(_ context.Context, in plugin.ToolBeforeInput) (plugin.ToolBeforeDecision, error) {
+	if in.Tool == g.denyTool {
+		return plugin.ToolBeforeDecision{Decision: plugin.DecisionDeny, Reason: "blocked by plugin"}, nil
+	}
+	return plugin.ToolBeforeDecision{Decision: plugin.DecisionAllow}, nil
+}
+func (g *gateSeam) ToolAfter(_ context.Context, _ plugin.ToolAfterInput) (plugin.ToolAfterPatch, error) {
+	if g.override == "" {
+		return plugin.ToolAfterPatch{}, nil
+	}
+	o := g.override
+	return plugin.ToolAfterPatch{ResultOverride: &o}, nil
+}
+
+func TestFlightPluginDeniesTool(t *testing.T) {
+	reg := tool.NewRegistry()
+	reg.Register(tool.NewBash())
+	eng := &fakeEngine{name: "fake", steps: []func(agent.StepInput) (agent.StepResult, error){
+		func(in agent.StepInput) (agent.StepResult, error) {
+			tc := agent.ToolCall{ID: "1", Name: "bash", Input: map[string]any{"command": "echo hi"}}
+			in.OnEvent(agent.StreamEvent{Kind: agent.EvToolCall, ToolCall: &tc})
+			return agent.StepResult{ToolCalls: []agent.ToolCall{tc}, Done: false}, nil
+		},
+		func(in agent.StepInput) (agent.StepResult, error) {
+			return agent.StepResult{Text: "done", Done: true}, nil
+		},
+	}}
+	st, err := store.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("store: %v", err)
+	}
+	f := New(Config{
+		ID: "test", System: "sys", Engine: eng, Store: st, Tools: reg,
+		Exec:    tool.ExecContext{Executor: bay.NewLocalExecutor()},
+		Plugins: plugin.NewChain(plugin.Entry{Seam: &gateSeam{denyTool: "bash"}}),
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = f.Run(ctx) }()
+
+	submit(t, f, "run echo")
+	events := collect(f.Queues().Events(), 500*time.Millisecond)
+	cancel()
+
+	if !hasToolResultContaining(events, "blocked by plugin") {
+		t.Fatalf("plugin deny not applied: %v", kinds(events))
+	}
+	if hasToolResultContaining(events, "hi") {
+		t.Fatal("denied tool should not have executed")
+	}
+}
+
+func TestFlightPluginOverridesResult(t *testing.T) {
+	reg := tool.NewRegistry()
+	reg.Register(tool.NewBash())
+	eng := &fakeEngine{name: "fake", steps: []func(agent.StepInput) (agent.StepResult, error){
+		func(in agent.StepInput) (agent.StepResult, error) {
+			tc := agent.ToolCall{ID: "1", Name: "bash", Input: map[string]any{"command": "echo hi"}}
+			in.OnEvent(agent.StreamEvent{Kind: agent.EvToolCall, ToolCall: &tc})
+			return agent.StepResult{ToolCalls: []agent.ToolCall{tc}, Done: false}, nil
+		},
+		func(in agent.StepInput) (agent.StepResult, error) {
+			return agent.StepResult{Text: "done", Done: true}, nil
+		},
+	}}
+	st, err := store.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("store: %v", err)
+	}
+	f := New(Config{
+		ID: "test", System: "sys", Engine: eng, Store: st, Tools: reg,
+		Exec:    tool.ExecContext{Executor: bay.NewLocalExecutor()},
+		Plugins: plugin.NewChain(plugin.Entry{Seam: &gateSeam{override: "REDACTED"}}),
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = f.Run(ctx) }()
+
+	submit(t, f, "run echo")
+	events := collect(f.Queues().Events(), 500*time.Millisecond)
+	cancel()
+
+	if !hasToolResultContaining(events, "REDACTED") {
+		t.Fatalf("plugin result override not applied: %v", kinds(events))
 	}
 }
 

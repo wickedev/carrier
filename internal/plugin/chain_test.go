@@ -52,7 +52,7 @@ func TestBeforeStepFold(t *testing.T) {
 		System: "base",
 		Tools:  []agent.Tool{{Name: "bash"}, {Name: "read"}},
 	}
-	c.BeforeStep(context.Background(), in)
+	c.BeforeStep(context.Background(), "s", in)
 
 	if in.System != "base\n\nrule A\n\nrule B" {
 		t.Fatalf("system fold = %q", in.System)

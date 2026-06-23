@@ -13,6 +13,7 @@ import (
 	"github.com/wickedev/carrier/internal/agent"
 	"github.com/wickedev/carrier/internal/engine"
 	"github.com/wickedev/carrier/internal/perm"
+	"github.com/wickedev/carrier/internal/plugin"
 	"github.com/wickedev/carrier/internal/sq"
 	"github.com/wickedev/carrier/internal/store"
 	"github.com/wickedev/carrier/internal/tool"
@@ -61,8 +62,11 @@ type Config struct {
 	Memory string
 	// Model, when set, overrides the Engine's default model for this session.
 	// Effort selects the reasoning-effort level where the provider supports it.
-	Model       string
-	Effort      string
+	Model  string
+	Effort string
+	// Plugins is the per-session seam chain (nil → no plugins). Its seams
+	// transform the request, gate/rewrite tool calls, and weigh in on permission.
+	Plugins     *plugin.Chain
 	Engine      engine.Engine
 	Store       store.Store
 	Tools       *tool.Registry
@@ -90,6 +94,7 @@ type Flight struct {
 	memory      string
 	model       string
 	effort      string
+	plugins     *plugin.Chain
 	engine      engine.Engine
 	store       store.Store
 	tools       *tool.Registry
@@ -121,6 +126,7 @@ func New(cfg Config) *Flight {
 		memory:      cfg.Memory,
 		model:       cfg.Model,
 		effort:      cfg.Effort,
+		plugins:     orChain(cfg.Plugins),
 		engine:      cfg.Engine,
 		store:       cfg.Store,
 		tools:       cfg.Tools,
@@ -157,6 +163,15 @@ func (f *Flight) sid() store.SessionID { return store.SessionID(f.id) }
 // turns until the model is idle, and repeats. Each Flight is one goroutine.
 func (f *Flight) Run(ctx context.Context) error {
 	defer f.queues.Close()
+	// session_start plugin seams may inject durable context for the whole session.
+	if extra := f.plugins.SessionStart(ctx, plugin.LifecycleInput{SessionID: string(f.sid())}); extra != "" {
+		if f.memory != "" {
+			f.memory += "\n\n"
+		}
+		f.memory += extra
+	}
+	// session_end runs even on cancellation (cleanup/side-effects in the seam).
+	defer f.plugins.SessionEnd(context.WithoutCancel(ctx), plugin.LifecycleInput{SessionID: string(f.sid())})
 	for {
 		// Block for input unless inputs were already buffered mid-turn.
 		if len(f.pending) == 0 {
@@ -287,6 +302,9 @@ func (f *Flight) runTurn(ctx context.Context, msgs []agent.Message) (agent.StepR
 			f.emit(turnCtx, ev)
 		},
 	}
+	// before_step plugin seams may append to the system prompt, override
+	// model/effort (clamped downstream by the engine), or filter the tool set.
+	f.plugins.BeforeStep(turnCtx, f.id, &in)
 
 	type outcome struct {
 		res agent.StepResult
@@ -352,38 +370,79 @@ func (f *Flight) drainInputs() (steered bool) {
 func (f *Flight) gatedDispatch(ctx context.Context, calls []agent.ToolCall) []agent.ToolResult {
 	results := make([]agent.ToolResult, len(calls))
 	pos := make(map[string]int, len(calls))
+	gated := make([]agent.ToolCall, len(calls)) // calls with plugin-rewritten input
 	var allowed []agent.ToolCall
 	for i, c := range calls {
 		pos[c.ID] = i
-		switch f.decide(ctx, c) {
-		case perm.Allow:
+		gated[i] = c
+		// tool_before plugin seams: may deny, ask, rewrite input, or add context.
+		gate := f.plugins.ToolBefore(ctx, f.id, c)
+		c.Input = gate.Input
+		gated[i] = c
+		if gate.Effect == plugin.DecisionDeny {
+			results[i] = deniedResult(c.ID, gate.Reason)
+			continue
+		}
+		if f.decide(ctx, c, gate.Effect == plugin.DecisionAsk) == perm.Allow {
 			allowed = append(allowed, c)
-		default: // Deny (or Ask without approval)
-			results[i] = agent.ToolResult{
-				ToolCallID: c.ID,
-				Content:    "error: permission denied",
-				IsError:    true,
-			}
+		} else {
+			results[i] = deniedResult(c.ID, gate.Reason)
 		}
 	}
 	for _, r := range tool.Dispatch(ctx, allowed, f.tools, f.exec, f.maxParallel) {
-		results[pos[r.ToolCallID]] = r
+		i := pos[r.ToolCallID]
+		// tool_after plugin seams: may override the result or append context.
+		f.plugins.ToolAfter(ctx, f.id, gated[i], &r)
+		results[i] = r
 	}
 	return results
 }
 
+func deniedResult(id, reason string) agent.ToolResult {
+	msg := "error: permission denied"
+	if reason != "" {
+		msg += ": " + reason
+	}
+	return agent.ToolResult{ToolCallID: id, Content: msg, IsError: true}
+}
+
 // decide resolves the permission effect for a tool call, consulting plan mode,
-// the policy, and (for Ask) the Approver.
-func (f *Flight) decide(ctx context.Context, c agent.ToolCall) perm.Effect {
+// the policy, the permission_ask plugin seams, and (for Ask) the Approver.
+// forceAsk reflects a tool_before plugin decision of "ask", which raises an
+// otherwise-Allow effect to Ask.
+func (f *Flight) decide(ctx context.Context, c agent.ToolCall, forceAsk bool) perm.Effect {
 	if f.planMode && !f.toolReadOnly(c) {
 		return perm.Deny // plan mode forbids mutating actions
 	}
-	if f.policy == nil {
-		return perm.Allow // permissive default; a server installs a policy
+	eff := perm.Allow // permissive default; a server installs a policy
+	if f.policy != nil {
+		eff = f.policy.Evaluate(c.Name, resourceFor(c)).Effect
 	}
-	d := f.policy.Evaluate(c.Name, resourceFor(c))
-	if d.Effect != perm.Ask {
-		return d.Effect
+	// permission_ask plugin seams. Most-restrictive wins: a plugin deny is
+	// terminal; a plugin allow (opted-in) only relaxes an Ask, never a Deny
+	// (layer-aware trust — a plugin can never escalate over a policy denial);
+	// a plugin ask raises an Allow to Ask.
+	if pd, _, had := f.plugins.PermissionAsk(ctx, plugin.PermissionInput{
+		SessionID: f.id, Action: c.Name, Resource: resourceFor(c),
+	}); had {
+		switch pd {
+		case plugin.DecisionDeny:
+			return perm.Deny
+		case plugin.DecisionAllow:
+			if eff == perm.Ask {
+				eff = perm.Allow
+			}
+		case plugin.DecisionAsk:
+			if eff == perm.Allow {
+				eff = perm.Ask
+			}
+		}
+	}
+	if forceAsk && eff == perm.Allow {
+		eff = perm.Ask
+	}
+	if eff != perm.Ask {
+		return eff
 	}
 	// Ask: consult the off-loop classifier first on a sanitized projection
 	// (action + resource only), tracking consecutive denials so a noisy
@@ -501,6 +560,15 @@ func (s EngineSummarizer) Summarize(ctx context.Context, history []agent.Message
 		return "", err
 	}
 	return res.Text, nil
+}
+
+// orChain returns c, or an empty (no-op) Chain when c is nil, so the Flight can
+// call plugin seams unconditionally.
+func orChain(c *plugin.Chain) *plugin.Chain {
+	if c == nil {
+		return plugin.NewChain()
+	}
+	return c
 }
 
 func orDefault(v, def int) int {

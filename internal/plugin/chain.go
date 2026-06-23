@@ -43,7 +43,7 @@ func (c *Chain) Empty() bool { return c == nil || len(c.entries) == 0 }
 // prompts are appended (in order), model/effort are overridden last-non-empty,
 // and the visible tool set is filtered (deny removes, allow-only intersects).
 // The engine still clamps model/effort to provider-supported values downstream.
-func (c *Chain) BeforeStep(ctx context.Context, in *agent.StepInput) {
+func (c *Chain) BeforeStep(ctx context.Context, sessionID string, in *agent.StepInput) {
 	if c.Empty() {
 		return
 	}
@@ -56,6 +56,7 @@ func (c *Chain) BeforeStep(ctx context.Context, in *agent.StepInput) {
 			continue
 		}
 		patch, err := e.Seam.BeforeStep(ctx, BeforeStepInput{
+			SessionID:    sessionID,
 			System:       in.System,
 			MessageCount: len(in.Messages),
 			Tools:        toolNames,
