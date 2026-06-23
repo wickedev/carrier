@@ -36,3 +36,7 @@ web/**/playwright-report/
 web/**/test-results/
 web/.pnpm-store/
 *.tsbuildinfo
+
+# local dev stack state
+.carrier-dev/
+.env

@@ -61,6 +61,30 @@ internal/obs/        cache-aware cost accounting, span tracer, decision audit
 internal/server/     HTTP + SSE surface, per-session fan-out hub, tenant auth
 ```
 
+## Local development
+
+The whole stack — Carrier runtime + BFF + web app — boots with one command:
+
+```sh
+make dev
+```
+
+It installs deps (Go + web), then starts all three on "3"-prefixed ports (so they
+dodge the usual defaults), killing anything already holding a port before it
+(re)starts:
+
+| Service          | URL                       |
+| ---------------- | ------------------------- |
+| Web (Vite)       | http://localhost:35173    |
+| BFF (Hono)       | http://localhost:38787    |
+| Carrier runtime  | http://localhost:39099    |
+
+Open **http://localhost:35173**; `Ctrl-C` tears the whole stack down. The database
+is embedded PGlite (persisted under `.carrier-dev/`, gitignored) — there is no
+separate database port. Override any port inline (`make dev WEB_PORT=45173`), drop
+a root `.env` for real GitHub App / `ANTHROPIC_API_KEY` credentials, and use
+`make kill` / `make clean` to free the ports / wipe local state.
+
 ## Build & run
 
 Requires Go 1.23+ (pinned to `1.26.4` via `.tool-versions` for asdf).
