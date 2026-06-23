@@ -19,7 +19,9 @@ import { and, eq } from "drizzle-orm";
 import {
   InstallPluginSchema,
   PluginInstallSchema,
+  PluginManifestSchema,
   type ConfigScope,
+  type PluginManifest,
 } from "@carrier/contract";
 import type { AppEnv } from "../context.js";
 import type { Db } from "../db/client.js";
@@ -67,6 +69,41 @@ function installToDto(row: PluginInstallRow) {
 
 /** Resolve a published version row by plugin name + version, plus the publisher
  *  key (for signature re-verification). Null if the version doesn't exist. */
+/**
+ * Bound the operator-approved capabilities by what the SIGNED manifest actually
+ * declares (Req 1.4 / 5.2): a granted capability the manifest never requested can
+ * never be obtained. Returns null when every grant is within the manifest, or an
+ * error string identifying the first over-grant. The manifest is the single
+ * source of truth — never the install request.
+ */
+function capabilityViolation(
+  grantedCaps: string[],
+  allowPermissions: boolean,
+  manifest: PluginManifest,
+): string | null {
+  const caps = manifest.capabilities;
+  for (const cap of grantedCaps) {
+    if (cap === "kv") {
+      if (!caps.kv) return "kv";
+      continue;
+    }
+    const secret = cap.startsWith("secret:") ? cap.slice("secret:".length) : null;
+    if (secret !== null) {
+      if (!caps.secrets.includes(secret)) return cap;
+      continue;
+    }
+    const host = cap.startsWith("network:") ? cap.slice("network:".length) : null;
+    if (host !== null) {
+      if (!caps.network.includes(host)) return cap;
+      continue;
+    }
+    return cap; // unknown capability token
+  }
+  // Granting permission-allow requires the manifest to request it.
+  if (allowPermissions && !caps.permissionsAllow) return "permissions.allow";
+  return null;
+}
+
 async function resolveVersion(
   db: Db,
   name: string,
@@ -75,6 +112,7 @@ async function resolveVersion(
   manifestDigest: string;
   signature: string;
   publicKey: string;
+  manifest: PluginManifest;
 } | null> {
   const pRows = await db
     .select()
@@ -102,10 +140,13 @@ async function resolveVersion(
     .limit(1);
   const pub = pubRows[0];
   if (!pub) return null;
+  const manifest = PluginManifestSchema.safeParse(JSON.parse(v.manifestJson));
+  if (!manifest.success) return null;
   return {
     manifestDigest: v.manifestDigest,
     signature: v.signature,
     publicKey: pub.publicKey,
+    manifest: manifest.data,
   };
 }
 
@@ -185,6 +226,13 @@ function mountScope(
       return c.json({ error: "bad_signature" }, 400);
     }
 
+    // Bound the approved capabilities by the signed manifest: nothing the
+    // manifest did not request can be granted.
+    const over = capabilityViolation(grantedCaps, allowPermissions, resolved.manifest);
+    if (over) {
+      return c.json({ error: "capability_not_declared", capability: over }, 400);
+    }
+
     const id = randomUUID();
     const row = {
       id,
@@ -234,9 +282,21 @@ function mountScope(
       updates.allowPermissions = body.allowPermissions;
     }
 
-    // Upgrade: changing version re-pins the manifest digest and re-verifies.
-    if (typeof body.version === "string" && body.version !== cur.version) {
-      const resolved = await resolveVersion(db, cur.pluginName, body.version);
+    const changingVersion =
+      typeof body.version === "string" && body.version !== cur.version;
+    const changingCaps =
+      Array.isArray(body.grantedCaps) ||
+      typeof body.allowPermissions === "boolean";
+
+    // When the version or the granted capabilities change, re-resolve the
+    // effective version's signed manifest, re-verify the signature, and bound the
+    // EFFECTIVE caps (post-patch) by that manifest — so neither an upgrade nor a
+    // cap edit can grant anything the manifest never requested.
+    if (changingVersion || changingCaps) {
+      const effectiveVersion = changingVersion
+        ? (body.version as string)
+        : cur.version;
+      const resolved = await resolveVersion(db, cur.pluginName, effectiveVersion);
       if (!resolved) return c.json({ error: "version_not_found" }, 400);
       if (
         !verifyDetachedSignature(
@@ -247,8 +307,25 @@ function mountScope(
       ) {
         return c.json({ error: "bad_signature" }, 400);
       }
-      updates.version = body.version;
-      updates.manifestDigest = resolved.manifestDigest;
+      const effectiveCaps = Array.isArray(body.grantedCaps)
+        ? (body.grantedCaps as string[])
+        : parseJsonArray(cur.grantedCapsJson);
+      const effectiveAllow =
+        typeof body.allowPermissions === "boolean"
+          ? body.allowPermissions
+          : cur.allowPermissions;
+      const over = capabilityViolation(
+        effectiveCaps,
+        effectiveAllow,
+        resolved.manifest,
+      );
+      if (over) {
+        return c.json({ error: "capability_not_declared", capability: over }, 400);
+      }
+      if (changingVersion) {
+        updates.version = body.version;
+        updates.manifestDigest = resolved.manifestDigest;
+      }
     }
 
     if (Object.keys(updates).length > 0) {

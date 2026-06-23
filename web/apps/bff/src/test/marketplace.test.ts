@@ -176,6 +176,7 @@ describe("plugin install routes (org/project scope)", () => {
     const pub = await h.publishSamplePlugin({
       name: "acme/lint",
       version: "1.0.0",
+      capabilities: { network: ["api.acme.com"], permissionsAllow: true },
     });
 
     const res = await h.app.request(`/orgs/${owner.orgId}/plugins`, {
@@ -199,6 +200,91 @@ describe("plugin install routes (org/project scope)", () => {
     });
     expect(list.status).toBe(200);
     expect((await list.json())).toHaveLength(1);
+  });
+
+  it("install cannot grant a capability the signed manifest did not declare (400)", async () => {
+    const h = await makeHarness();
+    const owner = await h.seedAccount("owner");
+    const cookie = await h.cookieFor(owner.accountId);
+    // The manifest declares only network:api.acme.com — nothing else.
+    await h.publishSamplePlugin({
+      name: "acme/lint",
+      version: "1.0.0",
+      capabilities: { network: ["api.acme.com"] },
+    });
+
+    const cases: Array<{ grantedCaps: string[]; allowPermissions?: boolean }> = [
+      { grantedCaps: ["network:evil.com"] }, // undeclared host
+      { grantedCaps: ["secret:STOLEN"] }, // undeclared secret
+      { grantedCaps: ["kv"] }, // kv not requested
+      { grantedCaps: [], allowPermissions: true }, // permissions.allow not requested
+    ];
+    for (const body of cases) {
+      const res = await h.app.request(`/orgs/${owner.orgId}/plugins`, {
+        method: "POST",
+        headers: json(cookie),
+        body: JSON.stringify({ name: "acme/lint", version: "1.0.0", ...body }),
+      });
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toBe("capability_not_declared");
+    }
+
+    // A grant within the manifest succeeds.
+    const ok = await h.app.request(`/orgs/${owner.orgId}/plugins`, {
+      method: "POST",
+      headers: json(cookie),
+      body: JSON.stringify({
+        name: "acme/lint",
+        version: "1.0.0",
+        grantedCaps: ["network:api.acme.com"],
+      }),
+    });
+    expect(ok.status).toBe(201);
+  });
+
+  it("patch cannot escalate capabilities beyond the manifest (400)", async () => {
+    const h = await makeHarness();
+    const owner = await h.seedAccount("owner");
+    const cookie = await h.cookieFor(owner.accountId);
+    await h.publishSamplePlugin({
+      name: "acme/lint",
+      version: "1.0.0",
+      capabilities: { network: ["api.acme.com"] },
+    });
+    const created = await (
+      await h.app.request(`/orgs/${owner.orgId}/plugins`, {
+        method: "POST",
+        headers: json(cookie),
+        body: JSON.stringify({
+          name: "acme/lint",
+          version: "1.0.0",
+          grantedCaps: ["network:api.acme.com"],
+        }),
+      })
+    ).json();
+
+    // Trying to widen caps via PATCH is rejected.
+    const patch = await h.app.request(
+      `/orgs/${owner.orgId}/plugins/${created.id}`,
+      {
+        method: "PATCH",
+        headers: json(cookie),
+        body: JSON.stringify({ grantedCaps: ["network:evil.com"] }),
+      },
+    );
+    expect(patch.status).toBe(400);
+    expect((await patch.json()).error).toBe("capability_not_declared");
+
+    // An enabled-only toggle still works.
+    const toggle = await h.app.request(
+      `/orgs/${owner.orgId}/plugins/${created.id}`,
+      {
+        method: "PATCH",
+        headers: json(cookie),
+        body: JSON.stringify({ enabled: false }),
+      },
+    );
+    expect(toggle.status).toBe(200);
   });
 
   it("org allowlist blocks an unlisted plugin (403 not_allowlisted)", async () => {
