@@ -5,7 +5,7 @@ import { cn } from "@carrier/ui";
 import { Plus, Settings, MessageSquare, Loader2, CircleDot, Circle } from "lucide-react";
 import type { SessionStatus } from "@carrier/contract";
 import { useProject, useSessions, useCreateSession } from "../api/queries";
-import { Card, Loading, ErrorState, EmptyState, Input } from "../components/primitives";
+import { Card, Loading, ErrorState, EmptyState } from "../components/primitives";
 
 function StatusIcon({ status }: { status: SessionStatus }) {
   if (status === "running") return <Loader2 className="h-3.5 w-3.5 animate-spin text-green-500 motion-reduce:animate-none" aria-hidden />;
@@ -21,18 +21,14 @@ export function ProjectPage() {
   const sessions = useSessions(project);
   const create = useCreateSession(project);
 
-  const [title, setTitle] = React.useState("");
-  const [planMode, setPlanMode] = React.useState(false);
-
-  const startSession = (e: React.FormEvent) => {
-    e.preventDefault();
+  // One-click session start. The title is auto-generated: a new session begins as
+  // "Untitled" and the runtime renames it to a summary on the first LLM turn — so
+  // there is nothing to fill in at creation.
+  const startSession = () => {
     create.mutate(
-      { title: title.trim() || undefined, planMode },
+      {},
       {
-        onSuccess: (s) => {
-          setTitle("");
-          navigate(`/${org}/${project}/s/${s.id}`);
-        },
+        onSuccess: (s) => navigate(`/${org}/${project}/s/${s.id}`),
       },
     );
   };
@@ -64,35 +60,15 @@ export function ProjectPage() {
         <p className="mb-4 text-xs text-fg-muted">Unbound workspace</p>
       )}
 
-      <Card className="mb-6 p-4">
-        <h2 className="mb-3 text-sm font-medium">New session</h2>
-        <form onSubmit={startSession} className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <Input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Session title (optional)"
-            aria-label="Session title"
-          />
-          <label
-            className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-sm"
-            title="Agent drafts a plan before editing code"
-          >
-            <input
-              type="checkbox"
-              checked={planMode}
-              onChange={(e) => setPlanMode(e.target.checked)}
-              className="h-4 w-4"
-            />
-            Plan mode
-          </label>
-          <Button type="submit" disabled={create.isPending} className="shrink-0">
-            <Plus className="h-4 w-4" aria-hidden /> Start
-          </Button>
-        </form>
+      <div className="mb-6">
+        <Button onClick={startSession} disabled={create.isPending}>
+          <Plus className="h-4 w-4" aria-hidden />
+          {create.isPending ? "Starting…" : "New session"}
+        </Button>
         {create.isError ? (
           <p className="mt-2 text-sm text-danger">{(create.error as Error).message}</p>
         ) : null}
-      </Card>
+      </div>
 
       <h2 className="mb-2 text-sm font-medium">Sessions</h2>
       {sessions.isLoading ? (
