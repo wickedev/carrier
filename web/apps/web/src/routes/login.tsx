@@ -12,11 +12,25 @@ const ERROR_LABELS: Record<string, string> = {
   invalid_body: "Please enter a valid email and a password (min 8 characters).",
 };
 
+// In dev only (never in a production build — import.meta.env.DEV is false there),
+// prefill the form with the seeded dev credentials so you can sign in with one
+// click. Overridable via VITE_DEV_EMAIL / VITE_DEV_PASSWORD.
+const devEnv = import.meta.env as unknown as {
+  VITE_DEV_EMAIL?: string;
+  VITE_DEV_PASSWORD?: string;
+};
+const DEV_EMAIL = import.meta.env.DEV
+  ? (devEnv.VITE_DEV_EMAIL ?? "dev@carrier.local")
+  : "";
+const DEV_PASSWORD = import.meta.env.DEV
+  ? (devEnv.VITE_DEV_PASSWORD ?? "carrierdev")
+  : "";
+
 /** /login — email/password (with a dev default) plus GitHub SSO. */
 export function LoginPage() {
   const [mode, setMode] = React.useState<"login" | "register">("login");
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
+  const [email, setEmail] = React.useState(DEV_EMAIL);
+  const [password, setPassword] = React.useState(DEV_PASSWORD);
   const [name, setName] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);

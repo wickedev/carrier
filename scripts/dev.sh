@@ -89,6 +89,8 @@ echo "▸ web      → http://localhost:${WEB_PORT}  (proxies /bff → ${BFF_POR
 ( cd "$ROOT/web" && \
   WEB_PORT="$WEB_PORT" \
   BFF_PROXY_TARGET="http://localhost:${BFF_PORT}" \
+  VITE_DEV_EMAIL="$DEV_USER_EMAIL" \
+  VITE_DEV_PASSWORD="$DEV_USER_PASSWORD" \
   pnpm --filter @carrier/web dev ) &
 PIDS+=("$!")
 
