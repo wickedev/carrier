@@ -5,6 +5,7 @@ import { Button } from "@carrier/ui";
 import { Plus, UserPlus, Github, Loader2 } from "lucide-react";
 import { Card, EmptyState, Loading, ErrorState, Input } from "../components/primitives";
 import { ConfigSection, DeleteButton } from "../components/config-controls";
+import { useToast } from "../components/toast";
 import {
   usePermissions,
   useProject,
@@ -74,6 +75,7 @@ export function OrgSettingsPage() {
 }
 
 function MembersSection({ orgSlug, current }: { orgSlug: string; current?: Org }) {
+  const toast = useToast();
   const manage = canManage(current?.role);
   const members = useMembers(orgSlug);
   const addMember = useAddMember(orgSlug);
@@ -86,7 +88,15 @@ function MembersSection({ orgSlug, current }: { orgSlug: string; current?: Org }
     e.preventDefault();
     const l = login.trim();
     if (!l) return;
-    addMember.mutate({ login: l, role }, { onSuccess: () => setLogin("") });
+    addMember.mutate(
+      { login: l, role },
+      {
+        onSuccess: () => {
+          setLogin("");
+          toast("Member added");
+        },
+      },
+    );
   };
 
   return (
@@ -109,7 +119,7 @@ function MembersSection({ orgSlug, current }: { orgSlug: string; current?: Org }
                 value={role}
                 onChange={(e) => setRole(e.target.value as Role)}
                 aria-label="Member role"
-                className="h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
+                className="h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950"
               >
                 <option value="member">member</option>
                 <option value="admin">admin</option>
@@ -133,7 +143,11 @@ function MembersSection({ orgSlug, current }: { orgSlug: string; current?: Org }
             <DeleteButton
               label={`Remove ${m.login}`}
               disabled={removeMember.isPending}
-              onClick={() => removeMember.mutate(m.accountId || m.login)}
+              onClick={() =>
+                removeMember.mutate(m.accountId || m.login, {
+                  onSuccess: () => toast("Removed"),
+                })
+              }
             />
           ) : null}
         </li>
@@ -207,6 +221,7 @@ export function ProjectSettingsPage() {
 }
 
 function RepoBindingSection({ orgSlug, projectId, manage }: { orgSlug: string; projectId: string; manage: boolean }) {
+  const toast = useToast();
   const projectQ = useProject(projectId);
   const installs = useInstallations(orgSlug);
   const bind = useBindRepo(projectId);
@@ -227,11 +242,14 @@ function RepoBindingSection({ orgSlug, projectId, manage }: { orgSlug: string; p
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (installationId === "" || !repoFullName) return;
-    bind.mutate({
-      installationId: Number(installationId),
-      repoFullName,
-      defaultBranch: branch.trim() || undefined,
-    });
+    bind.mutate(
+      {
+        installationId: Number(installationId),
+        repoFullName,
+        defaultBranch: branch.trim() || undefined,
+      },
+      { onSuccess: () => toast("Repository bound") },
+    );
   };
 
   return (
@@ -246,7 +264,12 @@ function RepoBindingSection({ orgSlug, projectId, manage }: { orgSlug: string; p
             {projectQ.data.repo.defaultBranch})
           </p>
           {manage ? (
-            <Button variant="outline" size="sm" disabled={unbind.isPending} onClick={() => unbind.mutate()}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={unbind.isPending}
+              onClick={() => unbind.mutate(undefined, { onSuccess: () => toast("Repository unbound") })}
+            >
               Unbind
             </Button>
           ) : null}
@@ -273,7 +296,7 @@ function RepoBindingSection({ orgSlug, projectId, manage }: { orgSlug: string; p
                   setRepoFullName("");
                   setBranch("");
                 }}
-                className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
+                className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950"
               >
                 <option value="">Select installation…</option>
                 {installs.data?.map((i) => (
@@ -290,7 +313,7 @@ function RepoBindingSection({ orgSlug, projectId, manage }: { orgSlug: string; p
                   setRepoFullName(e.target.value);
                   setBranch("");
                 }}
-                className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950"
+                className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950"
               >
                 <option value="">Select repository…</option>
                 {selected?.repos.map((r) => (
@@ -306,7 +329,7 @@ function RepoBindingSection({ orgSlug, projectId, manage }: { orgSlug: string; p
                 aria-label="Default branch"
               />
               <Button type="submit" disabled={installationId === "" || !repoFullName || bind.isPending}>
-                {bind.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+                {bind.isPending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
                 Bind repository
               </Button>
             </>
@@ -323,6 +346,7 @@ function RepoBindingSection({ orgSlug, projectId, manage }: { orgSlug: string; p
 const ACTIONS = ["read", "write", "execute", "network", "*"];
 
 function PermissionsSection({ projectId, manage }: { projectId: string; manage: boolean }) {
+  const toast = useToast();
   const perms = usePermissions(projectId);
   const add = useAddPermission(projectId);
   const del = useDeletePermission(projectId);
@@ -335,7 +359,15 @@ function PermissionsSection({ projectId, manage }: { projectId: string; manage: 
     e.preventDefault();
     const p = pattern.trim();
     if (!p) return;
-    add.mutate({ action, pattern: p, effect }, { onSuccess: () => setPattern("") });
+    add.mutate(
+      { action, pattern: p, effect },
+      {
+        onSuccess: () => {
+          setPattern("");
+          toast("Rule added");
+        },
+      },
+    );
   };
 
   return (
@@ -348,7 +380,7 @@ function PermissionsSection({ projectId, manage }: { projectId: string; manage: 
             value={action}
             onChange={(e) => setAction(e.target.value)}
             aria-label="Rule action"
-            className="h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
+            className="h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950"
           >
             {ACTIONS.map((a) => (
               <option key={a} value={a}>
@@ -366,7 +398,7 @@ function PermissionsSection({ projectId, manage }: { projectId: string; manage: 
             value={effect}
             onChange={(e) => setEffect(e.target.value as "allow" | "deny" | "ask")}
             aria-label="Rule effect"
-            className="h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
+            className="h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950"
           >
             <option value="allow">allow</option>
             <option value="deny">deny</option>
@@ -406,7 +438,7 @@ function PermissionsSection({ projectId, manage }: { projectId: string; manage: 
                 <DeleteButton
                   label={`Delete rule ${r.action} ${r.pattern}`}
                   disabled={del.isPending}
-                  onClick={() => del.mutate(r.id)}
+                  onClick={() => del.mutate(r.id, { onSuccess: () => toast("Removed") })}
                 />
               ) : null}
             </li>
@@ -485,7 +517,7 @@ function DangerZone({
             disabled={archive.isPending}
             onClick={doArchive}
           >
-            {archive.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+            {archive.isPending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
             Confirm archive
           </Button>
           <Button variant="ghost" size="sm" onClick={() => setConfirming(false)}>

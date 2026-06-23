@@ -112,7 +112,7 @@ export function LoginPage() {
 
       <button
         type="button"
-        className="text-sm text-fg-muted hover:underline"
+        className="rounded text-sm text-fg-muted hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400"
         onClick={() => {
           setMode((m) => (m === "login" ? "register" : "login"));
           setError(null);

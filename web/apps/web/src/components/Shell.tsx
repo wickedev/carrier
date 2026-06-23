@@ -60,7 +60,7 @@ function OrgSwitcher({ me, activeSlug }: { me: Me; activeSlug?: string }) {
                   navigate(`/${org.slug}`);
                 }}
                 className={cn(
-                  "flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800",
+                  "flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:hover:bg-neutral-800",
                   org.slug === activeSlug && "font-medium",
                 )}
               >

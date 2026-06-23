@@ -2,6 +2,7 @@ import * as React from "react";
 import { RouterProvider } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { createRouter } from "./routes/router";
+import { ToastProvider } from "./components/toast";
 import { installGlobalErrorTelemetry, recordRouteChange } from "./telemetry";
 
 /**
@@ -27,5 +28,9 @@ export function App() {
     });
   }, [router]);
 
-  return <RouterProvider router={router} />;
+  return (
+    <ToastProvider>
+      <RouterProvider router={router} />
+    </ToastProvider>
+  );
 }

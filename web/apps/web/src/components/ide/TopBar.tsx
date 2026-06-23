@@ -20,7 +20,7 @@ function StatusDot({ status }: { status: SessionStatus }) {
   if (status === "running")
     return (
       <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-        <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> running
+        <Loader2 className="h-3 w-3 animate-spin motion-reduce:animate-none" aria-hidden /> running
       </span>
     );
   if (status === "terminated")

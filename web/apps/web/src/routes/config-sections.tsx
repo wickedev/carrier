@@ -4,6 +4,7 @@ import { Button } from "@carrier/ui";
 import { Plus, Loader2 } from "lucide-react";
 import { Card, Badge, Input, Loading } from "../components/primitives";
 import { ConfigSection, DeleteButton, EnableToggle } from "../components/config-controls";
+import { useToast } from "../components/toast";
 import {
   useConfigList,
   useCreateConfig,
@@ -30,7 +31,7 @@ export interface SectionProps {
 // ── Shared styling helpers (mirror settings.tsx form controls) ────────────────
 
 const SELECT_CLASS =
-  "h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm dark:border-neutral-700 dark:bg-neutral-950";
+  "h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950";
 const TEXTAREA_CLASS =
   "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm outline-none placeholder:text-fg-subtle focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950";
 
@@ -53,6 +54,7 @@ function splitCommas(raw: string): string[] {
 // ── Agents ────────────────────────────────────────────────────────────────────
 
 export function AgentsSection({ scope, ownerKey, manage }: SectionProps) {
+  const toast = useToast();
   const list = useConfigList(scope, ownerKey, "agents");
   const create = useCreateConfig(scope, ownerKey, "agents");
   const update = useUpdateConfig(scope, ownerKey, "agents");
@@ -81,6 +83,7 @@ export function AgentsSection({ scope, ownerKey, manage }: SectionProps) {
           setDescription("");
           setPrompt("");
           setModel("");
+          toast("Saved");
         },
       },
     );
@@ -118,7 +121,7 @@ export function AgentsSection({ scope, ownerKey, manage }: SectionProps) {
                 aria-label="Agent model"
               />
               <Button type="submit" disabled={!name.trim() || create.isPending}>
-                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
+                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
                 Add agent
               </Button>
             </form>
@@ -147,7 +150,7 @@ export function AgentsSection({ scope, ownerKey, manage }: SectionProps) {
             <DeleteButton
               label={`Delete agent ${a.name}`}
               disabled={remove.isPending}
-              onClick={() => remove.mutate(a.id)}
+              onClick={() => remove.mutate(a.id, { onSuccess: () => toast("Removed") })}
             />
           ) : null}
         </li>
@@ -159,6 +162,7 @@ export function AgentsSection({ scope, ownerKey, manage }: SectionProps) {
 // ── Skills ──────────────────────────────────────────────────────────────────
 
 export function SkillsSection({ scope, ownerKey, manage }: SectionProps) {
+  const toast = useToast();
   const list = useConfigList(scope, ownerKey, "skills");
   const create = useCreateConfig(scope, ownerKey, "skills");
   const update = useUpdateConfig(scope, ownerKey, "skills");
@@ -191,6 +195,7 @@ export function SkillsSection({ scope, ownerKey, manage }: SectionProps) {
           setBody("");
           setAgent("");
           setAllowedTools("");
+          toast("Saved");
         },
       },
     );
@@ -234,7 +239,7 @@ export function SkillsSection({ scope, ownerKey, manage }: SectionProps) {
                 aria-label="Skill allowed tools"
               />
               <Button type="submit" disabled={!name.trim() || create.isPending}>
-                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
+                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
                 Add skill
               </Button>
             </form>
@@ -263,7 +268,7 @@ export function SkillsSection({ scope, ownerKey, manage }: SectionProps) {
             <DeleteButton
               label={`Delete skill ${s.name}`}
               disabled={remove.isPending}
-              onClick={() => remove.mutate(s.id)}
+              onClick={() => remove.mutate(s.id, { onSuccess: () => toast("Removed") })}
             />
           ) : null}
         </li>
@@ -275,6 +280,7 @@ export function SkillsSection({ scope, ownerKey, manage }: SectionProps) {
 // ── MCP servers ───────────────────────────────────────────────────────────────
 
 export function McpServersSection({ scope, ownerKey, manage }: SectionProps) {
+  const toast = useToast();
   const list = useConfigList(scope, ownerKey, "mcp");
   const create = useCreateConfig(scope, ownerKey, "mcp");
   const update = useUpdateConfig(scope, ownerKey, "mcp");
@@ -304,6 +310,7 @@ export function McpServersSection({ scope, ownerKey, manage }: SectionProps) {
           setCommand("");
           setArgs("");
           setEnvKeys("");
+          toast("Saved");
         },
       },
     );
@@ -344,7 +351,7 @@ export function McpServersSection({ scope, ownerKey, manage }: SectionProps) {
                 aria-label="MCP env keys"
               />
               <Button type="submit" disabled={!name.trim() || !command.trim() || create.isPending}>
-                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
+                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
                 Add server
               </Button>
             </form>
@@ -372,7 +379,7 @@ export function McpServersSection({ scope, ownerKey, manage }: SectionProps) {
             <DeleteButton
               label={`Delete MCP server ${m.name}`}
               disabled={remove.isPending}
-              onClick={() => remove.mutate(m.id)}
+              onClick={() => remove.mutate(m.id, { onSuccess: () => toast("Removed") })}
             />
           ) : null}
         </li>
@@ -384,6 +391,7 @@ export function McpServersSection({ scope, ownerKey, manage }: SectionProps) {
 // ── Context docs (AGENTS.md-like) ─────────────────────────────────────────────
 
 export function ContextSection({ scope, ownerKey, manage }: SectionProps) {
+  const toast = useToast();
   const list = useConfigList(scope, ownerKey, "context");
   const create = useCreateConfig(scope, ownerKey, "context");
   const update = useUpdateConfig(scope, ownerKey, "context");
@@ -402,6 +410,7 @@ export function ContextSection({ scope, ownerKey, manage }: SectionProps) {
         onSuccess: () => {
           setName("");
           setBody("");
+          toast("Saved");
         },
       },
     );
@@ -427,7 +436,7 @@ export function ContextSection({ scope, ownerKey, manage }: SectionProps) {
                 className={TEXTAREA_CLASS}
               />
               <Button type="submit" disabled={!name.trim() || create.isPending}>
-                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
+                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
                 Add document
               </Button>
             </form>
@@ -450,7 +459,7 @@ export function ContextSection({ scope, ownerKey, manage }: SectionProps) {
             <DeleteButton
               label={`Delete context ${d.name}`}
               disabled={remove.isPending}
-              onClick={() => remove.mutate(d.id)}
+              onClick={() => remove.mutate(d.id, { onSuccess: () => toast("Removed") })}
             />
           ) : null}
         </li>
@@ -471,6 +480,7 @@ const HOOK_EVENTS: HookEvent[] = [
 ];
 
 export function HooksSection({ scope, ownerKey, manage }: SectionProps) {
+  const toast = useToast();
   const list = useConfigList(scope, ownerKey, "hooks");
   const create = useCreateConfig(scope, ownerKey, "hooks");
   const update = useUpdateConfig(scope, ownerKey, "hooks");
@@ -499,6 +509,7 @@ export function HooksSection({ scope, ownerKey, manage }: SectionProps) {
           setName("");
           setCommand("");
           setMatcher("");
+          toast("Saved");
         },
       },
     );
@@ -540,7 +551,7 @@ export function HooksSection({ scope, ownerKey, manage }: SectionProps) {
                 aria-label="Hook matcher"
               />
               <Button type="submit" disabled={!name.trim() || !command.trim() || create.isPending}>
-                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
+                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
                 Add hook
               </Button>
             </form>
@@ -567,7 +578,7 @@ export function HooksSection({ scope, ownerKey, manage }: SectionProps) {
             <DeleteButton
               label={`Delete hook ${h.name}`}
               disabled={remove.isPending}
-              onClick={() => remove.mutate(h.id)}
+              onClick={() => remove.mutate(h.id, { onSuccess: () => toast("Removed") })}
             />
           ) : null}
         </li>
@@ -579,6 +590,7 @@ export function HooksSection({ scope, ownerKey, manage }: SectionProps) {
 // ── Env vars / secrets ─────────────────────────────────────────────────────────
 
 export function EnvVarsSection({ scope, ownerKey, manage }: SectionProps) {
+  const toast = useToast();
   const list = useConfigList(scope, ownerKey, "env");
   const create = useCreateConfig(scope, ownerKey, "env");
   const remove = useRemoveConfig(scope, ownerKey, "env");
@@ -598,6 +610,7 @@ export function EnvVarsSection({ scope, ownerKey, manage }: SectionProps) {
           setKey("");
           setValue("");
           setSecret(false);
+          toast("Saved");
         },
       },
     );
@@ -631,7 +644,7 @@ export function EnvVarsSection({ scope, ownerKey, manage }: SectionProps) {
                 secret
               </label>
               <Button type="submit" disabled={!key.trim() || create.isPending} className="shrink-0">
-                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
+                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
                 Add variable
               </Button>
             </form>
@@ -657,7 +670,7 @@ export function EnvVarsSection({ scope, ownerKey, manage }: SectionProps) {
             <DeleteButton
               label={`Delete env ${v.key}`}
               disabled={remove.isPending}
-              onClick={() => remove.mutate(v.id)}
+              onClick={() => remove.mutate(v.id, { onSuccess: () => toast("Removed") })}
             />
           ) : null}
         </li>
@@ -679,6 +692,7 @@ const DEFAULT_MODEL_PARAMS: ModelParams = {
 };
 
 export function ModelParamsSection({ scope, ownerKey, manage }: SectionProps) {
+  const toast = useToast();
   const query = useModelParams(scope, ownerKey, { retry: false });
   const put = usePutModelParams(scope, ownerKey);
 
@@ -691,7 +705,7 @@ export function ModelParamsSection({ scope, ownerKey, manage }: SectionProps) {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    put.mutate(form);
+    put.mutate(form, { onSuccess: () => toast("Saved") });
   };
 
   return (
@@ -768,7 +782,7 @@ export function ModelParamsSection({ scope, ownerKey, manage }: SectionProps) {
           </label>
           {manage ? (
             <Button type="submit" disabled={put.isPending}>
-              {put.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+              {put.isPending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
               Save
             </Button>
           ) : null}

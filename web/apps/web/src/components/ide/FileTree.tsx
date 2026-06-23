@@ -131,7 +131,7 @@ export function FileTree({
               type="button"
               onClick={() => toggle(entry.path)}
               style={{ paddingLeft: depth * 12 + 4 }}
-              className="flex w-full items-center gap-1 py-1 pr-2 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              className="flex w-full items-center gap-1 py-1 pr-2 text-left text-sm hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:hover:bg-neutral-800"
               aria-expanded={isOpen}
             >
               {isOpen ? (
@@ -154,7 +154,7 @@ export function FileTree({
           onClick={() => onSelect(entry.path)}
           style={{ paddingLeft: depth * 12 + 4 + 18 }}
           className={cn(
-            "flex w-full items-center gap-1 py-1 pr-2 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800",
+            "flex w-full items-center gap-1 py-1 pr-2 text-left text-sm hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:hover:bg-neutral-800",
             selected && "bg-blue-50 dark:bg-blue-950/40",
           )}
           aria-current={selected ? "true" : undefined}

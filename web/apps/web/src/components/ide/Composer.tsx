@@ -48,7 +48,7 @@ export function Composer({
             aria-pressed={!steer}
             onClick={() => setSteer(false)}
             className={cn(
-              "px-2 py-0.5",
+              "px-2 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400",
               !steer
                 ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
                 : "text-fg-muted",
@@ -61,7 +61,7 @@ export function Composer({
             aria-pressed={steer}
             onClick={() => setSteer(true)}
             className={cn(
-              "px-2 py-0.5",
+              "px-2 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400",
               steer
                 ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
                 : "text-fg-muted",

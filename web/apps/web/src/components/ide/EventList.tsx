@@ -115,7 +115,13 @@ export function EventCard({ event }: { event: SessionEvent }) {
 export function EventList({ events }: { events: SessionEvent[] }) {
   const visible = events.filter((e) => e.kind !== "approval_request");
   return (
-    <div className="flex flex-col py-2" data-testid="event-list">
+    <div
+      className="flex flex-col py-2"
+      data-testid="event-list"
+      role="log"
+      aria-live="polite"
+      aria-atomic="false"
+    >
       {visible.map((e) => (
         <EventCard key={e.seq} event={e} />
       ))}

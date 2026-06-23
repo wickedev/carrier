@@ -5,7 +5,7 @@ import { Loader2, AlertTriangle } from "lucide-react";
 /** Small reusable UI primitives built on top of @carrier/ui (do not edit packages/ui). */
 
 export function Spinner({ className }: { className?: string }) {
-  return <Loader2 className={cn("h-4 w-4 animate-spin", className)} aria-hidden />;
+  return <Loader2 className={cn("h-4 w-4 animate-spin motion-reduce:animate-none", className)} aria-hidden />;
 }
 
 export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {

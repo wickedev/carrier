@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { Card, Badge, Input, Loading, ErrorState, EmptyState } from "../components/primitives";
 import { ConfigSection, DeleteButton, EnableToggle } from "../components/config-controls";
+import { useToast } from "../components/toast";
 import {
   useMarketplaceSearch,
   usePluginVersions,
@@ -384,6 +385,7 @@ function InstallConsentDialog({
 }) {
   const caps = manifest.capabilities;
   const navigate = useNavigate();
+  const toast = useToast();
 
   const install = useInstallPlugin(orgScope.scope, orgScope.ownerKey);
 
@@ -412,7 +414,12 @@ function InstallConsentDialog({
         grantedCaps,
         allowPermissions: caps.permissionsAllow ? allowPermissions : false,
       },
-      { onSuccess: () => navigate(`/${org}/marketplace`) },
+      {
+        onSuccess: () => {
+          toast("Plugin installed");
+          navigate(`/${org}/marketplace`);
+        },
+      },
     );
   };
 
@@ -514,7 +521,7 @@ function InstallConsentDialog({
             Cancel
           </Button>
           <Button onClick={submit} disabled={install.isPending} data-testid="confirm-install">
-            {install.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+            {install.isPending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
             Install v{version}
           </Button>
         </div>
@@ -539,6 +546,7 @@ export function InstalledPluginsSection({
   ownerKey: string;
   manage: boolean;
 }) {
+  const toast = useToast();
   const list = useInstalledPlugins(scope, ownerKey);
   const update = useUpdateInstall(scope, ownerKey);
   const uninstall = useUninstall(scope, ownerKey);
@@ -570,7 +578,7 @@ export function InstalledPluginsSection({
             <DeleteButton
               label={`Uninstall ${p.name}`}
               disabled={uninstall.isPending}
-              onClick={() => uninstall.mutate(p.id)}
+              onClick={() => uninstall.mutate(p.id, { onSuccess: () => toast("Plugin uninstalled") })}
             />
           ) : null}
         </li>
