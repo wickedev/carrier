@@ -14,6 +14,7 @@ const (
 	EvUsage                            // an incremental usage update
 	EvError                            // a classified engine error
 	EvApprovalRequest                  // a tool action awaiting human approval
+	EvTitleSuggested                   // an auto-generated session title (first turn)
 )
 
 // StreamEvent is the canonical, provider-agnostic unit of streaming output.
@@ -41,6 +42,9 @@ type StreamEvent struct {
 
 	// Approval is set for EvApprovalRequest.
 	Approval *ApprovalRequest
+
+	// Title carries the auto-generated session title for EvTitleSuggested.
+	Title string
 }
 
 // ToolResult is the outcome of executing a ToolCall, normalized for feedback to
@@ -82,6 +86,8 @@ func (k EventKind) String() string {
 		return "error"
 	case EvApprovalRequest:
 		return "approval_request"
+	case EvTitleSuggested:
+		return "title_suggested"
 	default:
 		return "unknown"
 	}

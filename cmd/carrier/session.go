@@ -174,6 +174,7 @@ func (rt *runtime) newSession(sessionID string, opts server.SessionOptions) (*fl
 		Policy:        policy,
 		Exec:          exec,
 		Summarizer:    rt.summarizer,
+		Titler:        rt.titler,
 		MaxSteps:      opts.MaxSteps,
 		ContextBudget: budget,
 		PlanMode:      opts.PlanMode,

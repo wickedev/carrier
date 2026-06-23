@@ -60,6 +60,7 @@ type runtime struct {
 	engine        engine.Engine
 	baseExec      tool.ExecContext
 	summarizer    flight.Summarizer
+	titler        flight.Titler
 	defaultSystem string
 	defaultMemory string
 	defaultBudget int
@@ -84,6 +85,7 @@ func buildRuntime() (*runtime, error) {
 		engine:        eng,
 		baseExec:      tool.ExecContext{Executor: bay.NewLocalExecutor()},
 		summarizer:    flight.EngineSummarizer{Engine: eng},
+		titler:        flight.EngineTitler{Engine: eng},
 		defaultSystem: systemPrompt,
 		defaultMemory: mem,
 		defaultBudget: 150000,
@@ -121,6 +123,7 @@ func (rt *runtime) baseConfig() flight.Config {
 		Tools:         reg,
 		Exec:          rt.baseExec,
 		Summarizer:    rt.summarizer,
+		Titler:        rt.titler,
 		ContextBudget: rt.defaultBudget,
 	}
 }

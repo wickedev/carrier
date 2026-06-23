@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/wickedev/carrier/internal/agent"
@@ -52,6 +53,13 @@ type Summarizer interface {
 	Summarize(ctx context.Context, history []agent.Message) (string, error)
 }
 
+// Titler proposes a short session title from the first exchange. A new session
+// starts "Untitled"; after the first turn the Flight emits an EvTitleSuggested
+// event so the surface can rename it. A real implementation calls a cheap model.
+type Titler interface {
+	Title(ctx context.Context, firstUser, firstAssistant string) (string, error)
+}
+
 // Config constructs a Flight.
 type Config struct {
 	ID     string
@@ -75,6 +83,7 @@ type Config struct {
 	Approver    Approver
 	Classifier  perm.Classifier // nil → Ask falls straight to the Approver
 	Summarizer  Summarizer      // nil → placeholder compaction summary
+	Titler      Titler          // nil → no auto title
 	MaxSteps    int
 	IdleTimeout time.Duration
 	MaxParallel int
@@ -104,6 +113,8 @@ type Flight struct {
 	classifier  perm.Classifier
 	denials     *perm.DenialTracker
 	summarizer  Summarizer
+	titler      Titler
+	titled      bool // whether an auto title has been suggested yet
 	maxSteps    int
 	idleTimeout time.Duration
 	maxParallel int
@@ -136,6 +147,7 @@ func New(cfg Config) *Flight {
 		classifier:  cfg.Classifier,
 		denials:     perm.NewDenialTracker(5),
 		summarizer:  cfg.Summarizer,
+		titler:      cfg.Titler,
 		maxSteps:    orDefault(cfg.MaxSteps, defaultMaxSteps),
 		idleTimeout: orDefaultDur(cfg.IdleTimeout, defaultIdleTimeout),
 		maxParallel: orDefault(cfg.MaxParallel, defaultMaxParallel),
@@ -261,6 +273,10 @@ func (f *Flight) runUntilIdle(ctx context.Context) error {
 		if err := f.store.Append(ctx, f.sid(), arec); err != nil {
 			return err
 		}
+
+		// Auto-title: once, after the first turn, derive a short title from the
+		// opening exchange and emit it so the surface can rename the session.
+		f.maybeSuggestTitle(ctx, msgs, res.Text)
 
 		if res.Done {
 			return nil // idle; outer loop blocks for the next input
@@ -538,6 +554,74 @@ func (f *Flight) toolReadOnly(c agent.ToolCall) bool {
 		return false
 	}
 	return t.IsReadOnly(c.Input)
+}
+
+// maybeSuggestTitle generates and emits a session title exactly once, from the
+// first user message (and the first assistant reply). It is best-effort: a nil
+// Titler or any failure leaves the session "Untitled". The titled flag is set
+// up-front so a failed attempt is not retried.
+func (f *Flight) maybeSuggestTitle(ctx context.Context, history []agent.Message, assistant string) {
+	if f.titled || f.titler == nil {
+		return
+	}
+	f.titled = true
+	first := firstUserText(history)
+	if first == "" {
+		return
+	}
+	title, err := f.titler.Title(ctx, first, assistant)
+	if err != nil || title == "" {
+		return
+	}
+	f.emit(ctx, agent.StreamEvent{Kind: agent.EvTitleSuggested, Title: title})
+}
+
+func firstUserText(history []agent.Message) string {
+	for _, m := range history {
+		if m.Role == agent.RoleUser && m.Text != "" {
+			return m.Text
+		}
+	}
+	return ""
+}
+
+// EngineTitler proposes a short session title via one cheap Engine call.
+type EngineTitler struct {
+	Engine engine.Engine
+	System string // optional override
+}
+
+func (t EngineTitler) Title(ctx context.Context, firstUser, firstAssistant string) (string, error) {
+	sys := t.System
+	if sys == "" {
+		sys = "Write a concise session title (3-6 words, Title Case, no quotes or trailing punctuation) summarizing the user's task. Output only the title."
+	}
+	prompt := "User request:\n" + firstUser
+	if firstAssistant != "" {
+		prompt += "\n\nAssistant reply:\n" + firstAssistant
+	}
+	res, err := t.Engine.RunStep(ctx, agent.StepInput{
+		System:   sys,
+		Messages: []agent.Message{{Role: agent.RoleUser, Text: prompt}},
+	})
+	if err != nil {
+		return "", err
+	}
+	return cleanTitle(res.Text), nil
+}
+
+// cleanTitle trims whitespace/quotes and caps the title length.
+func cleanTitle(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.Trim(s, "\"'`")
+	s = strings.TrimSpace(s)
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		s = strings.TrimSpace(s[:i])
+	}
+	if len(s) > 80 {
+		s = strings.TrimSpace(s[:80])
+	}
+	return s
 }
 
 // EngineSummarizer summarizes history by asking an Engine for a concise note.

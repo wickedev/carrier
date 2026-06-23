@@ -236,6 +236,70 @@ func TestFlightPluginOverridesResult(t *testing.T) {
 	}
 }
 
+type fakeTitler struct {
+	title string
+	calls int32
+}
+
+func (t *fakeTitler) Title(_ context.Context, firstUser, _ string) (string, error) {
+	atomic.AddInt32(&t.calls, 1)
+	if firstUser == "" {
+		return "", nil
+	}
+	return t.title, nil
+}
+
+func TestFlightAutoTitle(t *testing.T) {
+	eng := &fakeEngine{name: "fake", steps: []func(agent.StepInput) (agent.StepResult, error){
+		func(in agent.StepInput) (agent.StepResult, error) {
+			in.OnEvent(agent.StreamEvent{Kind: agent.EvText, Text: "working"})
+			return agent.StepResult{Text: "working", Done: true}, nil
+		},
+		func(in agent.StepInput) (agent.StepResult, error) {
+			return agent.StepResult{Text: "more", Done: true}, nil
+		},
+	}}
+	titler := &fakeTitler{title: "Fix The Login Bug"}
+	st, err := store.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("store: %v", err)
+	}
+	f := New(Config{
+		ID: "test", System: "sys", Engine: eng, Store: st,
+		Exec:   tool.ExecContext{Executor: bay.NewLocalExecutor()},
+		Titler: titler,
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = f.Run(ctx) }()
+
+	submit(t, f, "the login button does nothing")
+	events := collect(f.Queues().Events(), 400*time.Millisecond)
+
+	var titles []string
+	for _, e := range events {
+		if e.Kind == agent.EvTitleSuggested {
+			titles = append(titles, e.Title)
+		}
+	}
+	if len(titles) != 1 || titles[0] != "Fix The Login Bug" {
+		t.Fatalf("expected one title 'Fix The Login Bug', got %v", titles)
+	}
+
+	// A second input must NOT re-title.
+	submit(t, f, "another request")
+	more := collect(f.Queues().Events(), 400*time.Millisecond)
+	cancel()
+	for _, e := range more {
+		if e.Kind == agent.EvTitleSuggested {
+			t.Fatal("title should be suggested only once")
+		}
+	}
+	if got := atomic.LoadInt32(&titler.calls); got != 1 {
+		t.Fatalf("titler called %d times, want 1", got)
+	}
+}
+
 func TestFlightToolErrorFeedback(t *testing.T) {
 	eng := &fakeEngine{name: "fake", steps: []func(agent.StepInput) (agent.StepResult, error){
 		func(in agent.StepInput) (agent.StepResult, error) {

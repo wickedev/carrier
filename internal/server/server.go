@@ -304,6 +304,8 @@ type eventDTO struct {
 	OutputTokens     int `json:"output_tokens,omitempty"`
 	CacheReadTokens  int `json:"cache_read_tokens,omitempty"`
 	CacheWriteTokens int `json:"cache_write_tokens,omitempty"`
+	// Title is the auto-generated session title (title_suggested events).
+	Title string `json:"title,omitempty"`
 }
 
 // handleCreate authenticates the caller, builds and launches a Flight, starts
@@ -612,6 +614,8 @@ func eventToDTO(ev agent.StreamEvent) eventDTO {
 		dto.OutputTokens = ev.Usage.OutputTokens
 		dto.CacheReadTokens = ev.Usage.CacheReadTokens
 		dto.CacheWriteTokens = ev.Usage.CacheWriteTokens
+	case ev.Kind == agent.EvTitleSuggested:
+		dto.Title = ev.Title
 	}
 	return dto
 }
