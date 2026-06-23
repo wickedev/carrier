@@ -13,6 +13,10 @@ BFF_PORT="${BFF_PORT:-38787}"      # Hono BFF        (default 8787  → 38787)
 CARRIER_PORT="${CARRIER_PORT:-39099}" # Carrier runtime (BFF default 9099 → 39099)
 CARRIER_TOKEN="${CARRIER_TOKEN:-dev-carrier-token}"
 
+# Seeded dev login (email/password) so you can sign in immediately.
+DEV_USER_EMAIL="${DEV_USER_EMAIL:-dev@carrier.local}"
+DEV_USER_PASSWORD="${DEV_USER_PASSWORD:-carrierdev}"
+
 # Persistent dev state (PGlite data, workspaces, plugin artifacts). PGlite is
 # embedded — there is NO separate database port.
 DEV_DIR="$ROOT/.carrier-dev"
@@ -75,6 +79,8 @@ echo "▸ bff      → http://localhost:${BFF_PORT}"
   CARRIER_TOKEN="$CARRIER_TOKEN" \
   WORKSPACE_ROOT="$WORKSPACE_ROOT" \
   PLUGIN_ARTIFACTS_ROOT="$PLUGINS_DIR" \
+  DEV_USER_EMAIL="$DEV_USER_EMAIL" \
+  DEV_USER_PASSWORD="$DEV_USER_PASSWORD" \
   pnpm --filter @carrier/bff dev ) &
 PIDS+=("$!")
 
@@ -88,4 +94,5 @@ PIDS+=("$!")
 
 echo
 echo "▸ stack up. open  →  http://localhost:${WEB_PORT}   (Ctrl-C to stop everything)"
+echo "▸ dev login       →  ${DEV_USER_EMAIL} / ${DEV_USER_PASSWORD}"
 wait

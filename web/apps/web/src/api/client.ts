@@ -126,6 +126,29 @@ async function request<T>(
   return schema.parse(data);
 }
 
+/** POST JSON to an `/auth` endpoint (outside the `/bff` prefix). Throws ApiError
+ *  with the server's error message on a non-2xx response. */
+async function authPost(path: string, body: unknown): Promise<void> {
+  const res = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (res.ok) return;
+  let parsed: unknown;
+  try {
+    parsed = await res.json();
+  } catch {
+    parsed = undefined;
+  }
+  const code =
+    parsed && typeof parsed === "object" && "error" in parsed
+      ? String((parsed as { error: unknown }).error)
+      : `Request failed: ${res.status}`;
+  throw new ApiError(res.status, code, parsed);
+}
+
 /** Build an array parser from an element schema (avoids a direct zod import). */
 function arrayOf<T>(element: Parser<T>): Parser<T[]> {
   return {
@@ -319,6 +342,19 @@ export const api = {
       method: "POST",
       credentials: "same-origin",
     }).then(() => undefined);
+  },
+
+  // Email/password auth (lives under /auth, not /bff). Throws ApiError on failure
+  // so the form can surface the message.
+  async login(body: { email: string; password: string }): Promise<void> {
+    await authPost("/auth/login", body);
+  },
+  async register(body: {
+    email: string;
+    password: string;
+    name?: string;
+  }): Promise<void> {
+    await authPost("/auth/register", body);
   },
 
   // ── Orgs ───────────────────────────────────────────────────────────────

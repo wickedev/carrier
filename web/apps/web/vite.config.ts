@@ -24,8 +24,14 @@ export default defineConfig({
     // Overridable via env so `make dev` can pick conflict-avoiding ports.
     port: Number(process.env.WEB_PORT) || 5173,
     proxy: {
-      // BFF is the only origin the app talks to.
-      "/bff": { target: bffTarget, changeOrigin: true },
+      // BFF is the only origin the app talks to. The client prefixes API calls
+      // with `/bff`; the BFF mounts those routes at the root, so strip the prefix.
+      "/bff": {
+        target: bffTarget,
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/bff/, ""),
+      },
+      // Auth routes live at `/auth` on the BFF too — forwarded as-is.
       "/auth": { target: bffTarget, changeOrigin: true },
     },
   },
