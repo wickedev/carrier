@@ -1,10 +1,12 @@
 module github.com/wickedev/carrier
 
-go 1.24
+go 1.25.0
 
 require (
 	github.com/anthropics/anthropic-sdk-go v1.51.1
 	github.com/openai/openai-go v1.12.0
+	github.com/tetratelabs/wazero v1.12.0
+	golang.org/x/sync v0.16.0
 )
 
 require (
@@ -18,5 +20,5 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
-	golang.org/x/sync v0.16.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
 )
