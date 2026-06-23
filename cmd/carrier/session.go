@@ -152,6 +152,11 @@ func (rt *runtime) newSession(sessionID string, opts server.SessionOptions) (*fl
 			})
 		}
 		chain, closePlugins, _ := rt.pluginLoader.LoadChain(context.Background(), refs, opts.Env)
+		// Audit plugin seam failures (Req 7.4): a misbehaving plugin is fail-closed
+		// and observable, never silent.
+		chain.OnError(func(name string, kind plugin.SeamKind, err error) {
+			fmt.Fprintf(os.Stderr, "carrier: plugin %s seam %s failed: %v\n", name, kind, err)
+		})
 		pluginChain = chain
 		closers = append(closers, closePlugins)
 	}
