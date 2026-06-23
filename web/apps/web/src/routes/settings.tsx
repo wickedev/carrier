@@ -2,8 +2,9 @@ import * as React from "react";
 import { useParams, useRouteLoaderData, Link, useNavigate } from "react-router";
 import type { Me, Org, Role } from "@carrier/contract";
 import { Button } from "@carrier/ui";
-import { Trash2, Plus, UserPlus, Github, Loader2 } from "lucide-react";
+import { Plus, UserPlus, Github, Loader2 } from "lucide-react";
 import { Card, EmptyState, Loading, ErrorState, Input } from "../components/primitives";
+import { ConfigSection, DeleteButton } from "../components/config-controls";
 import {
   usePermissions,
   useProject,
@@ -89,64 +90,55 @@ function MembersSection({ orgSlug, current }: { orgSlug: string; current?: Org }
   };
 
   return (
-    <Card className="mb-4 p-4" data-testid="members-section">
-      <h2 className="mb-2 text-sm font-medium">Members</h2>
-
-      {manage ? (
-        <form onSubmit={submit} className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Input
-            value={login}
-            onChange={(e) => setLogin(e.target.value)}
-            placeholder="GitHub login"
-            aria-label="Member login"
-          />
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as Role)}
-            aria-label="Member role"
-            className="h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
-          >
-            <option value="member">member</option>
-            <option value="admin">admin</option>
-            <option value="owner">owner</option>
-          </select>
-          <Button type="submit" disabled={!login.trim() || addMember.isPending} className="shrink-0">
-            <UserPlus className="h-4 w-4" aria-hidden /> Add
-          </Button>
-        </form>
-      ) : null}
-      {addMember.isError ? (
-        <p className="mb-2 text-sm text-danger">{(addMember.error as Error).message}</p>
-      ) : null}
-
-      {members.isLoading ? (
-        <Loading />
-      ) : members.isError ? (
-        <ErrorState message={(members.error as Error).message} onRetry={() => members.refetch()} />
-      ) : members.data && members.data.length > 0 ? (
-        <ul className="divide-y divide-neutral-200 text-sm dark:divide-neutral-800">
-          {members.data.map((m) => (
-            <li key={m.accountId || m.login} className="flex items-center gap-2 py-2">
-              <span className="flex-1 truncate font-medium">{m.login}</span>
-              <span className="text-xs text-fg-muted">{m.role}</span>
-              {manage ? (
-                <button
-                  type="button"
-                  aria-label={`Remove ${m.login}`}
-                  disabled={removeMember.isPending}
-                  onClick={() => removeMember.mutate(m.accountId || m.login)}
-                  className="text-neutral-400 hover:text-red-500"
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden />
-                </button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <EmptyState title="No members" description="Add a member by their GitHub login." />
+    <ConfigSection
+      title="Members"
+      testId="members-section"
+      query={members}
+      emptyState={<EmptyState title="No members" description="Add a member by their GitHub login." />}
+      form={
+        <>
+          {manage ? (
+            <form onSubmit={submit} className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Input
+                value={login}
+                onChange={(e) => setLogin(e.target.value)}
+                placeholder="GitHub login"
+                aria-label="Member login"
+              />
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as Role)}
+                aria-label="Member role"
+                className="h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
+              >
+                <option value="member">member</option>
+                <option value="admin">admin</option>
+                <option value="owner">owner</option>
+              </select>
+              <Button type="submit" disabled={!login.trim() || addMember.isPending} className="shrink-0">
+                <UserPlus className="h-4 w-4" aria-hidden /> Add
+              </Button>
+            </form>
+          ) : null}
+          {addMember.isError ? (
+            <p className="mb-2 text-sm text-danger">{(addMember.error as Error).message}</p>
+          ) : null}
+        </>
+      }
+      renderItem={(m) => (
+        <li key={m.accountId || m.login} className="flex items-center gap-2 py-2">
+          <span className="flex-1 truncate font-medium">{m.login}</span>
+          <span className="text-xs text-fg-muted">{m.role}</span>
+          {manage ? (
+            <DeleteButton
+              label={`Remove ${m.login}`}
+              disabled={removeMember.isPending}
+              onClick={() => removeMember.mutate(m.accountId || m.login)}
+            />
+          ) : null}
+        </li>
       )}
-    </Card>
+    />
   );
 }
 
@@ -411,15 +403,11 @@ function PermissionsSection({ projectId, manage }: { projectId: string; manage: 
                 {r.effect}
               </span>
               {manage ? (
-                <button
-                  type="button"
-                  aria-label={`Delete rule ${r.action} ${r.pattern}`}
+                <DeleteButton
+                  label={`Delete rule ${r.action} ${r.pattern}`}
                   disabled={del.isPending}
                   onClick={() => del.mutate(r.id)}
-                  className="text-neutral-400 hover:text-red-500"
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden />
-                </button>
+                />
               ) : null}
             </li>
           ))}

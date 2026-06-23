@@ -130,7 +130,6 @@ export function SessionPage() {
       <TopBar
         orgSlug={org}
         projectId={project}
-        projectName={undefined}
         session={sessionQ.data}
         status={status}
         connection={connection}

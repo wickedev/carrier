@@ -123,12 +123,6 @@ export function LoginPage() {
           : "Already have an account? Sign in"}
       </button>
 
-      <div className="flex w-72 items-center gap-3 text-xs text-fg-muted">
-        <div className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />
-        or
-        <div className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />
-      </div>
-
       <a href="/auth/github" className={buttonVariants({ variant: "outline" })}>
         <Github className="h-4 w-4" aria-hidden />
         Sign in with GitHub

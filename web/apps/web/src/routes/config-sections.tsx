@@ -1,8 +1,9 @@
 import * as React from "react";
 import type { ConfigScope, HookEvent, ModelParams } from "@carrier/contract";
 import { Button } from "@carrier/ui";
-import { Plus, Trash2, Loader2 } from "lucide-react";
-import { Card, Badge, Input, Loading, ErrorState } from "../components/primitives";
+import { Plus, Loader2 } from "lucide-react";
+import { Card, Badge, Input, Loading } from "../components/primitives";
+import { ConfigSection, DeleteButton, EnableToggle } from "../components/config-controls";
 import {
   useConfigList,
   useCreateConfig,
@@ -32,55 +33,6 @@ const SELECT_CLASS =
   "h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm dark:border-neutral-700 dark:bg-neutral-950";
 const TEXTAREA_CLASS =
   "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm outline-none placeholder:text-fg-subtle focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950";
-
-/** Toggle switch for the `enabled` flag, shown on every list row. */
-function EnableToggle({
-  enabled,
-  disabled,
-  onChange,
-  label,
-}: {
-  enabled: boolean;
-  disabled?: boolean;
-  onChange: (next: boolean) => void;
-  label: string;
-}) {
-  return (
-    <label className="flex items-center gap-1 text-xs text-fg-muted">
-      <input
-        type="checkbox"
-        checked={enabled}
-        disabled={disabled}
-        aria-label={label}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-      {enabled ? "on" : "off"}
-    </label>
-  );
-}
-
-/** Delete (trash) control for a list row. */
-function DeleteButton({
-  label,
-  disabled,
-  onClick,
-}: {
-  label: string;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      disabled={disabled}
-      onClick={onClick}
-      className="text-neutral-400 hover:text-red-500"
-    >
-      <Trash2 className="h-4 w-4" aria-hidden />
-    </button>
-  );
-}
 
 /** Parse a comma/space-separated list into trimmed, non-empty tokens. */
 function splitList(raw: string): string[] {
@@ -135,77 +87,72 @@ export function AgentsSection({ scope, ownerKey, manage }: SectionProps) {
   };
 
   return (
-    <Card className="mb-4 p-4" data-testid="agents-section">
-      <h2 className="mb-2 text-sm font-medium">Agents</h2>
-
-      {manage ? (
-        <form onSubmit={submit} className="mb-3 space-y-2">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="Agent name" />
-          <Input
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Description"
-            aria-label="Agent description"
-          />
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Prompt"
-            aria-label="Agent prompt"
-            rows={3}
-            className={TEXTAREA_CLASS}
-          />
-          <Input
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            placeholder="Model (optional)"
-            aria-label="Agent model"
-          />
-          <Button type="submit" disabled={!name.trim() || create.isPending}>
-            {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
-            Add agent
-          </Button>
-        </form>
-      ) : null}
-      {create.isError ? (
-        <p className="mb-2 text-sm text-danger">{(create.error as Error).message}</p>
-      ) : null}
-
-      {list.isLoading ? (
-        <Loading />
-      ) : list.isError ? (
-        <ErrorState message={(list.error as Error).message} onRetry={() => list.refetch()} />
-      ) : list.data && list.data.length > 0 ? (
-        <ul className="divide-y divide-neutral-200 text-sm dark:divide-neutral-800">
-          {list.data.map((a) => (
-            <li key={a.id} className="flex items-center gap-2 py-2">
-              <span className="flex-1 truncate">
-                <span className="font-medium">{a.name}</span>
-                {a.model ? <span className="ml-1 font-mono text-xs text-fg-muted">{a.model}</span> : null}
-                {a.description ? (
-                  <span className="block truncate text-xs text-fg-muted">{a.description}</span>
-                ) : null}
-              </span>
-              <EnableToggle
-                enabled={a.enabled}
-                disabled={!manage || update.isPending}
-                label={`Toggle agent ${a.name}`}
-                onChange={(enabled) => update.mutate({ id: a.id, patch: { enabled } })}
+    <ConfigSection
+      title="Agents"
+      testId="agents-section"
+      query={list}
+      emptyText="No agents configured."
+      form={
+        <>
+          {manage ? (
+            <form onSubmit={submit} className="mb-3 space-y-2">
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="Agent name" />
+              <Input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Description"
+                aria-label="Agent description"
               />
-              {manage ? (
-                <DeleteButton
-                  label={`Delete agent ${a.name}`}
-                  disabled={remove.isPending}
-                  onClick={() => remove.mutate(a.id)}
-                />
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-sm text-fg-muted">No agents configured.</p>
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Prompt"
+                aria-label="Agent prompt"
+                rows={3}
+                className={TEXTAREA_CLASS}
+              />
+              <Input
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                placeholder="Model (optional)"
+                aria-label="Agent model"
+              />
+              <Button type="submit" disabled={!name.trim() || create.isPending}>
+                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
+                Add agent
+              </Button>
+            </form>
+          ) : null}
+          {create.isError ? (
+            <p className="mb-2 text-sm text-danger">{(create.error as Error).message}</p>
+          ) : null}
+        </>
+      }
+      renderItem={(a) => (
+        <li key={a.id} className="flex items-center gap-2 py-2">
+          <span className="flex-1 truncate">
+            <span className="font-medium">{a.name}</span>
+            {a.model ? <span className="ml-1 font-mono text-xs text-fg-muted">{a.model}</span> : null}
+            {a.description ? (
+              <span className="block truncate text-xs text-fg-muted">{a.description}</span>
+            ) : null}
+          </span>
+          <EnableToggle
+            enabled={a.enabled}
+            disabled={!manage || update.isPending}
+            label={`Toggle agent ${a.name}`}
+            onChange={(enabled) => update.mutate({ id: a.id, patch: { enabled } })}
+          />
+          {manage ? (
+            <DeleteButton
+              label={`Delete agent ${a.name}`}
+              disabled={remove.isPending}
+              onClick={() => remove.mutate(a.id)}
+            />
+          ) : null}
+        </li>
       )}
-    </Card>
+    />
   );
 }
 
@@ -250,83 +197,78 @@ export function SkillsSection({ scope, ownerKey, manage }: SectionProps) {
   };
 
   return (
-    <Card className="mb-4 p-4" data-testid="skills-section">
-      <h2 className="mb-2 text-sm font-medium">Skills</h2>
-
-      {manage ? (
-        <form onSubmit={submit} className="mb-3 space-y-2">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="Skill name" />
-          <Input
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Description"
-            aria-label="Skill description"
-          />
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Body"
-            aria-label="Skill body"
-            rows={3}
-            className={TEXTAREA_CLASS}
-          />
-          <Input
-            value={agent}
-            onChange={(e) => setAgent(e.target.value)}
-            placeholder="Agent (optional)"
-            aria-label="Skill agent"
-          />
-          <Input
-            value={allowedTools}
-            onChange={(e) => setAllowedTools(e.target.value)}
-            placeholder="Allowed tools (comma-separated)"
-            aria-label="Skill allowed tools"
-          />
-          <Button type="submit" disabled={!name.trim() || create.isPending}>
-            {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
-            Add skill
-          </Button>
-        </form>
-      ) : null}
-      {create.isError ? (
-        <p className="mb-2 text-sm text-danger">{(create.error as Error).message}</p>
-      ) : null}
-
-      {list.isLoading ? (
-        <Loading />
-      ) : list.isError ? (
-        <ErrorState message={(list.error as Error).message} onRetry={() => list.refetch()} />
-      ) : list.data && list.data.length > 0 ? (
-        <ul className="divide-y divide-neutral-200 text-sm dark:divide-neutral-800">
-          {list.data.map((s) => (
-            <li key={s.id} className="flex items-center gap-2 py-2">
-              <span className="flex-1 truncate">
-                <span className="font-medium">{s.name}</span>
-                {s.agent ? <span className="ml-1 font-mono text-xs text-fg-muted">@{s.agent}</span> : null}
-                {s.description ? (
-                  <span className="block truncate text-xs text-fg-muted">{s.description}</span>
-                ) : null}
-              </span>
-              <EnableToggle
-                enabled={s.enabled}
-                disabled={!manage || update.isPending}
-                label={`Toggle skill ${s.name}`}
-                onChange={(enabled) => update.mutate({ id: s.id, patch: { enabled } })}
+    <ConfigSection
+      title="Skills"
+      testId="skills-section"
+      query={list}
+      emptyText="No skills configured."
+      form={
+        <>
+          {manage ? (
+            <form onSubmit={submit} className="mb-3 space-y-2">
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="Skill name" />
+              <Input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Description"
+                aria-label="Skill description"
               />
-              {manage ? (
-                <DeleteButton
-                  label={`Delete skill ${s.name}`}
-                  disabled={remove.isPending}
-                  onClick={() => remove.mutate(s.id)}
-                />
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-sm text-fg-muted">No skills configured.</p>
+              <textarea
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                placeholder="Body"
+                aria-label="Skill body"
+                rows={3}
+                className={TEXTAREA_CLASS}
+              />
+              <Input
+                value={agent}
+                onChange={(e) => setAgent(e.target.value)}
+                placeholder="Agent (optional)"
+                aria-label="Skill agent"
+              />
+              <Input
+                value={allowedTools}
+                onChange={(e) => setAllowedTools(e.target.value)}
+                placeholder="Allowed tools (comma-separated)"
+                aria-label="Skill allowed tools"
+              />
+              <Button type="submit" disabled={!name.trim() || create.isPending}>
+                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
+                Add skill
+              </Button>
+            </form>
+          ) : null}
+          {create.isError ? (
+            <p className="mb-2 text-sm text-danger">{(create.error as Error).message}</p>
+          ) : null}
+        </>
+      }
+      renderItem={(s) => (
+        <li key={s.id} className="flex items-center gap-2 py-2">
+          <span className="flex-1 truncate">
+            <span className="font-medium">{s.name}</span>
+            {s.agent ? <span className="ml-1 font-mono text-xs text-fg-muted">@{s.agent}</span> : null}
+            {s.description ? (
+              <span className="block truncate text-xs text-fg-muted">{s.description}</span>
+            ) : null}
+          </span>
+          <EnableToggle
+            enabled={s.enabled}
+            disabled={!manage || update.isPending}
+            label={`Toggle skill ${s.name}`}
+            onChange={(enabled) => update.mutate({ id: s.id, patch: { enabled } })}
+          />
+          {manage ? (
+            <DeleteButton
+              label={`Delete skill ${s.name}`}
+              disabled={remove.isPending}
+              onClick={() => remove.mutate(s.id)}
+            />
+          ) : null}
+        </li>
       )}
-    </Card>
+    />
   );
 }
 
@@ -368,74 +310,69 @@ export function McpServersSection({ scope, ownerKey, manage }: SectionProps) {
   };
 
   return (
-    <Card className="mb-4 p-4" data-testid="mcp-section">
-      <h2 className="mb-2 text-sm font-medium">MCP servers</h2>
-
-      {manage ? (
-        <form onSubmit={submit} className="mb-3 space-y-2">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="MCP name" />
-          <Input
-            value={command}
-            onChange={(e) => setCommand(e.target.value)}
-            placeholder="Command"
-            aria-label="MCP command"
-          />
-          <Input
-            value={args}
-            onChange={(e) => setArgs(e.target.value)}
-            placeholder="Args (space or comma-separated)"
-            aria-label="MCP args"
-          />
-          <Input
-            value={envKeys}
-            onChange={(e) => setEnvKeys(e.target.value)}
-            placeholder="Env keys (comma-separated)"
-            aria-label="MCP env keys"
-          />
-          <Button type="submit" disabled={!name.trim() || !command.trim() || create.isPending}>
-            {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
-            Add server
-          </Button>
-        </form>
-      ) : null}
-      {create.isError ? (
-        <p className="mb-2 text-sm text-danger">{(create.error as Error).message}</p>
-      ) : null}
-
-      {list.isLoading ? (
-        <Loading />
-      ) : list.isError ? (
-        <ErrorState message={(list.error as Error).message} onRetry={() => list.refetch()} />
-      ) : list.data && list.data.length > 0 ? (
-        <ul className="divide-y divide-neutral-200 text-sm dark:divide-neutral-800">
-          {list.data.map((m) => (
-            <li key={m.id} className="flex items-center gap-2 py-2">
-              <span className="flex-1 truncate">
-                <span className="font-medium">{m.name}</span>
-                <span className="block truncate font-mono text-xs text-fg-muted">
-                  {m.command} {m.args.join(" ")}
-                </span>
-              </span>
-              <EnableToggle
-                enabled={m.enabled}
-                disabled={!manage || update.isPending}
-                label={`Toggle MCP server ${m.name}`}
-                onChange={(enabled) => update.mutate({ id: m.id, patch: { enabled } })}
+    <ConfigSection
+      title="MCP servers"
+      testId="mcp-section"
+      query={list}
+      emptyText="No MCP servers configured."
+      form={
+        <>
+          {manage ? (
+            <form onSubmit={submit} className="mb-3 space-y-2">
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="MCP name" />
+              <Input
+                value={command}
+                onChange={(e) => setCommand(e.target.value)}
+                placeholder="Command"
+                aria-label="MCP command"
               />
-              {manage ? (
-                <DeleteButton
-                  label={`Delete MCP server ${m.name}`}
-                  disabled={remove.isPending}
-                  onClick={() => remove.mutate(m.id)}
-                />
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-sm text-fg-muted">No MCP servers configured.</p>
+              <Input
+                value={args}
+                onChange={(e) => setArgs(e.target.value)}
+                placeholder="Args (space or comma-separated)"
+                aria-label="MCP args"
+              />
+              <Input
+                value={envKeys}
+                onChange={(e) => setEnvKeys(e.target.value)}
+                placeholder="Env keys (comma-separated)"
+                aria-label="MCP env keys"
+              />
+              <Button type="submit" disabled={!name.trim() || !command.trim() || create.isPending}>
+                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
+                Add server
+              </Button>
+            </form>
+          ) : null}
+          {create.isError ? (
+            <p className="mb-2 text-sm text-danger">{(create.error as Error).message}</p>
+          ) : null}
+        </>
+      }
+      renderItem={(m) => (
+        <li key={m.id} className="flex items-center gap-2 py-2">
+          <span className="flex-1 truncate">
+            <span className="font-medium">{m.name}</span>
+            <span className="block truncate font-mono text-xs text-fg-muted">
+              {m.command} {m.args.join(" ")}
+            </span>
+          </span>
+          <EnableToggle
+            enabled={m.enabled}
+            disabled={!manage || update.isPending}
+            label={`Toggle MCP server ${m.name}`}
+            onChange={(enabled) => update.mutate({ id: m.id, patch: { enabled } })}
+          />
+          {manage ? (
+            <DeleteButton
+              label={`Delete MCP server ${m.name}`}
+              disabled={remove.isPending}
+              onClick={() => remove.mutate(m.id)}
+            />
+          ) : null}
+        </li>
       )}
-    </Card>
+    />
   );
 }
 
@@ -466,59 +403,54 @@ export function ContextSection({ scope, ownerKey, manage }: SectionProps) {
   };
 
   return (
-    <Card className="mb-4 p-4" data-testid="context-section">
-      <h2 className="mb-2 text-sm font-medium">Context docs</h2>
-
-      {manage ? (
-        <form onSubmit={submit} className="mb-3 space-y-2">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="Context name" />
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Body (AGENTS.md-like instructions)"
-            aria-label="Context body"
-            rows={4}
-            className={TEXTAREA_CLASS}
-          />
-          <Button type="submit" disabled={!name.trim() || create.isPending}>
-            {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
-            Add document
-          </Button>
-        </form>
-      ) : null}
-      {create.isError ? (
-        <p className="mb-2 text-sm text-danger">{(create.error as Error).message}</p>
-      ) : null}
-
-      {list.isLoading ? (
-        <Loading />
-      ) : list.isError ? (
-        <ErrorState message={(list.error as Error).message} onRetry={() => list.refetch()} />
-      ) : list.data && list.data.length > 0 ? (
-        <ul className="divide-y divide-neutral-200 text-sm dark:divide-neutral-800">
-          {list.data.map((d) => (
-            <li key={d.id} className="flex items-center gap-2 py-2">
-              <span className="flex-1 truncate font-medium">{d.name}</span>
-              <EnableToggle
-                enabled={d.enabled}
-                disabled={!manage || update.isPending}
-                label={`Toggle context ${d.name}`}
-                onChange={(enabled) => update.mutate({ id: d.id, patch: { enabled } })}
+    <ConfigSection
+      title="Context docs"
+      testId="context-section"
+      query={list}
+      emptyText="No context documents configured."
+      form={
+        <>
+          {manage ? (
+            <form onSubmit={submit} className="mb-3 space-y-2">
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="Context name" />
+              <textarea
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                placeholder="Body (AGENTS.md-like instructions)"
+                aria-label="Context body"
+                rows={4}
+                className={TEXTAREA_CLASS}
               />
-              {manage ? (
-                <DeleteButton
-                  label={`Delete context ${d.name}`}
-                  disabled={remove.isPending}
-                  onClick={() => remove.mutate(d.id)}
-                />
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-sm text-fg-muted">No context documents configured.</p>
+              <Button type="submit" disabled={!name.trim() || create.isPending}>
+                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
+                Add document
+              </Button>
+            </form>
+          ) : null}
+          {create.isError ? (
+            <p className="mb-2 text-sm text-danger">{(create.error as Error).message}</p>
+          ) : null}
+        </>
+      }
+      renderItem={(d) => (
+        <li key={d.id} className="flex items-center gap-2 py-2">
+          <span className="flex-1 truncate font-medium">{d.name}</span>
+          <EnableToggle
+            enabled={d.enabled}
+            disabled={!manage || update.isPending}
+            label={`Toggle context ${d.name}`}
+            onChange={(enabled) => update.mutate({ id: d.id, patch: { enabled } })}
+          />
+          {manage ? (
+            <DeleteButton
+              label={`Delete context ${d.name}`}
+              disabled={remove.isPending}
+              onClick={() => remove.mutate(d.id)}
+            />
+          ) : null}
+        </li>
       )}
-    </Card>
+    />
   );
 }
 
@@ -568,79 +500,74 @@ export function HooksSection({ scope, ownerKey, manage }: SectionProps) {
   };
 
   return (
-    <Card className="mb-4 p-4" data-testid="hooks-section">
-      <h2 className="mb-2 text-sm font-medium">Hooks</h2>
-
-      {manage ? (
-        <form onSubmit={submit} className="mb-3 space-y-2">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="Hook name" />
-          <select
-            value={event}
-            onChange={(e) => setEvent(e.target.value as HookEvent)}
-            aria-label="Hook event"
-            className={`${SELECT_CLASS} w-full`}
-          >
-            {HOOK_EVENTS.map((ev) => (
-              <option key={ev} value={ev}>
-                {ev}
-              </option>
-            ))}
-          </select>
-          <Input
-            value={command}
-            onChange={(e) => setCommand(e.target.value)}
-            placeholder="Command"
-            aria-label="Hook command"
-          />
-          <Input
-            value={matcher}
-            onChange={(e) => setMatcher(e.target.value)}
-            placeholder="Matcher (optional)"
-            aria-label="Hook matcher"
-          />
-          <Button type="submit" disabled={!name.trim() || !command.trim() || create.isPending}>
-            {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
-            Add hook
-          </Button>
-        </form>
-      ) : null}
-      {create.isError ? (
-        <p className="mb-2 text-sm text-danger">{(create.error as Error).message}</p>
-      ) : null}
-
-      {list.isLoading ? (
-        <Loading />
-      ) : list.isError ? (
-        <ErrorState message={(list.error as Error).message} onRetry={() => list.refetch()} />
-      ) : list.data && list.data.length > 0 ? (
-        <ul className="divide-y divide-neutral-200 text-sm dark:divide-neutral-800">
-          {list.data.map((h) => (
-            <li key={h.id} className="flex items-center gap-2 py-2">
-              <span className="flex-1 truncate">
-                <span className="font-medium">{h.name}</span>
-                <span className="ml-1 text-xs text-fg-muted">{h.event}</span>
-                <span className="block truncate font-mono text-xs text-fg-muted">{h.command}</span>
-              </span>
-              <EnableToggle
-                enabled={h.enabled}
-                disabled={!manage || update.isPending}
-                label={`Toggle hook ${h.name}`}
-                onChange={(enabled) => update.mutate({ id: h.id, patch: { enabled } })}
+    <ConfigSection
+      title="Hooks"
+      testId="hooks-section"
+      query={list}
+      emptyText="No hooks configured."
+      form={
+        <>
+          {manage ? (
+            <form onSubmit={submit} className="mb-3 space-y-2">
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="Hook name" />
+              <select
+                value={event}
+                onChange={(e) => setEvent(e.target.value as HookEvent)}
+                aria-label="Hook event"
+                className={`${SELECT_CLASS} w-full`}
+              >
+                {HOOK_EVENTS.map((ev) => (
+                  <option key={ev} value={ev}>
+                    {ev}
+                  </option>
+                ))}
+              </select>
+              <Input
+                value={command}
+                onChange={(e) => setCommand(e.target.value)}
+                placeholder="Command"
+                aria-label="Hook command"
               />
-              {manage ? (
-                <DeleteButton
-                  label={`Delete hook ${h.name}`}
-                  disabled={remove.isPending}
-                  onClick={() => remove.mutate(h.id)}
-                />
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-sm text-fg-muted">No hooks configured.</p>
+              <Input
+                value={matcher}
+                onChange={(e) => setMatcher(e.target.value)}
+                placeholder="Matcher (optional)"
+                aria-label="Hook matcher"
+              />
+              <Button type="submit" disabled={!name.trim() || !command.trim() || create.isPending}>
+                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
+                Add hook
+              </Button>
+            </form>
+          ) : null}
+          {create.isError ? (
+            <p className="mb-2 text-sm text-danger">{(create.error as Error).message}</p>
+          ) : null}
+        </>
+      }
+      renderItem={(h) => (
+        <li key={h.id} className="flex items-center gap-2 py-2">
+          <span className="flex-1 truncate">
+            <span className="font-medium">{h.name}</span>
+            <span className="ml-1 text-xs text-fg-muted">{h.event}</span>
+            <span className="block truncate font-mono text-xs text-fg-muted">{h.command}</span>
+          </span>
+          <EnableToggle
+            enabled={h.enabled}
+            disabled={!manage || update.isPending}
+            label={`Toggle hook ${h.name}`}
+            onChange={(enabled) => update.mutate({ id: h.id, patch: { enabled } })}
+          />
+          {manage ? (
+            <DeleteButton
+              label={`Delete hook ${h.name}`}
+              disabled={remove.isPending}
+              onClick={() => remove.mutate(h.id)}
+            />
+          ) : null}
+        </li>
       )}
-    </Card>
+    />
   );
 }
 
@@ -672,70 +599,65 @@ export function EnvVarsSection({ scope, ownerKey, manage }: SectionProps) {
   };
 
   return (
-    <Card className="mb-4 p-4" data-testid="env-section">
-      <h2 className="mb-2 text-sm font-medium">Environment variables</h2>
-
-      {manage ? (
-        <form onSubmit={submit} className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Input value={key} onChange={(e) => setKey(e.target.value)} placeholder="KEY" aria-label="Env key" />
-          <Input
-            type={secret ? "password" : "text"}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder="Value"
-            aria-label="Env value"
-          />
-          <label className="flex shrink-0 items-center gap-1 text-sm text-fg-muted">
-            <input
-              type="checkbox"
-              checked={secret}
-              onChange={(e) => setSecret(e.target.checked)}
-              aria-label="Secret"
-            />
-            secret
-          </label>
-          <Button type="submit" disabled={!key.trim() || create.isPending} className="shrink-0">
-            {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
-            Add variable
-          </Button>
-        </form>
-      ) : null}
-      {create.isError ? (
-        <p className="mb-2 text-sm text-danger">{(create.error as Error).message}</p>
-      ) : null}
-
-      {list.isLoading ? (
-        <Loading />
-      ) : list.isError ? (
-        <ErrorState message={(list.error as Error).message} onRetry={() => list.refetch()} />
-      ) : list.data && list.data.length > 0 ? (
-        <ul className="divide-y divide-neutral-200 text-sm dark:divide-neutral-800">
-          {list.data.map((v) => (
-            <li key={v.id} className="flex items-center gap-2 py-1.5">
-              <span className="w-40 truncate font-mono text-xs">{v.key}</span>
-              <span className="flex-1 truncate font-mono text-xs text-fg-muted">
-                {/* Never display stored secret values — show a mask instead. */}
-                {v.secret ? (v.hasValue ? "••••••••" : "—") : v.value}
-              </span>
-              {v.secret ? (
-                <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                  secret
-                </Badge>
-              ) : null}
-              {manage ? (
-                <DeleteButton
-                  label={`Delete env ${v.key}`}
-                  disabled={remove.isPending}
-                  onClick={() => remove.mutate(v.id)}
+    <ConfigSection
+      title="Environment variables"
+      testId="env-section"
+      query={list}
+      emptyText="No environment variables configured."
+      form={
+        <>
+          {manage ? (
+            <form onSubmit={submit} className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <Input value={key} onChange={(e) => setKey(e.target.value)} placeholder="KEY" aria-label="Env key" />
+              <Input
+                type={secret ? "password" : "text"}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="Value"
+                aria-label="Env value"
+              />
+              <label className="flex shrink-0 items-center gap-1 text-sm text-fg-muted">
+                <input
+                  type="checkbox"
+                  checked={secret}
+                  onChange={(e) => setSecret(e.target.checked)}
+                  aria-label="Secret"
                 />
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-sm text-fg-muted">No environment variables configured.</p>
+                secret
+              </label>
+              <Button type="submit" disabled={!key.trim() || create.isPending} className="shrink-0">
+                {create.isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Plus className="h-4 w-4" aria-hidden />}
+                Add variable
+              </Button>
+            </form>
+          ) : null}
+          {create.isError ? (
+            <p className="mb-2 text-sm text-danger">{(create.error as Error).message}</p>
+          ) : null}
+        </>
+      }
+      renderItem={(v) => (
+        <li key={v.id} className="flex items-center gap-2 py-1.5">
+          <span className="w-40 truncate font-mono text-xs">{v.key}</span>
+          <span className="flex-1 truncate font-mono text-xs text-fg-muted">
+            {/* Never display stored secret values — show a mask instead. */}
+            {v.secret ? (v.hasValue ? "••••••••" : "—") : v.value}
+          </span>
+          {v.secret ? (
+            <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+              secret
+            </Badge>
+          ) : null}
+          {manage ? (
+            <DeleteButton
+              label={`Delete env ${v.key}`}
+              disabled={remove.isPending}
+              onClick={() => remove.mutate(v.id)}
+            />
+          ) : null}
+        </li>
       )}
-    </Card>
+    />
   );
 }
 

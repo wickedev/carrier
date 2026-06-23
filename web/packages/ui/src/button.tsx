@@ -10,7 +10,6 @@ export const buttonVariants = cva(
         default: "bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900",
         ghost: "hover:bg-neutral-100 dark:hover:bg-neutral-800",
         outline: "border border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900",
-        destructive: "bg-red-600 text-white hover:bg-red-500",
       },
       size: {
         default: "h-9 px-4",

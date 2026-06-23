@@ -51,7 +51,6 @@ function ConnectionPill({ connection }: { connection: ConnectionState }) {
 export function TopBar({
   orgSlug,
   projectId,
-  projectName,
   session,
   status,
   connection,
@@ -64,7 +63,6 @@ export function TopBar({
 }: {
   orgSlug: string;
   projectId: string;
-  projectName?: string;
   session: Session | undefined;
   status: SessionStatus;
   connection: ConnectionState;
@@ -85,7 +83,7 @@ export function TopBar({
         </Link>
         <ChevronRight className="h-3.5 w-3.5" aria-hidden />
         <Link to={`/${orgSlug}/${projectId}`} className="hover:underline">
-          {projectName ?? projectId}
+          {projectId}
         </Link>
         <ChevronRight className="h-3.5 w-3.5" aria-hidden />
         <span className="text-neutral-800 dark:text-neutral-100">

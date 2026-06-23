@@ -19,10 +19,10 @@ import {
   Database,
   ShieldAlert,
   Plug,
-  Trash2,
   Loader2,
 } from "lucide-react";
 import { Card, Badge, Input, Loading, ErrorState, EmptyState } from "../components/primitives";
+import { ConfigSection, DeleteButton, EnableToggle } from "../components/config-controls";
 import {
   useMarketplaceSearch,
   usePluginVersions,
@@ -365,21 +365,19 @@ interface ScopeRef {
 
 /**
  * The consent modal: surfaces EVERY requested capability as a tick-box the
- * operator must approve, a distinct opt-in for `permissions.allow`, and a scope
- * selector (org vs project, when a project context is available). On confirm we
- * install the pinned version with the approved capabilities as `grantedCaps`.
+ * operator must approve and a distinct opt-in for `permissions.allow`. On
+ * confirm we install the pinned version (always org-scoped) with the approved
+ * capabilities as `grantedCaps`.
  */
 function InstallConsentDialog({
   org,
   orgScope,
-  projectScope,
   manifest,
   version,
   onClose,
 }: {
   org: string;
   orgScope: ScopeRef;
-  projectScope?: ScopeRef;
   manifest: PluginManifest;
   version: string;
   onClose: () => void;
@@ -387,9 +385,7 @@ function InstallConsentDialog({
   const caps = manifest.capabilities;
   const navigate = useNavigate();
 
-  const [scope, setScope] = React.useState<ConfigScope>("org");
-  const target = scope === "project" && projectScope ? projectScope : orgScope;
-  const install = useInstallPlugin(target.scope, target.ownerKey);
+  const install = useInstallPlugin(orgScope.scope, orgScope.ownerKey);
 
   // Per-capability approval state — network hosts, secret keys, and kv default
   // to checked (the operator can deselect); permissions.allow defaults to OFF
@@ -434,21 +430,6 @@ function InstallConsentDialog({
           Pinned version <span className="font-mono">v{version}</span>. Approve the capabilities
           below — anything you leave unchecked will be denied at runtime.
         </p>
-
-        {projectScope ? (
-          <label className="mb-4 block text-xs text-fg-muted">
-            Install scope
-            <select
-              value={scope}
-              onChange={(e) => setScope(e.target.value as ConfigScope)}
-              aria-label="Install scope"
-              className="mt-1 h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
-            >
-              <option value="org">Organization ({orgScope.ownerKey})</option>
-              <option value="project">This project</option>
-            </select>
-          </label>
-        ) : null}
 
         <div className="space-y-4">
           {caps.network.length > 0 ? (
@@ -563,53 +544,37 @@ export function InstalledPluginsSection({
   const uninstall = useUninstall(scope, ownerKey);
 
   return (
-    <Card className="mb-4 p-4" data-testid="installed-plugins-section">
-      <h2 className="mb-2 text-sm font-medium">Installed plugins</h2>
-
-      {list.isLoading ? (
-        <Loading />
-      ) : list.isError ? (
-        <ErrorState message={(list.error as Error).message} onRetry={() => list.refetch()} />
-      ) : list.data && list.data.length > 0 ? (
-        <ul className="divide-y divide-neutral-200 text-sm dark:divide-neutral-800">
-          {list.data.map((p) => (
-            <li key={p.id} className="flex items-center gap-2 py-2">
-              <span className="flex-1 truncate">
-                <span className="font-medium">{p.name}</span>
-                <span className="ml-1 font-mono text-xs text-fg-muted">v{p.version}</span>
-                {p.allowPermissions ? (
-                  <Badge className="ml-1 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                    permissions.allow
-                  </Badge>
-                ) : null}
-              </span>
-              <label className="flex items-center gap-1 text-xs text-fg-muted">
-                <input
-                  type="checkbox"
-                  checked={p.enabled}
-                  disabled={!manage || update.isPending}
-                  aria-label={`Toggle plugin ${p.name}`}
-                  onChange={(e) => update.mutate({ id: p.id, patch: { enabled: e.target.checked } })}
-                />
-                {p.enabled ? "on" : "off"}
-              </label>
-              {manage ? (
-                <button
-                  type="button"
-                  aria-label={`Uninstall ${p.name}`}
-                  disabled={uninstall.isPending}
-                  onClick={() => uninstall.mutate(p.id)}
-                  className="text-neutral-400 hover:text-red-500"
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden />
-                </button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-sm text-fg-muted">No plugins installed.</p>
+    <ConfigSection
+      title="Installed plugins"
+      testId="installed-plugins-section"
+      query={list}
+      emptyText="No plugins installed."
+      renderItem={(p) => (
+        <li key={p.id} className="flex items-center gap-2 py-2">
+          <span className="flex-1 truncate">
+            <span className="font-medium">{p.name}</span>
+            <span className="ml-1 font-mono text-xs text-fg-muted">v{p.version}</span>
+            {p.allowPermissions ? (
+              <Badge className="ml-1 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                permissions.allow
+              </Badge>
+            ) : null}
+          </span>
+          <EnableToggle
+            enabled={p.enabled}
+            disabled={!manage || update.isPending}
+            label={`Toggle plugin ${p.name}`}
+            onChange={(enabled) => update.mutate({ id: p.id, patch: { enabled } })}
+          />
+          {manage ? (
+            <DeleteButton
+              label={`Uninstall ${p.name}`}
+              disabled={uninstall.isPending}
+              onClick={() => uninstall.mutate(p.id)}
+            />
+          ) : null}
+        </li>
       )}
-    </Card>
+    />
   );
 }
