@@ -5,7 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import {
   LoginSchema,
   MeSchema,
@@ -68,10 +68,12 @@ export function authRoutes(): Hono<AppEnv> {
     if (!parsed.success) return c.json({ error: "invalid_body" }, 400);
     const email = parsed.data.email.toLowerCase();
 
+    // Only a PASSWORD account collides — consistent with the partial unique index
+    // (a GitHub account may share this email without blocking registration).
     const taken = await db
       .select({ id: account.id })
       .from(account)
-      .where(eq(account.email, email))
+      .where(and(eq(account.email, email), isNotNull(account.passwordHash)))
       .limit(1);
     if (taken[0]) return c.json({ error: "email_taken" }, 409);
 
@@ -99,10 +101,12 @@ export function authRoutes(): Hono<AppEnv> {
     if (!parsed.success) return c.json({ error: "invalid_body" }, 400);
     const email = parsed.data.email.toLowerCase();
 
+    // Resolve THE password account for this email (a GitHub account sharing the
+    // email has no password and must not shadow it) — matches the partial index.
     const rows = await db
       .select()
       .from(account)
-      .where(eq(account.email, email))
+      .where(and(eq(account.email, email), isNotNull(account.passwordHash)))
       .limit(1);
     const acct = rows[0];
     // Same response whether the account is missing or the password is wrong.
@@ -261,7 +265,7 @@ export async function seedDevUser(db: Db, config: Config): Promise<void> {
   const existing = await db
     .select({ id: account.id })
     .from(account)
-    .where(eq(account.email, email))
+    .where(and(eq(account.email, email), isNotNull(account.passwordHash)))
     .limit(1);
   if (existing[0]) return;
   await provisionLocalAccount(db, {

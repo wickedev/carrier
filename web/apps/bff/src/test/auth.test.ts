@@ -219,3 +219,32 @@ describe("auth: email/password", () => {
     expect(login.status).toBe(200);
   });
 });
+
+describe("auth: email/password vs GitHub coexistence", () => {
+  it("a GitHub account sharing an email does not block registration or shadow login", async () => {
+    const h = await makeHarness();
+    // seedAccount creates a GitHub-style account (github id set, no password) with
+    // email <login>@example.com.
+    await h.seedAccount("collide"); // email collide@example.com
+
+    // Registering a PASSWORD account with the same email is allowed (the partial
+    // unique index only constrains password accounts).
+    const reg = await h.app.request("/auth/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "collide@example.com", password: "longenough12" }),
+    });
+    expect(reg.status).toBe(201);
+
+    // Login resolves THE password account, not the GitHub one — succeeds.
+    const ok = await h.app.request("/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "collide@example.com", password: "longenough12" }),
+    });
+    expect(ok.status).toBe(200);
+    expect(extractSessionCookie(ok.headers.get("set-cookie"))).toContain(
+      "carrier_session=",
+    );
+  });
+});
