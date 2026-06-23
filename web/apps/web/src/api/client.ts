@@ -8,6 +8,13 @@ import {
   FileDiffSchema,
   PermissionRuleSchema,
   UsageSchema,
+  AgentDefSchema,
+  SkillDefSchema,
+  McpServerSchema,
+  ContextDocSchema,
+  HookDefSchema,
+  EnvVarSchema,
+  ModelParamsSchema,
   type Me,
   type Org,
   type Project,
@@ -17,6 +24,14 @@ import {
   type FileDiff,
   type PermissionRule,
   type Usage,
+  type AgentDef,
+  type SkillDef,
+  type McpServer,
+  type ContextDoc,
+  type HookDef,
+  type EnvVar,
+  type ModelParams,
+  type ConfigScope,
 } from "@carrier/contract";
 
 /**
@@ -207,6 +222,42 @@ const InstallationSchema: Parser<Installation> = {
   },
 };
 const InstallationListSchema = arrayOf(InstallationSchema);
+
+// ── Configuration (agents / skills / MCP / context / hooks / env / model) ─────
+//
+// All config kinds live at two scopes — an Org-level shared layer and a
+// Project-level layer. The BFF exposes identical CRUD shapes under either
+// `/orgs/:owner/config/<kind>` or `/projects/:owner/config/<kind>`, plus a
+// singleton model-params row under `/config/model`. We keep one typed entry per
+// kind that pairs the entity schema with its create/update input types so the
+// generic helpers below stay fully typed without repetition.
+
+/** Maps each config kind to its full entity type and its create-body type. */
+export interface ConfigKindMap {
+  agents: { entity: AgentDef; create: Omit<AgentDef, "id" | "scope"> };
+  skills: { entity: SkillDef; create: Omit<SkillDef, "id" | "scope"> };
+  mcp: { entity: McpServer; create: Omit<McpServer, "id" | "scope"> };
+  context: { entity: ContextDoc; create: Omit<ContextDoc, "id" | "scope"> };
+  hooks: { entity: HookDef; create: Omit<HookDef, "id" | "scope"> };
+  env: { entity: EnvVar; create: Omit<EnvVar, "id" | "scope" | "hasValue"> };
+}
+export type ConfigKind = keyof ConfigKindMap;
+
+/** Per-kind element parsers (list responses are arrays of these). */
+const CONFIG_SCHEMAS: { [K in ConfigKind]: Parser<ConfigKindMap[K]["entity"]> } = {
+  agents: AgentDefSchema,
+  skills: SkillDefSchema,
+  mcp: McpServerSchema,
+  context: ContextDocSchema,
+  hooks: HookDefSchema,
+  env: EnvVarSchema,
+};
+
+/** Base path for a (scope, owner) pair — the BFF resolves slug or id for owner. */
+function configBase(scope: ConfigScope, ownerKey: string): string {
+  const seg = scope === "org" ? "orgs" : "projects";
+  return `/${seg}/${encodeURIComponent(ownerKey)}/config`;
+}
 
 export const api = {
   // ── Identity ───────────────────────────────────────────────────────────
@@ -411,6 +462,80 @@ export const api = {
       VoidSchema,
       { method: "DELETE" },
     );
+  },
+
+  // ── Configuration system (org + project scopes) ──────────────────────────
+  config: {
+    list<K extends ConfigKind>(
+      scope: ConfigScope,
+      ownerKey: string,
+      kind: K,
+      signal?: AbortSignal,
+    ): Promise<ConfigKindMap[K]["entity"][]> {
+      return request(
+        `${configBase(scope, ownerKey)}/${kind}`,
+        arrayOf(CONFIG_SCHEMAS[kind]),
+        { signal },
+      );
+    },
+
+    create<K extends ConfigKind>(
+      scope: ConfigScope,
+      ownerKey: string,
+      kind: K,
+      body: ConfigKindMap[K]["create"],
+    ): Promise<ConfigKindMap[K]["entity"]> {
+      return request(`${configBase(scope, ownerKey)}/${kind}`, CONFIG_SCHEMAS[kind], {
+        method: "POST",
+        body: body as Json,
+      });
+    },
+
+    update<K extends ConfigKind>(
+      scope: ConfigScope,
+      ownerKey: string,
+      kind: K,
+      id: string,
+      patch: Partial<ConfigKindMap[K]["create"]> & { enabled?: boolean },
+    ): Promise<ConfigKindMap[K]["entity"]> {
+      return request(
+        `${configBase(scope, ownerKey)}/${kind}/${encodeURIComponent(id)}`,
+        CONFIG_SCHEMAS[kind],
+        { method: "PATCH", body: patch as Json },
+      );
+    },
+
+    remove(
+      scope: ConfigScope,
+      ownerKey: string,
+      kind: ConfigKind,
+      id: string,
+    ): Promise<void> {
+      return request(
+        `${configBase(scope, ownerKey)}/${kind}/${encodeURIComponent(id)}`,
+        VoidSchema,
+        { method: "DELETE" },
+      );
+    },
+
+    getModel(
+      scope: ConfigScope,
+      ownerKey: string,
+      signal?: AbortSignal,
+    ): Promise<ModelParams> {
+      return request(`${configBase(scope, ownerKey)}/model`, ModelParamsSchema, { signal });
+    },
+
+    putModel(
+      scope: ConfigScope,
+      ownerKey: string,
+      params: ModelParams,
+    ): Promise<ModelParams> {
+      return request(`${configBase(scope, ownerKey)}/model`, ModelParamsSchema, {
+        method: "PUT",
+        body: params as Json,
+      });
+    },
   },
 };
 

@@ -4,7 +4,13 @@ import {
   useQueryClient,
   type UseQueryOptions,
 } from "@tanstack/react-query";
-import { api, type Member, type Installation } from "./client";
+import {
+  api,
+  type Member,
+  type Installation,
+  type ConfigKind,
+  type ConfigKindMap,
+} from "./client";
 import type {
   Me,
   Org,
@@ -15,6 +21,8 @@ import type {
   FileDiff,
   Usage,
   PermissionRule,
+  ConfigScope,
+  ModelParams,
 } from "@carrier/contract";
 
 /** Centralized query keys so invalidation stays consistent. */
@@ -33,6 +41,10 @@ export const qk = {
   installations: (org: string) => ["installations", org] as const,
   sessionUsage: (id: string) => ["usage", "session", id] as const,
   projectUsage: (id: string) => ["usage", "project", id] as const,
+  config: (scope: ConfigScope, owner: string, kind: ConfigKind) =>
+    ["config", scope, owner, kind] as const,
+  modelParams: (scope: ConfigScope, owner: string) =>
+    ["config", scope, owner, "model"] as const,
 };
 
 export function useMe(opts?: Partial<UseQueryOptions<Me>>) {
@@ -252,6 +264,87 @@ export function useProjectUsage(projectId: string, opts?: Partial<UseQueryOption
     queryKey: qk.projectUsage(projectId),
     queryFn: ({ signal }) => api.projectUsage(projectId, signal),
     ...opts,
+  });
+}
+
+// ── Configuration system (org + project scopes) ──────────────────────────────
+
+export function useConfigList<K extends ConfigKind>(
+  scope: ConfigScope,
+  ownerKey: string,
+  kind: K,
+  opts?: Partial<UseQueryOptions<ConfigKindMap[K]["entity"][]>>,
+) {
+  return useQuery({
+    queryKey: qk.config(scope, ownerKey, kind),
+    queryFn: ({ signal }) => api.config.list(scope, ownerKey, kind, signal),
+    enabled: !!ownerKey,
+    ...opts,
+  });
+}
+
+export function useCreateConfig<K extends ConfigKind>(
+  scope: ConfigScope,
+  ownerKey: string,
+  kind: K,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ConfigKindMap[K]["create"]) =>
+      api.config.create(scope, ownerKey, kind, body),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: qk.config(scope, ownerKey, kind) }),
+  });
+}
+
+export function useUpdateConfig<K extends ConfigKind>(
+  scope: ConfigScope,
+  ownerKey: string,
+  kind: K,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: {
+      id: string;
+      patch: Partial<ConfigKindMap[K]["create"]> & { enabled?: boolean };
+    }) => api.config.update(scope, ownerKey, kind, vars.id, vars.patch),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: qk.config(scope, ownerKey, kind) }),
+  });
+}
+
+export function useRemoveConfig<K extends ConfigKind>(
+  scope: ConfigScope,
+  ownerKey: string,
+  kind: K,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.config.remove(scope, ownerKey, kind, id),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: qk.config(scope, ownerKey, kind) }),
+  });
+}
+
+export function useModelParams(
+  scope: ConfigScope,
+  ownerKey: string,
+  opts?: Partial<UseQueryOptions<ModelParams>>,
+) {
+  return useQuery({
+    queryKey: qk.modelParams(scope, ownerKey),
+    queryFn: ({ signal }) => api.config.getModel(scope, ownerKey, signal),
+    enabled: !!ownerKey,
+    ...opts,
+  });
+}
+
+export function usePutModelParams(scope: ConfigScope, ownerKey: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: ModelParams) => api.config.putModel(scope, ownerKey, params),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: qk.modelParams(scope, ownerKey) }),
   });
 }
 

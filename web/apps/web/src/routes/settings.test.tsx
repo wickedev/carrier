@@ -20,6 +20,14 @@ vi.mock("../api/client", () => ({
     unbindRepo: vi.fn(),
     archiveProject: vi.fn(),
     projectUsage: vi.fn(),
+    config: {
+      list: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      remove: vi.fn(),
+      getModel: vi.fn(),
+      putModel: vi.fn(),
+    },
   },
 }));
 
@@ -75,6 +83,9 @@ beforeEach(() => {
   (api.permissions as ReturnType<typeof vi.fn>).mockResolvedValue([]);
   (api.project as ReturnType<typeof vi.fn>).mockResolvedValue(project);
   (api.projectUsage as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("no usage"));
+  // Config sections rendered by both settings pages — empty defaults.
+  (api.config.list as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+  (api.config.getModel as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("no model"));
 });
 
 // ── Members (Req 21) ──────────────────────────────────────────────────────────
@@ -91,11 +102,16 @@ describe("OrgSettingsPage — member management", () => {
     });
 
     renderPage(<OrgSettingsPage />);
-    await screen.findByText("octo");
+    const section = await screen.findByTestId("members-section");
+    await within(section).findByText("octo");
 
-    fireEvent.change(screen.getByLabelText("Member login"), { target: { value: "newbie" } });
-    fireEvent.change(screen.getByLabelText("Member role"), { target: { value: "admin" } });
-    fireEvent.click(screen.getByRole("button", { name: /Add/i }));
+    fireEvent.change(within(section).getByLabelText("Member login"), {
+      target: { value: "newbie" },
+    });
+    fireEvent.change(within(section).getByLabelText("Member role"), {
+      target: { value: "admin" },
+    });
+    fireEvent.click(within(section).getByRole("button", { name: /Add/i }));
 
     await waitFor(() =>
       expect(api.addMember).toHaveBeenCalledWith("acme", { login: "newbie", role: "admin" }),

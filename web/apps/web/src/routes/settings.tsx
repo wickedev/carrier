@@ -19,6 +19,7 @@ import {
   useProjectUsage,
 } from "../api/queries";
 import { formatUsd, formatTokens } from "../components/ide/UsagePanel";
+import { ConfigSections } from "./config-sections";
 
 /** Roles that may manage org members / project settings. */
 function canManage(role?: Role): boolean {
@@ -62,6 +63,9 @@ export function OrgSettingsPage() {
 
       <MembersSection orgSlug={org} current={current} />
       <InstallationsSection orgSlug={org} />
+
+      <h2 className="mb-4 mt-8 text-lg font-semibold">Configuration</h2>
+      <ConfigSections scope="org" ownerKey={org} manage={canManage(current?.role)} />
     </div>
   );
 }
@@ -196,7 +200,11 @@ export function ProjectSettingsPage() {
       <h1 className="mb-4 text-lg font-semibold">Project settings</h1>
 
       <RepoBindingSection orgSlug={currentOrg?.slug ?? org} projectId={project} manage={manage} />
+
+      <h2 className="mb-4 mt-8 text-lg font-semibold">Configuration</h2>
+      <ConfigSections scope="project" ownerKey={project} manage={manage} />
       <PermissionsSection projectId={project} manage={manage} />
+
       <UsageSection projectId={project} />
       <DangerZone orgSlug={org} projectId={project} manage={manage} />
     </div>
