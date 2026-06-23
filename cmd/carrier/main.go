@@ -50,70 +50,86 @@ func main() {
 	}
 }
 
-// buildRuntime assembles the shared Store, Engine, tool Registry, Executor, and
-// durable Memory used to construct Flights.
-func buildRuntime() (store.Store, flight.Config, error) {
+// runtime holds the shared, session-independent dependencies (Store, Engine,
+// base Executor, summarizer, defaults). Per-session Flights are built from it by
+// newSession (see session.go), which layers each session's config — context,
+// model, env, permissions, skills, named sub-agents, and MCP servers — on top.
+type runtime struct {
+	store         store.Store
+	engine        engine.Engine
+	baseExec      tool.ExecContext
+	summarizer    flight.Summarizer
+	defaultSystem string
+	defaultMemory string
+	defaultBudget int
+}
+
+// buildRuntime assembles the shared Store, Engine, Executor, and durable Memory.
+func buildRuntime() (*runtime, error) {
 	st, err := store.NewFileStore(filepath.Join(os.TempDir(), "carrier", "sessions"))
 	if err != nil {
-		return nil, flight.Config{}, err
+		return nil, err
 	}
 
 	// Throttled engine to protect the provider from 429 storms across sessions.
 	eng := engine.NewThrottle(engine.NewAnthropicEngine(), 8, 4)
 
-	exec := tool.ExecContext{Executor: bay.NewLocalExecutor()}
-
-	reg := tool.NewRegistry()
-	reg.Register(tool.NewBash())
-
-	// Subagents: a task tool that spawns child Flights sharing this runtime.
-	spawner := subagent.New(subagent.SpawnerConfig{
-		Engine:        eng,
-		Store:         st,
-		Tools:         reg,
-		Exec:          exec,
-		MaxConcurrent: 8,
-		MaxDepth:      3,
-	})
-	reg.Register(subagent.NewTaskTool(spawner))
-
 	cwd, _ := os.Getwd()
 	mem, _ := memory.LoadInstructions(cwd, 0)
 
-	tmpl := flight.Config{
-		System:        systemPrompt,
-		Memory:        mem,
-		Engine:        eng,
-		Store:         st,
+	return &runtime{
+		store:         st,
+		engine:        eng,
+		baseExec:      tool.ExecContext{Executor: bay.NewLocalExecutor()},
+		summarizer:    flight.EngineSummarizer{Engine: eng},
+		defaultSystem: systemPrompt,
+		defaultMemory: mem,
+		defaultBudget: 150000,
+	}, nil
+}
+
+// baseConfig builds a default template flight.Config (no per-session config) with
+// a fresh tool registry (bash + a generic sub-agent task tool). Used by the
+// one-shot smoke test.
+func (rt *runtime) baseConfig() flight.Config {
+	reg := tool.NewRegistry()
+	reg.Register(tool.NewBash())
+	spawner := subagent.New(subagent.SpawnerConfig{
+		Engine: rt.engine, Store: rt.store, Tools: reg, Exec: rt.baseExec,
+		MaxConcurrent: 8, MaxDepth: 3,
+	})
+	reg.Register(subagent.NewTaskTool(spawner))
+	return flight.Config{
+		System:        rt.defaultSystem,
+		Memory:        rt.defaultMemory,
+		Engine:        rt.engine,
+		Store:         rt.store,
 		Tools:         reg,
-		Exec:          exec,
-		Summarizer:    flight.EngineSummarizer{Engine: eng},
-		ContextBudget: 150000,
+		Exec:          rt.baseExec,
+		Summarizer:    rt.summarizer,
+		ContextBudget: rt.defaultBudget,
 	}
-	return st, tmpl, nil
 }
 
 func serve() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	st, tmpl, err := buildRuntime()
+	rt, err := buildRuntime()
 	if err != nil {
 		return err
 	}
 
 	tw := tower.New(256)
-	factory := func(sessionID, tenant string) *flight.Flight {
-		cfg := tmpl
-		cfg.ID = sessionID
-		return flight.New(cfg)
+	factory := func(sessionID, tenant string, opts server.SessionOptions) (*flight.Flight, func()) {
+		return rt.newSession(sessionID, opts)
 	}
 
 	token := os.Getenv("CARRIER_TOKEN")
 	if token == "" {
 		token = "dev-token"
 	}
-	srv := server.New(tw, factory, st, map[string]string{token: "default"})
+	srv := server.New(tw, factory, rt.store, map[string]string{token: "default"})
 
 	addr := os.Getenv("CARRIER_ADDR")
 	if addr == "" {
@@ -141,10 +157,11 @@ func smokeTest() error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
-	_, tmpl, err := buildRuntime()
+	rt, err := buildRuntime()
 	if err != nil {
 		return err
 	}
+	tmpl := rt.baseConfig()
 	tmpl.ID = "smoke-1"
 	f := flight.New(tmpl)
 

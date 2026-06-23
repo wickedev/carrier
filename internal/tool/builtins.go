@@ -3,6 +3,7 @@ package tool
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/wickedev/carrier/internal/bay"
 )
@@ -40,9 +41,15 @@ func (b *Bash) Exec(ctx context.Context, input map[string]any, ec ExecContext) (
 	if ec.Executor == nil {
 		return Result{}, fmt.Errorf("bash: no executor configured")
 	}
+	var env []string
+	if len(ec.Env) > 0 {
+		// Layer the per-session env/secrets on top of the host environment.
+		env = append(os.Environ(), ec.Env...)
+	}
 	res, err := ec.Executor.Exec(ctx, bay.ExecSpec{
 		Argv: []string{"/bin/sh", "-c", cmd},
 		Cwd:  ec.Cwd,
+		Env:  env,
 	})
 	if err != nil {
 		return Result{}, err

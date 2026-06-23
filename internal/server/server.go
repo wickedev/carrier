@@ -16,6 +16,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -28,12 +29,76 @@ import (
 	"github.com/wickedev/carrier/internal/tower"
 )
 
-// Factory builds a Flight for a new session. The caller supplies it (closing
-// over the engine, store, tool registry, and executor) so the server stays
-// decoupled from Flight construction. The returned Flight's ID must equal
-// sessionID and its Store must be the same Store passed to [New] so history
-// replay sees the session's records.
-type Factory func(sessionID, tenant string) *flight.Flight
+// Factory builds a Flight for a new session from the per-session [SessionOptions]
+// parsed off the create request. The caller supplies it (closing over the
+// engine, store, tool registry, and executor) so the server stays decoupled from
+// Flight construction. The returned Flight's ID must equal sessionID and its
+// Store must be the same Store passed to [New] so history replay sees the
+// session's records. The returned cleanup func (may be nil) is invoked once when
+// the session's Flight ends, to release per-session resources such as MCP
+// subprocesses.
+type Factory func(sessionID, tenant string, opts SessionOptions) (*flight.Flight, func())
+
+// SessionOptions is the per-session configuration parsed from the POST
+// /v1/sessions body and handed to the [Factory]. It is plain data so the server
+// stays decoupled from how a Flight is built; the Factory interprets it.
+type SessionOptions struct {
+	Cwd           string
+	System        string
+	Context       string // AGENTS.md-like instructions injected as durable memory
+	PlanMode      bool
+	Model         string
+	Effort        string
+	MaxSteps      int
+	ContextBudget int
+	Env           map[string]string
+	MCPServers    []MCPServerSpec
+	Skills        []SkillSpec
+	Subagents     []SubagentSpec
+	Hooks         []HookSpec
+	Permissions   []PermissionSpec
+}
+
+// MCPServerSpec is a per-session MCP (stdio) server registration.
+type MCPServerSpec struct {
+	Name    string
+	Command string
+	Args    []string
+	Env     map[string]string
+}
+
+// SkillSpec is a per-session skill (name + description shown to the model, body
+// loaded on demand).
+type SkillSpec struct {
+	Name         string
+	Description  string
+	Body         string
+	Agent        string
+	AllowedTools []string
+}
+
+// SubagentSpec is a per-session named sub-agent definition.
+type SubagentSpec struct {
+	Name        string
+	Description string
+	Prompt      string
+	Model       string
+}
+
+// HookSpec is a per-session command hook bound to a lifecycle event.
+type HookSpec struct {
+	Name    string
+	Event   string
+	Command string
+	Matcher string
+}
+
+// PermissionSpec is a per-session permission rule {action, pattern, effect}.
+type PermissionSpec struct {
+	Action  string
+	Pattern string
+	Effect  string
+}
 
 // Server is the HTTP + SSE surface over a Tower of Flights.
 //
@@ -101,6 +166,92 @@ type createResponse struct {
 	SessionID string `json:"session_id"`
 }
 
+// createRequest is the (optional) body of POST /v1/sessions: the per-session
+// configuration, snake-cased on the wire. An empty body yields zero options.
+type createRequest struct {
+	Cwd           string            `json:"cwd"`
+	System        string            `json:"system"`
+	PlanMode      bool              `json:"plan_mode"`
+	Context       string            `json:"context"`
+	Model         string            `json:"model"`
+	Effort        string            `json:"effort"`
+	MaxSteps      int               `json:"max_steps"`
+	ContextBudget int               `json:"context_budget"`
+	Env           map[string]string `json:"env"`
+	MCPServers    []struct {
+		Name    string            `json:"name"`
+		Command string            `json:"command"`
+		Args    []string          `json:"args"`
+		Env     map[string]string `json:"env"`
+	} `json:"mcp_servers"`
+	Skills []struct {
+		Name         string   `json:"name"`
+		Description  string   `json:"description"`
+		Body         string   `json:"body"`
+		Agent        string   `json:"agent"`
+		AllowedTools []string `json:"allowed_tools"`
+	} `json:"skills"`
+	Subagents []struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Prompt      string `json:"prompt"`
+		Model       string `json:"model"`
+	} `json:"subagents"`
+	Hooks []struct {
+		Name    string `json:"name"`
+		Event   string `json:"event"`
+		Command string `json:"command"`
+		Matcher string `json:"matcher"`
+	} `json:"hooks"`
+	Permissions []struct {
+		Action  string `json:"action"`
+		Pattern string `json:"pattern"`
+		Effect  string `json:"effect"`
+	} `json:"permissions"`
+}
+
+// toOptions projects the wire request onto the decoupled SessionOptions.
+func (r *createRequest) toOptions() SessionOptions {
+	opts := SessionOptions{
+		Cwd:           r.Cwd,
+		System:        r.System,
+		Context:       r.Context,
+		PlanMode:      r.PlanMode,
+		Model:         r.Model,
+		Effort:        r.Effort,
+		MaxSteps:      r.MaxSteps,
+		ContextBudget: r.ContextBudget,
+		Env:           r.Env,
+	}
+	for _, m := range r.MCPServers {
+		opts.MCPServers = append(opts.MCPServers, MCPServerSpec{
+			Name: m.Name, Command: m.Command, Args: m.Args, Env: m.Env,
+		})
+	}
+	for _, s := range r.Skills {
+		opts.Skills = append(opts.Skills, SkillSpec{
+			Name: s.Name, Description: s.Description, Body: s.Body,
+			Agent: s.Agent, AllowedTools: s.AllowedTools,
+		})
+	}
+	for _, a := range r.Subagents {
+		opts.Subagents = append(opts.Subagents, SubagentSpec{
+			Name: a.Name, Description: a.Description, Prompt: a.Prompt, Model: a.Model,
+		})
+	}
+	for _, h := range r.Hooks {
+		opts.Hooks = append(opts.Hooks, HookSpec{
+			Name: h.Name, Event: h.Event, Command: h.Command, Matcher: h.Matcher,
+		})
+	}
+	for _, p := range r.Permissions {
+		opts.Permissions = append(opts.Permissions, PermissionSpec{
+			Action: p.Action, Pattern: p.Pattern, Effect: p.Effect,
+		})
+	}
+	return opts
+}
+
 // inputRequest is the body of POST /v1/sessions/{id}/input.
 type inputRequest struct {
 	Text  string `json:"text"`
@@ -137,8 +288,16 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Parse the optional per-session config. An empty body (EOF) is fine — it
+	// yields zero options (a default session). A malformed body is a 400.
+	var req createRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+		writeError(w, http.StatusBadRequest, "invalid body: "+err.Error())
+		return
+	}
+
 	sid := newSessionID()
-	f := s.factory(sid, tenant)
+	f, cleanup := s.factory(sid, tenant, req.toOptions())
 
 	// Wire a human-in-the-loop approver: when an Ask-effect tool fires, surface an
 	// approval_request event on the stream and block until the client answers via
@@ -176,6 +335,11 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 		delete(s.hubs, sid)
 		delete(s.approvers, sid)
 		s.mu.Unlock()
+		// Release per-session resources (e.g. MCP subprocesses) once the Flight
+		// has ended and its events are fully drained.
+		if cleanup != nil {
+			cleanup()
+		}
 	}()
 
 	writeJSON(w, http.StatusOK, createResponse{SessionID: sid})

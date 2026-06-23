@@ -40,8 +40,12 @@ type Spiller interface {
 // confined Executor it must run commands through, the working directory, and an
 // optional Spiller for large results.
 type ExecContext struct {
-	Executor       bay.Executor
-	Cwd            string
+	Executor bay.Executor
+	Cwd      string
+	// Env are extra environment entries ("KEY=VALUE") layered onto the host
+	// environment for command execution (per-session env/secrets). Empty → the
+	// child inherits the host environment unchanged.
+	Env            []string
 	Spiller        Spiller
 	MaxResultBytes int // 0 → no spill
 }

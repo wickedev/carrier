@@ -3,6 +3,8 @@ package subagent
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 
 	"github.com/wickedev/carrier/internal/tool"
 )
@@ -36,12 +38,25 @@ type taskTool struct {
 	spawner *Spawner
 }
 
-// NewTaskTool builds the "task" sub-agent tool backed by s.
+// NewTaskTool builds the "task" sub-agent tool backed by s. Any named agents
+// registered on the Spawner are advertised in the tool description and accepted
+// via the optional "agent" parameter.
 func NewTaskTool(s *Spawner) tool.Tool {
+	desc := "Delegate a focused unit of work to a sub-agent. The sub-agent runs the full agent loop on the given prompt and returns a summarized result. Use for independent work that can run in parallel."
+	if agents := s.Agents(); len(agents) > 0 {
+		sort.Slice(agents, func(i, j int) bool { return agents[i].Name < agents[j].Name })
+		var b strings.Builder
+		b.WriteString(desc)
+		b.WriteString("\n\nAvailable named agents (pass via \"agent\"):")
+		for _, a := range agents {
+			fmt.Fprintf(&b, "\n- %s: %s", a.Name, a.Description)
+		}
+		desc = b.String()
+	}
 	return &taskTool{
 		Base: tool.Base{
 			ToolName:        "task",
-			ToolDescription: "Delegate a focused unit of work to a sub-agent. The sub-agent runs the full agent loop on the given prompt and returns a summarized result. Use for independent work that can run in parallel.",
+			ToolDescription: desc,
 			ToolSchema: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -52,6 +67,10 @@ func NewTaskTool(s *Spawner) tool.Tool {
 					"description": map[string]any{
 						"type":        "string",
 						"description": "A short (3-5 word) label for the task.",
+					},
+					"agent": map[string]any{
+						"type":        "string",
+						"description": "Optional name of a registered sub-agent to dispatch to (see the list above). Omit for the default general-purpose sub-agent.",
 					},
 				},
 				"required": []any{"prompt"},
@@ -74,13 +93,15 @@ func (t *taskTool) Exec(ctx context.Context, input map[string]any, _ tool.ExecCo
 		return tool.Result{Content: "error: task requires a non-empty prompt", IsError: true}, nil
 	}
 
+	agentName, _ := input["agent"].(string)
+
 	depth := depthFrom(ctx)
 	parentID := fmt.Sprintf("task.d%d", depth)
 
 	// Children run at depth+1, and their own context carries that depth so any
 	// task tool they call in turn keeps accumulating toward MaxDepth.
 	childCtx := WithDepth(ctx, depth+1)
-	summary, err := t.spawner.Spawn(childCtx, parentID, prompt, depth)
+	summary, err := t.spawner.SpawnAs(childCtx, parentID, agentName, prompt, depth)
 	if err != nil {
 		return tool.Result{Content: fmt.Sprintf("error: %v", err), IsError: true}, nil
 	}

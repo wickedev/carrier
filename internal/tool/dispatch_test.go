@@ -171,3 +171,23 @@ func TestBashViaLocalExecutor(t *testing.T) {
 		t.Fatalf("bash result = %+v", res[0])
 	}
 }
+
+// TestBashInjectsExecContextEnv verifies per-session env/secrets in
+// ExecContext.Env are visible to the command (and layered on the host env).
+func TestBashInjectsExecContextEnv(t *testing.T) {
+	reg := NewRegistry()
+	reg.Register(NewBash())
+	ec := ExecContext{
+		Executor: bay.NewLocalExecutor(),
+		Env:      []string{"CARRIER_TEST_SECRET=s3cr3t"},
+	}
+	res := Dispatch(context.Background(), []agent.ToolCall{
+		{ID: "1", Name: "bash", Input: map[string]any{"command": "printf %s \"$CARRIER_TEST_SECRET\""}},
+	}, reg, ec, 4)
+	if res[0].IsError {
+		t.Fatalf("bash error: %+v", res[0])
+	}
+	if got := res[0].Content; got != "s3cr3t" {
+		t.Fatalf("env not injected: command saw %q, want %q", got, "s3cr3t")
+	}
+}

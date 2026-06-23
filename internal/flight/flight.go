@@ -58,7 +58,11 @@ type Config struct {
 	// Memory is durable instruction/context (e.g. AGENTS.md) injected ahead of
 	// the conversation but outside the mutable history, so it is never
 	// compacted. See internal/memory.
-	Memory      string
+	Memory string
+	// Model, when set, overrides the Engine's default model for this session.
+	// Effort selects the reasoning-effort level where the provider supports it.
+	Model       string
+	Effort      string
 	Engine      engine.Engine
 	Store       store.Store
 	Tools       *tool.Registry
@@ -84,6 +88,8 @@ type Flight struct {
 	id          string
 	system      string
 	memory      string
+	model       string
+	effort      string
 	engine      engine.Engine
 	store       store.Store
 	tools       *tool.Registry
@@ -113,6 +119,8 @@ func New(cfg Config) *Flight {
 		id:          cfg.ID,
 		system:      cfg.System,
 		memory:      cfg.Memory,
+		model:       cfg.Model,
+		effort:      cfg.Effort,
 		engine:      cfg.Engine,
 		store:       cfg.Store,
 		tools:       cfg.Tools,
@@ -269,6 +277,8 @@ func (f *Flight) runTurn(ctx context.Context, msgs []agent.Message) (agent.StepR
 		System:   f.effectiveSystem(),
 		Messages: msgs,
 		Tools:    f.visibleTools(),
+		Model:    f.model,
+		Effort:   f.effort,
 		OnEvent: func(ev agent.StreamEvent) {
 			select {
 			case activity <- struct{}{}:

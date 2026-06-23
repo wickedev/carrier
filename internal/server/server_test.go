@@ -39,13 +39,14 @@ func newTestServer(t *testing.T, tokens map[string]string) (*Server, store.Store
 		t.Fatalf("NewFileStore: %v", err)
 	}
 	tw := tower.New(16)
-	factory := func(sid, tenant string) *flight.Flight {
-		return flight.New(flight.Config{
+	factory := func(sid, tenant string, opts SessionOptions) (*flight.Flight, func()) {
+		f := flight.New(flight.Config{
 			ID:     sid,
 			System: "test",
 			Engine: fakeEngine{reply: "hello from fake"},
 			Store:  st,
 		})
+		return f, nil
 	}
 	srv := New(tw, factory, st, tokens)
 	// Stop every Flight goroutine before the t.TempDir() FileStore is removed, so

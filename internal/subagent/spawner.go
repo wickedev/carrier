@@ -33,9 +33,20 @@ const (
 	drainIdle = 750 * time.Millisecond
 )
 
+// Agent is a named sub-agent definition: a delegate the model can dispatch work
+// to by name, running the child Flight with the agent's own system prompt and
+// (optionally) its own model. Registered per session via SpawnerConfig.Agents.
+type Agent struct {
+	Name        string
+	Description string
+	System      string
+	Model       string
+}
+
 // SpawnerConfig configures a Spawner. The Engine/Store/Tools/Exec/Policy are
 // shared with (typically inherited from) the parent runtime; MaxConcurrent and
-// MaxDepth bound fan-out and recursion respectively.
+// MaxDepth bound fan-out and recursion respectively. Agents registers named
+// sub-agent definitions the task tool can dispatch to.
 type SpawnerConfig struct {
 	Engine        engine.Engine
 	Store         store.Store
@@ -44,6 +55,7 @@ type SpawnerConfig struct {
 	Policy        perm.Policy
 	MaxConcurrent int
 	MaxDepth      int
+	Agents        []Agent
 }
 
 // Spawner builds and runs child Flights on demand. It bounds concurrent
@@ -57,6 +69,7 @@ type Spawner struct {
 	policy   perm.Policy
 	maxDepth int
 	maxSteps int
+	agents   map[string]Agent
 
 	sem     *semaphore.Weighted
 	counter atomic.Uint64
@@ -77,6 +90,12 @@ func New(cfg SpawnerConfig) *Spawner {
 	if maxDepth < 1 {
 		maxDepth = defaultMaxDepth
 	}
+	agents := make(map[string]Agent, len(cfg.Agents))
+	for _, a := range cfg.Agents {
+		if a.Name != "" {
+			agents[a.Name] = a
+		}
+	}
 	return &Spawner{
 		engine:   cfg.Engine,
 		store:    cfg.Store,
@@ -85,8 +104,19 @@ func New(cfg SpawnerConfig) *Spawner {
 		policy:   DeriveCeiling(cfg.Policy),
 		maxDepth: maxDepth,
 		maxSteps: defaultChildMaxSteps,
+		agents:   agents,
 		sem:      semaphore.NewWeighted(int64(maxConc)),
 	}
+}
+
+// Agents returns the registered named sub-agent definitions in no particular
+// order. The task tool lists them so the model knows what it can dispatch to.
+func (s *Spawner) Agents() []Agent {
+	out := make([]Agent, 0, len(s.agents))
+	for _, a := range s.agents {
+		out = append(out, a)
+	}
+	return out
 }
 
 // MaxDepth reports the configured recursion bound.
@@ -102,6 +132,13 @@ func (s *Spawner) MaxDepth() int { return s.maxDepth }
 // the stream goes quiet, then cancels the child and returns the accumulated
 // text (Req 13.5).
 func (s *Spawner) Spawn(ctx context.Context, parentID, prompt string, depth int) (summary string, err error) {
+	return s.SpawnAs(ctx, parentID, "", prompt, depth)
+}
+
+// SpawnAs is Spawn dispatched to a named agent. When agentName matches a
+// registered Agent, the child Flight runs with that agent's system prompt and
+// model; an empty or unknown name falls back to the default generic sub-agent.
+func (s *Spawner) SpawnAs(ctx context.Context, parentID, agentName, prompt string, depth int) (summary string, err error) {
 	if depth >= s.maxDepth {
 		return "", fmt.Errorf("subagent: recursion depth %d exceeds max %d", depth, s.maxDepth)
 	}
@@ -113,7 +150,7 @@ func (s *Spawner) Spawn(ctx context.Context, parentID, prompt string, depth int)
 	defer s.sem.Release(1)
 
 	childID := fmt.Sprintf("%s.sub.%d", parentID, s.counter.Add(1))
-	child := flight.New(flight.Config{
+	cfg := flight.Config{
 		ID:       childID,
 		Engine:   s.engine,
 		Store:    s.store,
@@ -121,7 +158,12 @@ func (s *Spawner) Spawn(ctx context.Context, parentID, prompt string, depth int)
 		Policy:   s.policy,
 		Exec:     s.exec,
 		MaxSteps: s.maxSteps,
-	})
+	}
+	if a, ok := s.agents[agentName]; ok && agentName != "" {
+		cfg.System = a.System
+		cfg.Model = a.Model
+	}
+	child := flight.New(cfg)
 
 	// The child runs under its own cancellable context so we can stop it once it
 	// goes quiet. Cancelling ends child.Run, which closes the child's queues.

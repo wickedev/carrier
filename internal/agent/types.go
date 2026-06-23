@@ -54,6 +54,12 @@ type StepInput struct {
 	Messages []Message
 	Tools    []Tool
 
+	// Model, when non-empty, overrides the Engine's default model for this turn
+	// (per-session model selection). Effort, when non-empty, selects the
+	// reasoning effort level where the provider supports it.
+	Model  string
+	Effort string
+
 	// OnEvent, if set, receives canonical StreamEvents as the turn streams.
 	// The Engine emits events through this callback; the aggregated outcome is
 	// still returned as a StepResult.

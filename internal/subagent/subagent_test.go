@@ -2,6 +2,7 @@ package subagent
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -46,6 +47,73 @@ func (e *fakeEngine) RunStep(ctx context.Context, in agent.StepInput) (agent.Ste
 		in.OnEvent(agent.StreamEvent{Kind: agent.EvText, Text: e.text})
 	}
 	return agent.StepResult{Text: e.text, Done: true}, nil
+}
+
+// recordEngine captures the System and Model of the last RunStep, so a test can
+// assert which agent definition a child Flight ran under.
+type recordEngine struct {
+	mu     sync.Mutex
+	system string
+	model  string
+}
+
+func (e *recordEngine) Name() string { return "record" }
+
+func (e *recordEngine) RunStep(ctx context.Context, in agent.StepInput) (agent.StepResult, error) {
+	e.mu.Lock()
+	e.system = in.System
+	e.model = in.Model
+	e.mu.Unlock()
+	if in.OnEvent != nil {
+		in.OnEvent(agent.StreamEvent{Kind: agent.EvText, Text: "ok"})
+	}
+	return agent.StepResult{Text: "ok", Done: true}, nil
+}
+
+func TestSpawnAsNamedAgentAppliesSystemAndModel(t *testing.T) {
+	t.Parallel()
+	eng := &recordEngine{}
+	sp := New(SpawnerConfig{
+		Engine:        eng,
+		Store:         newStore(t),
+		Tools:         tool.NewRegistry(),
+		MaxConcurrent: 2,
+		MaxDepth:      3,
+		Agents: []Agent{{
+			Name:        "writer",
+			Description: "writes docs",
+			System:      "You are a technical writer.",
+			Model:       "claude-test-model",
+		}},
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if _, err := sp.SpawnAs(ctx, "parent", "writer", "draft the readme", 0); err != nil {
+		t.Fatalf("SpawnAs: %v", err)
+	}
+
+	eng.mu.Lock()
+	gotSystem, gotModel := eng.system, eng.model
+	eng.mu.Unlock()
+	if gotSystem != "You are a technical writer." {
+		t.Fatalf("child system = %q, want the writer agent's system prompt", gotSystem)
+	}
+	if gotModel != "claude-test-model" {
+		t.Fatalf("child model = %q, want the writer agent's model", gotModel)
+	}
+
+	// An unknown agent name falls back to the default (empty system/model).
+	if _, err := sp.SpawnAs(ctx, "parent", "nope", "do it", 0); err != nil {
+		t.Fatalf("SpawnAs fallback: %v", err)
+	}
+	eng.mu.Lock()
+	fbSystem, fbModel := eng.system, eng.model
+	eng.mu.Unlock()
+	if fbSystem != "" || fbModel != "" {
+		t.Fatalf("unknown agent should fall back to default, got system=%q model=%q", fbSystem, fbModel)
+	}
 }
 
 func newStore(t *testing.T) store.Store {

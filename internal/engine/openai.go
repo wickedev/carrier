@@ -54,6 +54,9 @@ func (e *OpenAIEngine) Name() string { return "openai" }
 // StreamEvents through in.OnEvent, and aggregates into an agent.StepResult.
 func (e *OpenAIEngine) RunStep(ctx context.Context, in agent.StepInput) (agent.StepResult, error) {
 	model := e.Model
+	if in.Model != "" {
+		model = in.Model // per-session model override
+	}
 	if model == "" {
 		model = defaultOpenAIModel
 	}
