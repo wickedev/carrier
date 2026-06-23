@@ -26,6 +26,7 @@ import (
 	"github.com/wickedev/carrier/internal/engine"
 	"github.com/wickedev/carrier/internal/flight"
 	"github.com/wickedev/carrier/internal/memory"
+	"github.com/wickedev/carrier/internal/plugin/wasm"
 	"github.com/wickedev/carrier/internal/server"
 	"github.com/wickedev/carrier/internal/sq"
 	"github.com/wickedev/carrier/internal/store"
@@ -62,6 +63,7 @@ type runtime struct {
 	defaultSystem string
 	defaultMemory string
 	defaultBudget int
+	pluginLoader  *wasm.Loader // nil → plugins disabled
 }
 
 // buildRuntime assembles the shared Store, Engine, Executor, and durable Memory.
@@ -77,7 +79,7 @@ func buildRuntime() (*runtime, error) {
 	cwd, _ := os.Getwd()
 	mem, _ := memory.LoadInstructions(cwd, 0)
 
-	return &runtime{
+	rt := &runtime{
 		store:         st,
 		engine:        eng,
 		baseExec:      tool.ExecContext{Executor: bay.NewLocalExecutor()},
@@ -85,7 +87,19 @@ func buildRuntime() (*runtime, error) {
 		defaultSystem: systemPrompt,
 		defaultMemory: mem,
 		defaultBudget: 150000,
-	}, nil
+	}
+
+	// Plugin host (wazero), enabled when a content-addressed artifact cache dir is
+	// configured. Plugins resolve their WASM from it by digest.
+	if cacheDir := os.Getenv("CARRIER_PLUGIN_CACHE"); cacheDir != "" {
+		host, err := wasm.NewHost(context.Background(), wasm.Limits{})
+		if err != nil {
+			return nil, err
+		}
+		host.SetLogSink(func(msg string) { fmt.Fprintf(os.Stderr, "carrier: plugin: %s\n", msg) })
+		rt.pluginLoader = wasm.NewLoader(host, wasm.CASResolver{Dir: cacheDir})
+	}
+	return rt, nil
 }
 
 // baseConfig builds a default template flight.Config (no per-session config) with

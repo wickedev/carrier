@@ -8,6 +8,8 @@ import (
 	"github.com/wickedev/carrier/internal/flight"
 	"github.com/wickedev/carrier/internal/mcp"
 	"github.com/wickedev/carrier/internal/perm"
+	"github.com/wickedev/carrier/internal/plugin"
+	"github.com/wickedev/carrier/internal/plugin/wasm"
 	"github.com/wickedev/carrier/internal/server"
 	"github.com/wickedev/carrier/internal/skill"
 	"github.com/wickedev/carrier/internal/subagent"
@@ -136,12 +138,31 @@ func (rt *runtime) newSession(sessionID string, opts server.SessionOptions) (*fl
 		budget = opts.ContextBudget
 	}
 
+	// Active (WASM) plugins: resolve by digest, instantiate sandboxed, and build
+	// the per-session seam Chain. Best-effort — a plugin that fails to load is
+	// skipped. The instances are closed by the cleanup func on session end.
+	var pluginChain *plugin.Chain
+	if rt.pluginLoader != nil && len(opts.Plugins) > 0 {
+		refs := make([]wasm.Ref, 0, len(opts.Plugins))
+		for _, p := range opts.Plugins {
+			refs = append(refs, wasm.Ref{
+				Name: p.Name, Version: p.Version, ManifestDigest: p.ManifestDigest,
+				WasmDigest: p.WasmDigest, GrantedCaps: p.GrantedCaps,
+				AllowPermissions: p.AllowPermissions,
+			})
+		}
+		chain, closePlugins, _ := rt.pluginLoader.LoadChain(context.Background(), refs, opts.Env)
+		pluginChain = chain
+		closers = append(closers, closePlugins)
+	}
+
 	f := flight.New(flight.Config{
 		ID:            sessionID,
 		System:        system,
 		Memory:        mem,
 		Model:         opts.Model,
 		Effort:        opts.Effort,
+		Plugins:       pluginChain,
 		Engine:        rt.engine,
 		Store:         rt.store,
 		Tools:         reg,
