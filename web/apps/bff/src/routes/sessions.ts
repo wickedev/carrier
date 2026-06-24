@@ -140,16 +140,17 @@ export function sessionRoutes(): Hono<AppEnv> {
 
           const ev: SessionEvent | null = normalizeEvent(raw);
           if (!ev) continue;
-          if (ev.seq <= lastSeq) continue; // dedupe / ordering guard
-          lastSeq = ev.seq;
-          // Persist auto-generated session titles. The runtime emits this once
-          // after the first turn; replay re-applies the same value (idempotent).
+          // Persist auto-generated session titles BEFORE the forward-dedupe, so a
+          // title is never lost if its seq trips the guard. The runtime emits it
+          // once after the first turn; re-applying the same value is idempotent.
           if (ev.kind === "title" && ev.title.length > 0) {
             await db
               .update(sessionTable)
               .set({ title: ev.title })
               .where(eq(sessionTable.id, sessionId));
           }
+          if (ev.seq <= lastSeq) continue; // dedupe / ordering guard (forwarding)
+          lastSeq = ev.seq;
           await stream.writeSSE({
             event: ev.kind,
             id: String(ev.seq),

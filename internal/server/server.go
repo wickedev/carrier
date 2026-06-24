@@ -494,15 +494,27 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	sub := h.subscribe()
 	defer h.unsubscribe(sub)
 
-	// Replay history first so a reconnecting client catches up (Req 17.4).
+	// Replay history first so a reconnecting client catches up (Req 17.4),
+	// tracking the high-water seq so live events continue the sequence.
+	maxSeq := 0
 	if recs, err := s.store.History(r.Context(), store.SessionID(sid)); err == nil {
 		for _, rec := range recs {
-			if !writeSSE(w, flusher, recordToDTO(rec)) {
+			dto := recordToDTO(rec)
+			if dto.Seq > maxSeq {
+				maxSeq = dto.Seq
+			}
+			if !writeSSE(w, flusher, dto) {
 				return
 			}
 		}
 	}
 
+	// Live events carry no store seq, so assign each a monotonically increasing
+	// seq continuing past history. Without this every live event would serialize
+	// as seq 0 and a seq-deduping client (the BFF relay, the web reducer) would
+	// drop all but the first — silently losing live text, status, and the
+	// auto-generated title.
+	liveSeq := maxSeq
 	ctx := r.Context()
 	for {
 		select {
@@ -512,7 +524,10 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return // hub closed (Flight ended)
 			}
-			if !writeSSE(w, flusher, eventToDTO(ev)) {
+			liveSeq++
+			dto := eventToDTO(ev)
+			dto.Seq = liveSeq
+			if !writeSSE(w, flusher, dto) {
 				return
 			}
 		}
@@ -590,8 +605,8 @@ func writeSSE(w http.ResponseWriter, flusher http.Flusher, dto eventDTO) bool {
 	return true
 }
 
-// eventToDTO projects a live StreamEvent into the SSE DTO. Live events have no
-// store seq, so Seq is left zero.
+// eventToDTO projects a live StreamEvent into the SSE DTO. Seq is left zero here;
+// handleEvents assigns a monotonic live seq continuing past the replayed history.
 func eventToDTO(ev agent.StreamEvent) eventDTO {
 	dto := eventDTO{Kind: ev.Kind.String(), Text: ev.Text}
 	switch {
