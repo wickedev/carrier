@@ -494,39 +494,31 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	sub := h.subscribe()
 	defer h.unsubscribe(sub)
 
-	// Replay history first so a reconnecting client catches up (Req 17.4),
-	// tracking the high-water seq so live events continue the sequence.
-	maxSeq := 0
+	// Replay history first so a reconnecting client catches up (Req 17.4). History
+	// records carry small store seqs; live events are stamped by the hub into a
+	// high range (liveSeqBase+), so the two never collide in a client's seq space.
 	if recs, err := s.store.History(r.Context(), store.SessionID(sid)); err == nil {
 		for _, rec := range recs {
-			dto := recordToDTO(rec)
-			if dto.Seq > maxSeq {
-				maxSeq = dto.Seq
-			}
-			if !writeSSE(w, flusher, dto) {
+			if !writeSSE(w, flusher, recordToDTO(rec)) {
 				return
 			}
 		}
 	}
 
-	// Live events carry no store seq, so assign each a monotonically increasing
-	// seq continuing past history. Without this every live event would serialize
-	// as seq 0 and a seq-deduping client (the BFF relay, the web reducer) would
-	// drop all but the first — silently losing live text, status, and the
-	// auto-generated title.
-	liveSeq := maxSeq
+	// Live events use the hub-stamped, per-session monotonic seq (the same value
+	// for every connection, climbing across reconnects), so a seq-deduping client
+	// never drops a fresh live event nor collides one with a previously-seen seq.
 	ctx := r.Context()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case ev, ok := <-sub.ch:
+		case le, ok := <-sub.ch:
 			if !ok {
 				return // hub closed (Flight ended)
 			}
-			liveSeq++
-			dto := eventToDTO(ev)
-			dto.Seq = liveSeq
+			dto := eventToDTO(le.ev)
+			dto.Seq = le.seq
 			if !writeSSE(w, flusher, dto) {
 				return
 			}

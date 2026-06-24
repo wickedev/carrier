@@ -106,3 +106,76 @@ func TestLiveEventsGetMonotonicSeq(t *testing.T) {
 		t.Fatalf("title seq = %d, want > 0", titleSeq)
 	}
 }
+
+// collectLiveSeqs opens an events stream, drives one turn, and returns the seqs of
+// the live (hub-stamped) events it observes — those above liveSeqBase.
+func collectLiveSeqs(t *testing.T, ts *httptest.Server, sid, input string) []int {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	resp := openEvents(t, ctx, ts, "tok", sid)
+	defer resp.Body.Close()
+	if code := postInput(t, ts, "tok", sid, input, false); code != http.StatusAccepted {
+		t.Fatalf("input status = %d", code)
+	}
+	var seqs []int
+	sc := bufio.NewScanner(resp.Body)
+	for sc.Scan() {
+		line := sc.Text()
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		var dto eventDTO
+		if err := json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &dto); err != nil {
+			continue
+		}
+		if dto.Seq > liveSeqBase {
+			seqs = append(seqs, dto.Seq)
+		}
+		if dto.Kind == "title_suggested" {
+			break // the title is the last live event of the turn
+		}
+	}
+	return seqs
+}
+
+// TestLiveSeqMonotonicAcrossReconnect guards the reconnect-collision bug: the live
+// seq must be per-session and lifetime-monotonic, NOT connection-local. A second
+// connection's live events must get strictly higher seqs than the first's, so a
+// client whose dedupe set persists across reconnects never drops them as "seen".
+func TestLiveSeqMonotonicAcrossReconnect(t *testing.T) {
+	st, err := store.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("store: %v", err)
+	}
+	tw := tower.New(8)
+	factory := func(sid, tenant string, opts SessionOptions) (*flight.Flight, func()) {
+		return flight.New(flight.Config{
+			ID: sid, System: "t", Engine: multiEventEngine{}, Store: st,
+		}), nil
+	}
+	srv := New(tw, factory, st, map[string]string{"tok": "default"})
+	t.Cleanup(srv.Shutdown)
+	ts := httptest.NewServer(srv.Handler())
+	t.Cleanup(ts.Close)
+
+	sid := createSession(t, ts, "tok")
+
+	first := collectLiveSeqs(t, ts, sid, "first request")
+	second := collectLiveSeqs(t, ts, sid, "second request") // a reconnect
+
+	if len(first) == 0 || len(second) == 0 {
+		t.Fatalf("missing live events: first=%v second=%v", first, second)
+	}
+	maxFirst := 0
+	for _, s := range first {
+		if s > maxFirst {
+			maxFirst = s
+		}
+	}
+	for _, s := range second {
+		if s <= maxFirst {
+			t.Fatalf("reconnect live seq %d collides with/precedes first connection (max %d): the counter reset", s, maxFirst)
+		}
+	}
+}
