@@ -85,6 +85,21 @@ separate database port. Override any port inline (`make dev WEB_PORT=45173`), dr
 a root `.env` for real GitHub App / `ANTHROPIC_API_KEY` credentials, and use
 `make kill` / `make clean` to free the ports / wipe local state.
 
+### LLM auth for local dev (Codex BYOS — no API key)
+
+With **no `ANTHROPIC_API_KEY`** set, `make dev` auto-selects the **Codex BYOS**
+engine: it authenticates the LLM with your local **ChatGPT subscription** token
+(from `codex login`, read fresh from `~/.codex/auth.json`) — so you can run the
+whole stack with **no API key**. Force it with `CARRIER_AUTH=codex`; opt back to
+the API key with `CARRIER_AUTH=anthropic` + `ANTHROPIC_API_KEY`.
+
+> **Local development only.** A subscription token is intended for the Codex/ChatGPT
+> apps, shares your subscription's rate limit (so running `codex` at the same time
+> can throttle both), and is a ToS gray area for other uses. The engine is gated to
+> the local runtime and is **never** wired into the multi-tenant server path —
+> production must use a real API key (or Bedrock/Vertex). If the token has expired,
+> run `codex` once to refresh it.
+
 ## Build & run
 
 Requires Go 1.23+ (pinned to `1.26.4` via `.tool-versions` for asdf).

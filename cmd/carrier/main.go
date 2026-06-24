@@ -67,6 +67,27 @@ type runtime struct {
 	pluginLoader  *wasm.Loader // nil → plugins disabled
 }
 
+// selectEngine picks the LLM backend.
+//
+// Default: the Anthropic API engine (production; reads ANTHROPIC_API_KEY).
+//
+// LOCAL DEV ONLY — Codex BYOS: when CARRIER_AUTH=codex (or, with no
+// ANTHROPIC_API_KEY set, a usable ~/.codex token is present), use the Codex
+// engine, which authenticates with the developer's ChatGPT SUBSCRIPTION OAuth
+// token (no API key). This is a convenience for `make dev` only; it shares the
+// subscription's rate limit and is a ToS gray area, so it must never be used on
+// the multi-tenant server. Opt out anytime with CARRIER_AUTH=anthropic.
+func selectEngine() engine.Engine {
+	mode := os.Getenv("CARRIER_AUTH")
+	useCodex := mode == "codex" ||
+		(mode == "" && os.Getenv("ANTHROPIC_API_KEY") == "" && engine.CodexAuthAvailable())
+	if useCodex {
+		fmt.Fprintln(os.Stderr, "carrier: using Codex BYOS engine (ChatGPT subscription, LOCAL DEV ONLY)")
+		return engine.NewCodexEngine()
+	}
+	return engine.NewAnthropicEngine()
+}
+
 // buildRuntime assembles the shared Store, Engine, Executor, and durable Memory.
 func buildRuntime() (*runtime, error) {
 	st, err := store.NewFileStore(filepath.Join(os.TempDir(), "carrier", "sessions"))
@@ -75,7 +96,7 @@ func buildRuntime() (*runtime, error) {
 	}
 
 	// Throttled engine to protect the provider from 429 storms across sessions.
-	eng := engine.NewThrottle(engine.NewAnthropicEngine(), 8, 4)
+	eng := engine.NewThrottle(selectEngine(), 8, 4)
 
 	cwd, _ := os.Getwd()
 	mem, _ := memory.LoadInstructions(cwd, 0)
