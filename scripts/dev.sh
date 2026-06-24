@@ -64,11 +64,12 @@ trap cleanup INT TERM EXIT
 echo "▸ building carrier runtime"
 go build -o "$DEV_DIR/bin/carrier" ./cmd/carrier
 echo "▸ carrier  → http://localhost:${CARRIER_PORT}"
-# LLM auth: with no ANTHROPIC_API_KEY the runtime auto-selects the Codex BYOS
-# engine (the local ChatGPT subscription token from `codex login`) — LOCAL DEV
-# ONLY. Force it with CARRIER_AUTH=codex, or use the API key with
-# CARRIER_AUTH=anthropic + ANTHROPIC_API_KEY.
-CARRIER_ADDR=":${CARRIER_PORT}" \
+# LLM auth: default is the Anthropic API engine (ANTHROPIC_API_KEY). For a
+# no-API-key local run, opt into Codex BYOS with `CARRIER_AUTH=codex make dev`
+# (your local ChatGPT subscription token from `codex login`) — LOCAL DEV ONLY.
+# Carrier binds to 127.0.0.1 so the BYOS safety guard (loopback-only) is satisfied
+# and the runtime is never reachable by other hosts.
+CARRIER_ADDR="127.0.0.1:${CARRIER_PORT}" \
 CARRIER_TOKEN="$CARRIER_TOKEN" \
 CARRIER_PLUGIN_CACHE="$PLUGINS_DIR" \
 CARRIER_AUTH="${CARRIER_AUTH:-}" \

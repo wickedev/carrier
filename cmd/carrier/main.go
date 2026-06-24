@@ -14,6 +14,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -67,21 +68,41 @@ type runtime struct {
 	pluginLoader  *wasm.Loader // nil → plugins disabled
 }
 
+// byosRequested reports whether the operator EXPLICITLY opted into the Codex BYOS
+// engine. It is deliberately explicit-only (never auto-enabled by the mere
+// presence of a token) so a production deployment with no ANTHROPIC_API_KEY can
+// never silently serve every tenant off one personal ChatGPT subscription.
+func byosRequested() bool { return os.Getenv("CARRIER_AUTH") == "codex" }
+
+// isLoopbackAddr reports whether a listen address binds ONLY the loopback
+// interface (so it is unreachable from other hosts). A wildcard host (":8080" /
+// "0.0.0.0:..." / "[::]:...") binds all interfaces and is NOT loopback.
+func isLoopbackAddr(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		host = addr // no port; treat the whole string as the host
+	}
+	if host == "" {
+		return false // ":8080" → all interfaces
+	}
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
 // selectEngine picks the LLM backend.
 //
 // Default: the Anthropic API engine (production; reads ANTHROPIC_API_KEY).
 //
-// LOCAL DEV ONLY — Codex BYOS: when CARRIER_AUTH=codex (or, with no
-// ANTHROPIC_API_KEY set, a usable ~/.codex token is present), use the Codex
-// engine, which authenticates with the developer's ChatGPT SUBSCRIPTION OAuth
-// token (no API key). This is a convenience for `make dev` only; it shares the
-// subscription's rate limit and is a ToS gray area, so it must never be used on
-// the multi-tenant server. Opt out anytime with CARRIER_AUTH=anthropic.
+// LOCAL DEV ONLY — Codex BYOS: only when CARRIER_AUTH=codex is explicitly set.
+// It authenticates with the developer's ChatGPT SUBSCRIPTION OAuth token (no API
+// key), shares that subscription's rate limit, and is a ToS gray area. `serve`
+// additionally refuses to start with BYOS unless bound to a loopback address (see
+// serve), so it can never serve remote/multi-tenant traffic.
 func selectEngine() engine.Engine {
-	mode := os.Getenv("CARRIER_AUTH")
-	useCodex := mode == "codex" ||
-		(mode == "" && os.Getenv("ANTHROPIC_API_KEY") == "" && engine.CodexAuthAvailable())
-	if useCodex {
+	if byosRequested() {
 		fmt.Fprintln(os.Stderr, "carrier: using Codex BYOS engine (ChatGPT subscription, LOCAL DEV ONLY)")
 		return engine.NewCodexEngine()
 	}
@@ -153,6 +174,24 @@ func serve() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	addr := os.Getenv("CARRIER_ADDR")
+	if addr == "" {
+		addr = ":8080"
+	}
+
+	// Safety guard: the Codex BYOS engine (one personal ChatGPT subscription) is
+	// for local single-user dev only and must never serve remote/multi-tenant
+	// traffic. Refuse to start the multi-session server with BYOS unless it is
+	// bound to a loopback address — so it physically cannot be reached by other
+	// tenants over the network. Production must use ANTHROPIC_API_KEY (default
+	// engine) instead.
+	if byosRequested() && !isLoopbackAddr(addr) {
+		return fmt.Errorf(
+			"refusing to serve with Codex BYOS on non-loopback address %q: "+
+				"BYOS (CARRIER_AUTH=codex) is local-dev-only — bind 127.0.0.1, "+
+				"or use ANTHROPIC_API_KEY for a real deployment", addr)
+	}
+
 	rt, err := buildRuntime()
 	if err != nil {
 		return err
@@ -169,10 +208,6 @@ func serve() error {
 	}
 	srv := server.New(tw, factory, rt.store, map[string]string{token: "default"})
 
-	addr := os.Getenv("CARRIER_ADDR")
-	if addr == "" {
-		addr = ":8080"
-	}
 	httpSrv := &http.Server{Addr: addr, Handler: srv.Handler()}
 
 	go func() {

@@ -19,8 +19,10 @@ import (
 //
 // LOCAL DEVELOPMENT ONLY. A subscription token is intended for the Codex/ChatGPT
 // apps, shares the subscription's rate limit, and is a ToS gray area for other
-// uses — never wire this into Carrier's multi-tenant server path; production must
-// use a real API key (or Bedrock/Vertex). See cmd/carrier for the gate.
+// uses. It is gated in cmd/carrier: selected ONLY on an explicit CARRIER_AUTH=codex
+// (never auto-enabled), and `carrier serve` refuses to start with it unless bound
+// to a loopback address — so it can never serve remote/multi-tenant traffic.
+// Production must use a real API key (or Bedrock/Vertex).
 //
 // This is a hand-rolled HTTP/SSE client, not the openai-go SDK: that SDK targets
 // api.openai.com with an api key, whereas this backend is a different endpoint,

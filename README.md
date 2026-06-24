@@ -87,18 +87,25 @@ a root `.env` for real GitHub App / `ANTHROPIC_API_KEY` credentials, and use
 
 ### LLM auth for local dev (Codex BYOS — no API key)
 
-With **no `ANTHROPIC_API_KEY`** set, `make dev` auto-selects the **Codex BYOS**
-engine: it authenticates the LLM with your local **ChatGPT subscription** token
-(from `codex login`, read fresh from `~/.codex/auth.json`) — so you can run the
-whole stack with **no API key**. Force it with `CARRIER_AUTH=codex`; opt back to
-the API key with `CARRIER_AUTH=anthropic` + `ANTHROPIC_API_KEY`.
+By default the runtime uses the Anthropic API engine (`ANTHROPIC_API_KEY`). For a
+**no-API-key** local run, opt into the **Codex BYOS** engine explicitly:
 
-> **Local development only.** A subscription token is intended for the Codex/ChatGPT
-> apps, shares your subscription's rate limit (so running `codex` at the same time
-> can throttle both), and is a ToS gray area for other uses. The engine is gated to
-> the local runtime and is **never** wired into the multi-tenant server path —
-> production must use a real API key (or Bedrock/Vertex). If the token has expired,
-> run `codex` once to refresh it.
+```sh
+CARRIER_AUTH=codex make dev
+```
+
+It authenticates the LLM with your local **ChatGPT subscription** token (from
+`codex login`, read fresh from `~/.codex/auth.json`) — so the whole stack runs
+with **no API key**.
+
+> **Local development only — enforced.** A subscription token is intended for the
+> Codex/ChatGPT apps, shares your subscription's rate limit (running `codex` at the
+> same time can throttle both), and is a ToS gray area for other uses. Two guards
+> make a production/multi-tenant slip impossible: BYOS is **never auto-enabled**
+> (it requires the explicit `CARRIER_AUTH=codex`), and `carrier serve` **refuses to
+> start with BYOS unless bound to a loopback address** (`make dev` binds
+> `127.0.0.1`), so it can never serve remote tenants. Production must use a real API
+> key (or Bedrock/Vertex). If the token has expired, run `codex` once to refresh it.
 
 ## Build & run
 
