@@ -1,6 +1,7 @@
 package tool
 
 import (
+	"net"
 	"strings"
 	"testing"
 )
@@ -49,6 +50,33 @@ func TestWebFetchGuards(t *testing.T) {
 		r := run(t, wf, "", map[string]any{"url": u})
 		if !r.IsError || !strings.Contains(r.Content, "private/loopback") {
 			t.Fatalf("SSRF to %s should be refused: %+v", u, r)
+		}
+	}
+}
+
+func TestIsPublicIP(t *testing.T) {
+	// The dial-time guard (which closes the DNS-rebinding hole) rejects any IP
+	// for which isPublicIP is false.
+	cases := map[string]bool{
+		"8.8.8.8":         true,
+		"1.1.1.1":         true,
+		"2606:4700::1111": true,
+		"127.0.0.1":       false, // loopback
+		"::1":             false, // loopback v6
+		"10.0.0.5":        false, // private
+		"192.168.1.10":    false, // private
+		"172.16.0.1":      false, // private
+		"169.254.169.254": false, // link-local (cloud metadata)
+		"0.0.0.0":         false, // unspecified
+		"224.0.0.1":       false, // multicast
+	}
+	for s, want := range cases {
+		ip := net.ParseIP(s)
+		if ip == nil {
+			t.Fatalf("bad test IP %q", s)
+		}
+		if got := isPublicIP(ip); got != want {
+			t.Errorf("isPublicIP(%s) = %v, want %v", s, got, want)
 		}
 	}
 }

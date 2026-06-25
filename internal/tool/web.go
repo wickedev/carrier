@@ -52,16 +52,7 @@ func (webFetchTool) Exec(ctx context.Context, input map[string]any, _ ExecContex
 		return errResult("%v", err)
 	}
 	req.Header.Set("User-Agent", "carrier-web-fetch/1.0")
-	client := &http.Client{
-		Timeout: webFetchTimeout,
-		CheckRedirect: func(r *http.Request, via []*http.Request) error {
-			if len(via) >= 5 {
-				return fmt.Errorf("too many redirects")
-			}
-			return guardPublicHost(r.URL.Hostname())
-		},
-	}
-	resp, err := client.Do(req)
+	resp, err := webClient.Do(req)
 	if err != nil {
 		return errResult("%v", err)
 	}
@@ -74,8 +65,17 @@ func (webFetchTool) Exec(ctx context.Context, input map[string]any, _ ExecContex
 	}, nil
 }
 
-// guardPublicHost blocks SSRF to non-public destinations (loopback, private,
-// link-local, unspecified). Every resolved IP must be public.
+// isPublicIP reports whether ip is a routable public address (not loopback,
+// private, link-local, multicast, or unspecified).
+func isPublicIP(ip net.IP) bool {
+	return !(ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified())
+}
+
+// guardPublicHost is a fast, friendly pre-check for obviously-private hosts. It
+// is NOT the security boundary — DNS can rebind between this lookup and the
+// actual dial — so the real enforcement is in webClient's DialContext, which
+// validates and connects to the SAME resolved IP.
 func guardPublicHost(host string) error {
 	if host == "" {
 		return fmt.Errorf("missing host")
@@ -85,12 +85,51 @@ func guardPublicHost(host string) error {
 		return fmt.Errorf("cannot resolve host %q", host)
 	}
 	for _, ip := range ips {
-		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
-			ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+		if !isPublicIP(ip) {
 			return fmt.Errorf("refusing to fetch a private/loopback address: %s", host)
 		}
 	}
 	return nil
+}
+
+// webClient enforces SSRF protection at DIAL time (closing the DNS-rebinding
+// hole): for every connection — including redirects — it resolves the host,
+// rejects non-public IPs, and dials the validated IP literal so no second
+// resolution can swap in a private address.
+var webClient = &http.Client{
+	Timeout: webFetchTimeout,
+	Transport: &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			host, port, err := net.SplitHostPort(addr)
+			if err != nil {
+				return nil, err
+			}
+			ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+			if err != nil {
+				return nil, err
+			}
+			var d net.Dialer
+			var lastErr error = fmt.Errorf("no usable address for host %q", host)
+			for _, ipa := range ips {
+				if !isPublicIP(ipa.IP) {
+					lastErr = fmt.Errorf("refusing to connect to a private/loopback address: %s (%s)", host, ipa.IP)
+					continue
+				}
+				conn, derr := d.DialContext(ctx, network, net.JoinHostPort(ipa.IP.String(), port))
+				if derr == nil {
+					return conn, nil
+				}
+				lastErr = derr
+			}
+			return nil, lastErr
+		},
+	},
+	CheckRedirect: func(_ *http.Request, via []*http.Request) error {
+		if len(via) >= 5 {
+			return fmt.Errorf("too many redirects")
+		}
+		return nil // per-connection IP safety is enforced by DialContext
+	},
 }
 
 var (
