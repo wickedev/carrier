@@ -2,22 +2,46 @@
 
 @variant dark (&:where(.dark, .dark *));
 
+/*
+ * Industrial / terminal theme — dark-first.
+ * Chrome + accent tokens (DESIGN-SYSTEM-industrial.md §1.2) are set on BOTH
+ * :root and .dark to the same dark values so the app reads correctly whether
+ * or not `.dark` is applied. Semantic state tokens (--success/--warning/--info/
+ * --untracked/--danger) remain split light/dark and are reserved for state.
+ */
 :root {
-  --fg:        var(--color-neutral-900);
-  --fg-muted:  var(--color-neutral-600);  /* AA on white */
-  --fg-subtle: var(--color-neutral-500);
-  /* Semantic state accents. Light = -600, dark = -400 (mirrors --danger). */
-  --danger:    var(--color-red-600);      /* AA on white */
+  /* chrome */
+  --bg:        #080808;   /* deactivated CRT, not pure black */
+  --panel:     #0e0e0e;
+  --line:      #242424;   /* the 1px grid color */
+  /* foreground (industrial dark-first values) */
+  --fg:        #e6e6e6;   /* phosphor white */
+  --fg-muted:  #8c8c8c;
+  --fg-subtle: #5a5a5a;
+  /* brand + primary action */
+  --accent:    #f59e0b;   /* amber */
+  --accent-fg: #000000;   /* text on amber fills */
+  /* Semantic state accents. Light = -600 (AA on light), retained intact. */
+  --danger:    var(--color-red-600);
   --success:   var(--color-green-600);
   --warning:   var(--color-amber-600);
   --info:      var(--color-blue-600);
   --untracked: var(--color-violet-600);
-  color-scheme: light;
+  color-scheme: dark;
 }
 .dark {
-  --fg:        var(--color-neutral-100);
-  --fg-muted:  var(--color-neutral-400);  /* AA on neutral-950 */
-  --fg-subtle: #909090;                    /* AA on neutral-950 (6.20:1) */
+  /* chrome — identical to :root (dark-first) */
+  --bg:        #080808;
+  --panel:     #0e0e0e;
+  --line:      #242424;
+  --fg:        #e6e6e6;
+  --fg-muted:  #8c8c8c;
+  /* Spec value is #5a5a5a, but #909090 reads better as placeholder/subtle
+     contrast on near-black (AA, ~6.2:1). Keeping #909090 here intentionally. */
+  --fg-subtle: #909090;
+  --accent:    #f59e0b;
+  --accent-fg: #000000;
+  /* Semantic state accents kept at dark -400 (AA on near-black). */
   --danger:    var(--color-red-400);
   --success:   var(--color-green-400);
   --warning:   var(--color-amber-400);
@@ -26,6 +50,11 @@
   color-scheme: dark;
 }
 @theme inline {
+  --color-bg:        var(--bg);
+  --color-panel:     var(--panel);
+  --color-line:      var(--line);
+  --color-accent:    var(--accent);
+  --color-accent-fg: var(--accent-fg);
   --color-fg:        var(--fg);
   --color-fg-muted:  var(--fg-muted);
   --color-fg-subtle: var(--fg-subtle);
@@ -39,12 +68,38 @@
 @theme {
   --text-2xs: 0.6875rem; /* 11px @ 16px root */
   --text-3xs: 0.625rem;  /* 10px @ 16px root */
+
+  /* Fonts (self-hosted via Fontsource, imported in main.tsx). Mono is the
+     default body font; display is page titles only. */
+  --font-mono:    "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+  --font-sans:    "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+  --font-display: "Space Grotesk Variable", "Space Grotesk", sans-serif;
+
+  /* Radius 0 everywhere (Tailwind v4 radius token names). rounded-full stays
+     round because it resolves to a fixed 9999px, not these tokens. */
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius:    0;
 }
 
-/* Single source of truth for the app-wide keyboard focus ring. */
+/* Single source of truth for the app-wide keyboard focus ring. Amber for the
+   industrial look. */
 @layer components {
   .focus-ring:focus-visible {
-    @apply outline-none ring-2 ring-neutral-400;
+    @apply outline-none;
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+
+  /* Grid-rule background — list/landing views only (Projects, Sessions).
+     Copied from design-mockups/industrial.html .grid-bg. */
+  .grid-rule {
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-position: -1px -1px;
   }
 }
 
@@ -52,4 +107,15 @@ html,
 body,
 #root {
   height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-mono);
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-fg);
 }
