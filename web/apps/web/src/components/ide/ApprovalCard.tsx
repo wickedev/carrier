@@ -51,8 +51,18 @@ export function ApprovalCard({
     }
   }, [expired, approval.reqId, onExpire]);
 
+  // Move focus to the card container on mount so screen readers announce the
+  // alertdialog. We intentionally focus the container (not the Approve button)
+  // to avoid an accidental Enter-to-approve.
+  const cardRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    cardRef.current?.focus();
+  }, []);
+
   return (
     <Card
+      ref={cardRef}
+      tabIndex={-1}
       className="mx-3 my-2 border-amber-300 dark:border-amber-800"
       role="alertdialog"
       aria-label={`Approval request: ${approval.tool}`}

@@ -134,6 +134,7 @@ export function FileTree({
           <div key={entry.path}>
             <button
               type="button"
+              role="treeitem"
               onClick={() => toggle(entry.path)}
               style={{ paddingLeft: depth * INDENT_STEP + ROW_PAD }}
               className="flex w-full items-center gap-1 py-1 pr-2 text-left text-sm hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:hover:bg-neutral-800"
@@ -147,7 +148,7 @@ export function FileTree({
               <Folder className="h-3.5 w-3.5 shrink-0 text-blue-400" aria-hidden />
               <span className="truncate">{entry.name}</span>
             </button>
-            {isOpen ? renderDir(entry.path, depth + 1) : null}
+            {isOpen ? <div role="group">{renderDir(entry.path, depth + 1)}</div> : null}
           </div>
         );
       }
@@ -156,6 +157,7 @@ export function FileTree({
         <button
           key={entry.path}
           type="button"
+          role="treeitem"
           onClick={() => onSelect(entry.path)}
           style={{ paddingLeft: depth * INDENT_STEP + ROW_PAD + ICON_GUTTER }}
           className={cn(

@@ -91,6 +91,12 @@ export function Shell({ me }: { me: Me }) {
 
   return (
     <div className="flex h-full flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-neutral-900 focus:px-3 focus:py-1.5 focus:text-sm focus:text-white dark:focus:bg-neutral-100 dark:focus:text-neutral-900"
+      >
+        Skip to content
+      </a>
       <header className="flex items-center gap-3 border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
         <Link to="/" className="text-sm font-semibold">
           Carrier
@@ -110,7 +116,7 @@ export function Shell({ me }: { me: Me }) {
           </Button>
         </div>
       </header>
-      <main className="min-h-0 flex-1">
+      <main id="main" className="min-h-0 flex-1">
         <Outlet />
       </main>
     </div>
