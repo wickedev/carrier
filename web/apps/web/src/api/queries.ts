@@ -148,7 +148,16 @@ export function usePermissions(projectId: string) {
 export function useCreateProject(orgSlug: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) => api.createProject(orgSlug, name),
+    // Create the project, then optionally bind a GitHub repo in the same flow so
+    // the dialog can offer repo selection at creation time (repo is optional).
+    mutationFn: async (vars: {
+      name: string;
+      repo?: { installationId: number; repoFullName: string; defaultBranch?: string };
+    }) => {
+      const project = await api.createProject(orgSlug, vars.name);
+      if (vars.repo) return api.bindRepo(project.id, vars.repo);
+      return project;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.projects(orgSlug) }),
   });
 }
