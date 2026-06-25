@@ -179,11 +179,22 @@ export class CarrierClient {
     return respBody.session_id;
   }
 
-  async sendInput(sessionId: string, text: string, steer = false): Promise<void> {
+  async sendInput(
+    sessionId: string,
+    text: string,
+    steer = false,
+    overrides: { model?: string; effort?: string; planMode?: boolean } = {},
+  ): Promise<void> {
+    // Per-turn overrides are optional: omit absent ones so the runtime falls
+    // back to the session defaults (snake_case `plan_mode` on the wire).
+    const body: Record<string, unknown> = { text, steer };
+    if (overrides.model) body.model = overrides.model;
+    if (overrides.effort) body.effort = overrides.effort;
+    if (overrides.planMode !== undefined) body.plan_mode = overrides.planMode;
     const res = await this.fetchImpl(`${this.baseUrl}/v1/sessions/${sessionId}/input`, {
       method: "POST",
       headers: this.headers({ "content-type": "application/json" }),
-      body: JSON.stringify({ text, steer }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new CarrierError(`sendInput failed`, res.status);
   }

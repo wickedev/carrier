@@ -62,9 +62,17 @@ func (d Delivery) String() string {
 }
 
 // Input is one piece of inbound user input plus its delivery semantics.
+//
+// Model, Effort, and PlanMode are OPTIONAL per-turn overrides of the
+// session-default model parameters: an empty Model/Effort or a nil PlanMode
+// means "use the session default". They take effect for the turn sequence the
+// input drives (the Flight folds them in [Flight.foldPending]).
 type Input struct {
 	Msg      agent.Message
 	Delivery Delivery
+	Model    string
+	Effort   string
+	PlanMode *bool
 }
 
 // OverflowPolicy governs [Queues.Emit] behaviour when the event queue (EQ) is
