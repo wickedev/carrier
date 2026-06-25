@@ -128,6 +128,42 @@ func TestWriteAndEditTool(t *testing.T) {
 	}
 }
 
+func TestMultiEditTool(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, filepath.Join(dir, "f.txt"), "alpha beta gamma\n")
+
+	r := run(t, NewMultiEdit(), dir, map[string]any{
+		"path": "f.txt",
+		"edits": []any{
+			map[string]any{"old_string": "alpha", "new_string": "ALPHA"},
+			map[string]any{"old_string": "gamma", "new_string": "GAMMA"},
+		},
+	})
+	if r.IsError {
+		t.Fatalf("multi_edit: %+v", r)
+	}
+	got, _ := os.ReadFile(filepath.Join(dir, "f.txt"))
+	if string(got) != "ALPHA beta GAMMA\n" {
+		t.Fatalf("multi_edit result: %q", got)
+	}
+
+	// A failing edit (not found) must abort all → file unchanged.
+	r = run(t, NewMultiEdit(), dir, map[string]any{
+		"path": "f.txt",
+		"edits": []any{
+			map[string]any{"old_string": "ALPHA", "new_string": "x"},
+			map[string]any{"old_string": "nope", "new_string": "y"},
+		},
+	})
+	if !r.IsError || !strings.Contains(r.Content, "edit 2") {
+		t.Fatalf("multi_edit should abort on a missing edit: %+v", r)
+	}
+	got, _ = os.ReadFile(filepath.Join(dir, "f.txt"))
+	if string(got) != "ALPHA beta GAMMA\n" {
+		t.Fatalf("multi_edit must not partially apply: %q", got)
+	}
+}
+
 func TestPathTraversalRejected(t *testing.T) {
 	dir := t.TempDir()
 	for _, tl := range []Tool{NewRead(), NewWrite(), NewEdit(), NewLs()} {

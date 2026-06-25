@@ -465,6 +465,73 @@ func (editTool) Exec(_ context.Context, input map[string]any, ec ExecContext) (R
 	return Result{Content: fmt.Sprintf("Replaced %d occurrence(s) in %s", count, strArg(input, "path"))}, nil
 }
 
+// ── multi_edit ───────────────────────────────────────────────────────────────
+
+type multiEditTool struct{ Base }
+
+// NewMultiEdit returns the multi_edit tool: several exact replacements applied to
+// one file atomically (all-or-nothing).
+func NewMultiEdit() *multiEditTool {
+	return &multiEditTool{Base{
+		ToolName: "multi_edit",
+		ToolDescription: "Apply several exact-string replacements to one file in a single, atomic " +
+			"operation: edits run in order and each must match (unique unless its replace_all is set); " +
+			"if any edit fails, the file is left unchanged.",
+		ToolSchema: obj(props{
+			"path": strProp("File path within the working copy."),
+			"edits": arrProp("Edits to apply in order.", obj(props{
+				"old_string":  strProp("Exact text to replace."),
+				"new_string":  strProp("Replacement text."),
+				"replace_all": boolProp("Replace every occurrence of this edit's old_string (optional)."),
+			}, "old_string", "new_string")),
+		}, "path", "edits"),
+	}}
+}
+
+func (multiEditTool) Exec(_ context.Context, input map[string]any, ec ExecContext) (Result, error) {
+	abs, err := resolveInCwd(ec.Cwd, strArg(input, "path"))
+	if err != nil {
+		return errResult("%v", err)
+	}
+	raw, ok := input["edits"].([]any)
+	if !ok || len(raw) == 0 {
+		return errResult("missing required argument 'edits'")
+	}
+	data, err := os.ReadFile(abs)
+	if err != nil {
+		return errResult("%v", err)
+	}
+	content := string(data)
+	total := 0
+	for i, e := range raw {
+		m, _ := e.(map[string]any)
+		oldStr, _ := m["old_string"].(string)
+		newStr, _ := m["new_string"].(string)
+		if oldStr == "" {
+			return errResult("edit %d: missing old_string", i+1)
+		}
+		cnt := strings.Count(content, oldStr)
+		if cnt == 0 {
+			return errResult("edit %d: old_string not found", i+1)
+		}
+		replaceAll, _ := m["replace_all"].(bool)
+		if !replaceAll && cnt > 1 {
+			return errResult("edit %d: old_string occurs %d times; add context or set replace_all", i+1, cnt)
+		}
+		if replaceAll {
+			content = strings.ReplaceAll(content, oldStr, newStr)
+			total += cnt
+		} else {
+			content = strings.Replace(content, oldStr, newStr, 1)
+			total++
+		}
+	}
+	if err := os.WriteFile(abs, []byte(content), 0o644); err != nil {
+		return errResult("%v", err)
+	}
+	return Result{Content: fmt.Sprintf("Applied %d edit(s) (%d replacement(s)) to %s", len(raw), total, strArg(input, "path"))}, nil
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 // walk visits files/dirs under base, calling fn with the path RELATIVE to base
@@ -548,4 +615,7 @@ func intProp(desc string) map[string]any {
 }
 func boolProp(desc string) map[string]any {
 	return map[string]any{"type": "boolean", "description": desc}
+}
+func arrProp(desc string, items map[string]any) map[string]any {
+	return map[string]any{"type": "array", "description": desc, "items": items}
 }

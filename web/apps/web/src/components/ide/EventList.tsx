@@ -17,6 +17,9 @@ import {
   Search,
   FilePlus,
   Pencil,
+  FilePen,
+  Globe,
+  ListChecks,
 } from "lucide-react";
 import { Card, Badge, CardHeader } from "../primitives";
 
@@ -38,6 +41,9 @@ const TOOL_ICON: Record<string, typeof Wrench> = {
   grep: Search,
   write: FilePlus,
   edit: Pencil,
+  multi_edit: FilePen,
+  web_fetch: Globe,
+  todo_write: ListChecks,
 };
 
 /** A compact view of a tool call: a one-line `primary` arg for the header, and
@@ -61,6 +67,16 @@ function toolCallView(name: string, input: unknown): { primary: string; body: st
     case "write":
     case "edit":
       return { primary: s("path"), body: null };
+    case "multi_edit": {
+      const n = Array.isArray(o.edits) ? o.edits.length : 0;
+      return { primary: `${s("path")}  (${n} edit${n === 1 ? "" : "s"})`, body: null };
+    }
+    case "web_fetch":
+      return { primary: s("url"), body: null };
+    case "todo_write": {
+      const n = Array.isArray(o.todos) ? o.todos.length : 0;
+      return { primary: `${n} task${n === 1 ? "" : "s"}`, body: null };
+    }
     default:
       return { primary: "", body: formatInput(input) };
   }
