@@ -65,11 +65,50 @@ func (webFetchTool) Exec(ctx context.Context, input map[string]any, _ ExecContex
 	}, nil
 }
 
-// isPublicIP reports whether ip is a routable public address (not loopback,
-// private, link-local, multicast, or unspecified).
+// nonPublicNets are special-use ranges NOT covered by the net.IP predicates
+// below (which only catch loopback/private/link-local/multicast/unspecified) but
+// that must never be an SSRF target — most notably 100.64.0.0/10 (carrier-grade
+// NAT, often internal infra), plus NAT64, documentation, benchmark, reserved,
+// and broadcast ranges. Parsed once at startup.
+var nonPublicNets = parseCIDRs(
+	"0.0.0.0/8",          // "this host on this network" (RFC 1122)
+	"100.64.0.0/10",      // carrier-grade NAT / shared address space (RFC 6598)
+	"192.0.0.0/24",       // IETF protocol assignments
+	"192.0.2.0/24",       // TEST-NET-1 (documentation)
+	"192.88.99.0/24",     // 6to4 relay anycast (deprecated)
+	"198.18.0.0/15",      // benchmarking (RFC 2544)
+	"198.51.100.0/24",    // TEST-NET-2
+	"203.0.113.0/24",     // TEST-NET-3
+	"240.0.0.0/4",        // reserved / class E
+	"255.255.255.255/32", // limited broadcast
+	"64:ff9b::/96",       // NAT64 (can embed a private IPv4)
+	"100::/64",           // discard-only
+	"2001:db8::/32",      // documentation
+)
+
+func parseCIDRs(cidrs ...string) []*net.IPNet {
+	out := make([]*net.IPNet, 0, len(cidrs))
+	for _, c := range cidrs {
+		if _, n, err := net.ParseCIDR(c); err == nil {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// isPublicIP reports whether ip is a routable public address. It rejects the
+// net.IP special categories AND the extra special-use ranges in nonPublicNets.
 func isPublicIP(ip net.IP) bool {
-	return !(ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
-		ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified())
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() {
+		return false
+	}
+	for _, n := range nonPublicNets {
+		if n.Contains(ip) {
+			return false
+		}
+	}
+	return true
 }
 
 // guardPublicHost is a fast, friendly pre-check for obviously-private hosts. It

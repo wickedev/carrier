@@ -58,17 +58,28 @@ func TestIsPublicIP(t *testing.T) {
 	// The dial-time guard (which closes the DNS-rebinding hole) rejects any IP
 	// for which isPublicIP is false.
 	cases := map[string]bool{
-		"8.8.8.8":         true,
-		"1.1.1.1":         true,
-		"2606:4700::1111": true,
-		"127.0.0.1":       false, // loopback
-		"::1":             false, // loopback v6
-		"10.0.0.5":        false, // private
-		"192.168.1.10":    false, // private
-		"172.16.0.1":      false, // private
-		"169.254.169.254": false, // link-local (cloud metadata)
-		"0.0.0.0":         false, // unspecified
-		"224.0.0.1":       false, // multicast
+		"8.8.8.8":           true,
+		"1.1.1.1":           true,
+		"2606:4700::1111":   true,
+		"127.0.0.1":         false, // loopback
+		"::1":               false, // loopback v6
+		"::ffff:127.0.0.1":  false, // IPv4-mapped loopback
+		"10.0.0.5":          false, // private
+		"192.168.1.10":      false, // private
+		"172.16.0.1":        false, // private
+		"169.254.169.254":   false, // link-local (cloud metadata)
+		"0.0.0.0":           false, // unspecified
+		"0.1.2.3":           false, // 0.0.0.0/8 "this network"
+		"224.0.0.1":         false, // multicast
+		"100.64.0.1":        false, // carrier-grade NAT (RFC 6598)
+		"::ffff:100.64.0.1": false, // mapped CGNAT
+		"198.18.0.1":        false, // benchmarking
+		"192.0.2.5":         false, // TEST-NET-1
+		"203.0.113.9":       false, // TEST-NET-3
+		"240.0.0.1":         false, // reserved class E
+		"255.255.255.255":   false, // broadcast
+		"64:ff9b::7f00:1":   false, // NAT64 embedding 127.0.0.1
+		"2001:db8::1":       false, // documentation v6
 	}
 	for s, want := range cases {
 		ip := net.ParseIP(s)
