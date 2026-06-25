@@ -17,16 +17,18 @@
   /* foreground (industrial dark-first values) */
   --fg:        #e6e6e6;   /* phosphor white */
   --fg-muted:  #8c8c8c;
-  --fg-subtle: #5a5a5a;
+  --fg-subtle: #909090;   /* AA on #080808 (~6.2:1) — dark-first */
   /* brand + primary action */
   --accent:    #f59e0b;   /* amber */
   --accent-fg: #000000;   /* text on amber fills */
-  /* Semantic state accents. Light = -600 (AA on light), retained intact. */
-  --danger:    var(--color-red-600);
-  --success:   var(--color-green-600);
-  --warning:   var(--color-amber-600);
-  --info:      var(--color-blue-600);
-  --untracked: var(--color-violet-600);
+  /* Semantic accents are dark-first too: the substrate is #080808 in BOTH
+     modes, so use the -400 (bright) variants here as well — the -600 variants
+     are too dark to clear AA on near-black. (Matches the .dark block.) */
+  --danger:    var(--color-red-400);
+  --success:   var(--color-green-400);
+  --warning:   var(--color-amber-400);
+  --info:      var(--color-blue-400);
+  --untracked: var(--color-violet-400);
   color-scheme: dark;
 }
 .dark {
@@ -92,16 +94,6 @@
     box-shadow: 0 0 0 2px var(--accent);
   }
 
-  /* Primary action button (amber fill, black text, uppercase, square, no
-     shadow). Defined here for reuse; applied at call sites in later phases.
-     Copied from design-mockups/industrial.html `.bg-amber-500 … text-black`. */
-  .btn-primary {
-    @apply bg-accent font-bold uppercase text-accent-fg;
-  }
-  .btn-primary:hover {
-    filter: brightness(1.1);
-  }
-
   /* Display headings (Space Grotesk). Copied from design-mockups/industrial.html
      `.disp`. */
   .font-display {
@@ -117,6 +109,25 @@
     background-size: 40px 40px;
     background-position: -1px -1px;
   }
+}
+
+/* Primary action button (amber fill, black text, uppercase, square). Applied to
+   <Button className="btn-primary">. Kept UNLAYERED on purpose: @carrier/ui's
+   Button carries the default variant's `bg-neutral-900 dark:bg-neutral-100`
+   which lives in Tailwind's `utilities` layer and would otherwise win over a
+   `components`-layer rule. Unlayered declarations beat all layered ones, so the
+   amber fill/text wins in both light and dark without per-call-site overrides. */
+.btn-primary {
+  background-color: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.btn-primary:hover {
+  filter: brightness(1.1);
+}
+.btn-primary:disabled {
+  filter: none;
 }
 
 html,
