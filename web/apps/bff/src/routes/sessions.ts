@@ -18,9 +18,10 @@ import {
 import { z } from "zod";
 import type { AppEnv } from "../context.js";
 import { session as sessionTable } from "../db/schema.js";
+import { CarrierError } from "@carrier/carrier-client";
 import { orgById, resolveSession } from "./authz.js";
 import { orgOwnsRepo } from "./github.js";
-import { toSessionDto } from "./projects.js";
+import { ensureCarrierSession, toSessionDto } from "./projects.js";
 import { normalizeEvent } from "../carrier.js";
 import { usageDeltaFromRaw } from "../usage.js";
 import {
@@ -89,19 +90,34 @@ export function sessionRoutes(): Hono<AppEnv> {
 
   // ── input / interrupt ──────────────────────────────────────────────────────
   app.post("/:id/input", async (c) => {
-    const { db, carrier } = c.var.deps;
-    const ctx = await resolveSession(db, c.var.account.id, c.req.param("id"));
+    const { carrier } = c.var.deps;
+    const ctx = await resolveSession(c.var.deps.db, c.var.account.id, c.req.param("id"));
     if (!ctx) return c.json({ error: "not_found" }, 404);
     const body = SendInputSchema.safeParse(await c.req.json().catch(() => ({})));
     if (!body.success) return c.json({ error: "invalid_body" }, 400);
-    if (!ctx.session.carrierSessionId) {
-      return c.json({ error: "no_carrier_session" }, 409);
+
+    // Heal a missing Carrier session (createSession failed at create time) before
+    // forwarding; if the runtime is down, 503 so the client retries.
+    let cid = ctx.session.carrierSessionId;
+    if (!cid) {
+      cid = await ensureCarrierSession(c.var.deps, ctx.session, ctx.project);
+      if (!cid) return c.json({ error: "carrier_unavailable" }, 503);
     }
-    await carrier().sendInput(
-      ctx.session.carrierSessionId,
-      body.data.text,
-      body.data.steer ?? false,
-    );
+    const text = body.data.text;
+    const steer = body.data.steer ?? false;
+    try {
+      await carrier().sendInput(cid, text, steer);
+    } catch (e) {
+      // A stale id (Carrier restarted and forgot the session) yields 404 — heal
+      // once over the same working copy and retry.
+      if (e instanceof CarrierError && e.status === 404) {
+        const healed = await ensureCarrierSession(c.var.deps, ctx.session, ctx.project, cid);
+        if (!healed) return c.json({ error: "carrier_unavailable" }, 503);
+        await carrier().sendInput(healed, text, steer);
+      } else {
+        throw e;
+      }
+    }
     return c.json({ ok: true });
   });
 
@@ -120,45 +136,83 @@ export function sessionRoutes(): Hono<AppEnv> {
     const { db, carrier, usage } = c.var.deps;
     const ctx = await resolveSession(db, c.var.account.id, c.req.param("id"));
     if (!ctx) return c.json({ error: "not_found" }, 404);
-    const cid = ctx.session.carrierSessionId;
-    if (!cid) return c.json({ error: "no_carrier_session" }, 409);
+
+    // Heal a missing Carrier session so a (re)connecting client streams a live
+    // session instead of looping on a 409. If the runtime is genuinely down, 503
+    // — the EventSource retries, and "reconnecting…" now means what it says.
+    let cid = ctx.session.carrierSessionId;
+    if (!cid) {
+      cid = await ensureCarrierSession(c.var.deps, ctx.session, ctx.project);
+    }
+    if (!cid) return c.json({ error: "carrier_unavailable" }, 503);
 
     const sessionId = ctx.session.id;
     const client = carrier();
+    const initialCid = cid;
     return streamSSE(c, async (stream) => {
       const ac = new AbortController();
       // End the upstream when the client disconnects.
       stream.onAbort(() => ac.abort());
       let lastSeq = -1;
-      try {
-        // streamEvents yields history first (with seq) then live frames; the BFF
-        // normalizes each and forwards in order, deduping by seq.
-        for await (const raw of client.streamEvents(cid, ac.signal)) {
-          // Accumulate per-session usage from usage/step_finish frames (task 20).
-          const delta = usageDeltaFromRaw(raw);
-          if (delta) usage.add(sessionId, delta);
 
-          const ev: SessionEvent | null = normalizeEvent(raw);
-          if (!ev) continue;
-          // Persist auto-generated session titles BEFORE the forward-dedupe, so a
-          // title is never lost if its seq trips the guard. The runtime emits it
-          // once after the first turn; re-applying the same value is idempotent.
-          if (ev.kind === "title" && ev.title.length > 0) {
-            await db
-              .update(sessionTable)
-              .set({ title: ev.title })
-              .where(eq(sessionTable.id, sessionId));
-          }
-          if (ev.seq <= lastSeq) continue; // dedupe / ordering guard (forwarding)
-          lastSeq = ev.seq;
-          await stream.writeSSE({
-            event: ev.kind,
-            id: String(ev.seq),
-            data: JSON.stringify(ev),
-          });
+      const forward = async (raw: Parameters<typeof normalizeEvent>[0]) => {
+        // Accumulate per-session usage from usage/step_finish frames (task 20).
+        const delta = usageDeltaFromRaw(raw);
+        if (delta) usage.add(sessionId, delta);
+
+        const ev: SessionEvent | null = normalizeEvent(raw);
+        if (!ev) return;
+        // Persist auto-generated session titles BEFORE the forward-dedupe, so a
+        // title is never lost if its seq trips the guard. The runtime emits it
+        // once after the first turn; re-applying the same value is idempotent.
+        if (ev.kind === "title" && ev.title.length > 0) {
+          await db
+            .update(sessionTable)
+            .set({ title: ev.title })
+            .where(eq(sessionTable.id, sessionId));
         }
-      } catch {
-        // upstream closed or aborted — end the SSE response.
+        if (ev.seq <= lastSeq) return; // dedupe / ordering guard (forwarding)
+        lastSeq = ev.seq;
+        await stream.writeSSE({
+          event: ev.kind,
+          id: String(ev.seq),
+          data: JSON.stringify(ev),
+        });
+      };
+
+      // streamEvents yields history first (with seq) then live frames; the BFF
+      // normalizes each and forwards in order, deduping by seq. A stale id (the
+      // runtime restarted and forgot the session → 404) is healed once over the
+      // same working copy, then the fresh Flight's stream takes over.
+      let activeCid = initialCid;
+      let healed = false;
+      for (;;) {
+        try {
+          for await (const raw of client.streamEvents(activeCid, ac.signal)) {
+            await forward(raw);
+          }
+          return; // upstream closed normally (e.g. the Flight ended)
+        } catch (e) {
+          if (
+            !healed &&
+            !ac.signal.aborted &&
+            e instanceof CarrierError &&
+            e.status === 404
+          ) {
+            healed = true;
+            const fresh = await ensureCarrierSession(
+              c.var.deps,
+              ctx.session,
+              ctx.project,
+              activeCid,
+            );
+            if (fresh) {
+              activeCid = fresh;
+              continue;
+            }
+          }
+          return; // unreachable/aborted — end the SSE response; the client reconnects.
+        }
       }
     });
   });
