@@ -26,6 +26,14 @@ import (
 func (rt *runtime) newSession(sessionID string, opts server.SessionOptions) (*flight.Flight, func()) {
 	reg := tool.NewRegistry()
 	reg.Register(tool.NewBash())
+	// First-class file tools (read-only ones are concurrency-safe + usable in
+	// plan mode; edit/write are mutating). All are confined to the working copy.
+	reg.Register(tool.NewRead())
+	reg.Register(tool.NewLs())
+	reg.Register(tool.NewGlob())
+	reg.Register(tool.NewGrep())
+	reg.Register(tool.NewWrite())
+	reg.Register(tool.NewEdit())
 
 	// In-memory skills → a per-session skill gateway. Bodies are captured by a
 	// closure (no filesystem), matching skill.Skill's lazy-body contract.
