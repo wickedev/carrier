@@ -92,7 +92,7 @@ export function Toggle<T extends string>({
   onChange: (value: T) => void;
   variant: "subtle" | "solid";
   grouped?: boolean;
-  options: { value: T; label: React.ReactNode; icon?: React.ReactNode }[];
+  options: { value: T; label: React.ReactNode; icon?: React.ReactNode; title?: string }[];
 }) {
   const buttons = options.map((opt) => {
     const active = value === opt.value;
@@ -100,6 +100,7 @@ export function Toggle<T extends string>({
       <button
         key={opt.value}
         type="button"
+        title={opt.title}
         aria-pressed={active}
         onClick={() => onChange(opt.value)}
         className={

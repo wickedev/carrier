@@ -47,8 +47,8 @@ export function Composer({
           value={steer ? "steer" : "queue"}
           onChange={(v) => setSteer(v === "steer")}
           options={[
-            { value: "queue", label: "Queue" },
-            { value: "steer", label: "Steer" },
+            { value: "queue", label: "Queue", title: "Send after the current step finishes" },
+            { value: "steer", label: "Steer", title: "Interrupt the agent and redirect now" },
           ]}
         />
         {running ? (
