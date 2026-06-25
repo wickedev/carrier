@@ -44,7 +44,7 @@ export function AgentPanel({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-line px-3 py-2 text-2xs uppercase tracking-[0.15em] text-fg-subtle">
+      <div className="flex h-9 items-center border-b border-line px-3 text-2xs uppercase tracking-[0.15em] text-fg-subtle">
         Agent stream
       </div>
       <div ref={scrollRef} className="flex-1 overflow-auto" data-testid="agent-scroll">
