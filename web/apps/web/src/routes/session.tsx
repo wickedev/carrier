@@ -54,6 +54,7 @@ export function SessionPage() {
 
   const stream = useSessionStream;
   const events = useStore(stream, (s) => s.events);
+  const userMessages = useStore(stream, (s) => s.userMessages);
   const status = useStore(stream, (s) => s.status);
   const approvals = useStore(stream, (s) => s.pendingApprovals);
   const connection = useStore(stream, (s) => s.connection);
@@ -104,6 +105,8 @@ export function SessionPage() {
     text: string,
     opts: { steer: boolean; model?: string; effort?: string; planMode?: boolean },
   ) => {
+    // Render the prompt immediately (Carrier doesn't echo user input on the stream).
+    stream.getState().addUserMessage(text);
     setSending(true);
     try {
       await api.sendInput(sessionId, text, opts);
@@ -222,6 +225,7 @@ export function SessionPage() {
             agent={
               <AgentPanel
                 events={events}
+                userMessages={userMessages}
                 approvals={approvals}
                 running={status === "running"}
                 sending={sending}

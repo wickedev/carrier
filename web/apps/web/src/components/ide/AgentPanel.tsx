@@ -4,13 +4,14 @@ import { EventList } from "./EventList";
 import { ApprovalCard } from "./ApprovalCard";
 import { Composer, type SendOptions, type SessionDefaults } from "./Composer";
 import { EmptyState } from "../primitives";
-import type { PendingApproval } from "../../session/stream";
+import type { PendingApproval, UserMessage } from "../../session/stream";
 
 /**
  * AgentPanel — the right pane: streamed event log + pending approvals + composer.
  */
 export function AgentPanel({
   events,
+  userMessages,
   approvals,
   running,
   sending,
@@ -22,6 +23,7 @@ export function AgentPanel({
   defaults,
 }: {
   events: SessionEvent[];
+  userMessages: UserMessage[];
   approvals: PendingApproval[];
   running: boolean;
   sending?: boolean;
@@ -46,11 +48,11 @@ export function AgentPanel({
         Agent stream
       </div>
       <div ref={scrollRef} className="flex-1 overflow-auto" data-testid="agent-scroll">
-        {events.length === 0 && approvals.length === 0 ? (
+        {events.length === 0 && userMessages.length === 0 && approvals.length === 0 ? (
           <EmptyState title="No activity yet" description="Send a message to start the session." />
         ) : (
           <>
-            <EventList events={events} />
+            <EventList events={events} userMessages={userMessages} />
             {approvals.map((a) => (
               <ApprovalCard
                 key={a.reqId}
