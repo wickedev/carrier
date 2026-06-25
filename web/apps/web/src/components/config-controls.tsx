@@ -29,7 +29,7 @@ export function EnableToggle({
         disabled={disabled}
         aria-label={label}
         onChange={(e) => onChange(e.target.checked)}
-        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400"
+        className="focus-ring"
       />
       {enabled ? "on" : "off"}
     </label>
@@ -52,7 +52,7 @@ export function DeleteButton({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="rounded text-neutral-400 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400"
+      className="text-fg-muted hover:text-danger focus-ring"
     >
       <Trash2 className="h-4 w-4" aria-hidden />
     </button>
@@ -99,7 +99,7 @@ export function ConfigSection<T>({
 }) {
   return (
     <Card className="mb-4 p-4" data-testid={testId}>
-      <h2 className="mb-2 flex items-center gap-1.5 text-sm font-medium">
+      <h2 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.15em] text-fg">
         {icon}
         {title}
       </h2>
@@ -112,7 +112,7 @@ export function ConfigSection<T>({
       ) : query.isError ? (
         <ErrorState message={(query.error as Error).message} onRetry={() => query.refetch()} />
       ) : query.data && query.data.length > 0 ? (
-        <ul className="divide-y divide-neutral-200 text-sm dark:divide-neutral-800">
+        <ul className="divide-y divide-line text-sm">
           {query.data.map((item) => renderItem(item))}
         </ul>
       ) : emptyState !== undefined ? (

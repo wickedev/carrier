@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Carrier — Redesign 시안</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style> body{font-family:'Inter',sans-serif} .mono{font-family:'JetBrains Mono',monospace} </style>
+</head>
+<body class="min-h-screen bg-neutral-950 text-neutral-100">
+  <div class="mx-auto max-w-5xl px-6 py-16">
+    <p class="mono text-xs uppercase tracking-[0.2em] text-neutral-500">Carrier · Redesign comps · 2026-06-25</p>
+    <h1 class="mt-3 text-4xl font-bold tracking-tight" style="font-family:'Space Grotesk'">세 가지 리디자인 방향</h1>
+    <p class="mt-3 max-w-xl text-neutral-400">각 시안은 Projects · Sessions · Session(IDE) 3개 화면을 탭으로 전환할 수 있습니다. 같은 콘텐츠, 다른 디자인 언어.</p>
+
+    <div class="mt-10 grid gap-5 sm:grid-cols-3">
+      <!-- Industrial -->
+      <a href="./industrial.html" class="group block overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900 transition hover:border-amber-500/60 hover:-translate-y-0.5">
+        <div class="h-32 border-b border-neutral-800 bg-neutral-950 p-3 mono text-[10px] leading-tight text-neutral-500">
+          <div class="text-amber-500">┌ CARRIER ───────── dev ▸</div>
+          <div class="mt-2">▸ ㅁㄴㅇㄹ&nbsp;&nbsp;unbound&nbsp;&nbsp;3 sess ●</div>
+          <div class="mt-1 text-neutral-700">───────────────────────</div>
+          <div class="mt-1">#01 untitled&nbsp;&nbsp;idle&nbsp;&nbsp;14:20 ›</div>
+          <div>#02 untitled&nbsp;&nbsp;idle&nbsp;&nbsp;00:14 ›</div>
+        </div>
+        <div class="p-4">
+          <h2 class="font-semibold">Industrial / terminal</h2>
+          <p class="mt-1 text-sm text-neutral-400">mono · 고밀도 · 1px 그리드 · 고대비</p>
+        </div>
+      </a>
+      <!-- Minimal -->
+      <a href="./minimal.html" class="group block overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900 transition hover:border-indigo-400/60 hover:-translate-y-0.5">
+        <div class="h-32 border-b border-neutral-800 bg-neutral-900 p-3 text-[10px] leading-tight text-neutral-400">
+          <div class="flex gap-2"><div class="w-10 text-neutral-500">Carrier</div><div class="flex-1 font-semibold text-neutral-200">Projects</div></div>
+          <div class="mt-2 flex gap-2"><div class="w-10 space-y-1 text-neutral-500"><div class="text-indigo-300">Proj</div><div>Sess</div></div>
+          <div class="flex-1 space-y-1"><div class="font-medium text-neutral-200">ㅁㄴㅇㄹ</div><div class="text-neutral-500">Unbound · 3 sessions</div><div class="h-px bg-neutral-800"></div><div class="text-neutral-500">Untitled&nbsp;&nbsp;idle</div></div></div>
+        </div>
+        <div class="p-4">
+          <h2 class="font-semibold">Refined minimal</h2>
+          <p class="mt-1 text-sm text-neutral-400">사이드바 IA · 여백 · divide-y · 따뜻한 중립색</p>
+        </div>
+      </a>
+      <!-- Premium -->
+      <a href="./premium.html" class="group block overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900 transition hover:border-violet-400/60 hover:-translate-y-0.5">
+        <div class="h-32 border-b border-neutral-800 bg-gradient-to-br from-neutral-900 to-neutral-950 p-3 text-[10px] leading-tight text-neutral-400">
+          <div class="font-semibold text-neutral-200">Projects</div>
+          <div class="mt-2 rounded-md border border-neutral-700 bg-neutral-800/60 p-2 shadow-lg">
+            <div class="flex items-center justify-between"><span class="font-medium text-neutral-100">ㅁㄴㅇㄹ</span><span class="text-emerald-400">● unbound</span></div>
+            <div class="mt-1 text-neutral-500">3 active sessions</div>
+            <div class="mt-1.5 h-1 w-full rounded-full bg-neutral-700"><div class="h-1 w-1/3 rounded-full bg-violet-400"></div></div>
+          </div>
+        </div>
+        <div class="p-4">
+          <h2 class="font-semibold">Premium product</h2>
+          <p class="mt-1 text-sm text-neutral-400">입체 위계 · 소프트 섀도 · 상태 시각화</p>
+        </div>
+      </a>
+    </div>
+
+    <p class="mono mt-12 text-xs text-neutral-600">tip: 각 페이지 상단 탭으로 Projects / Sessions / Session 화면 전환</p>
+  </div>
+</body>
+</html>

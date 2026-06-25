@@ -3,7 +3,7 @@ import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 
 function Handle() {
   return (
-    <PanelResizeHandle className="w-px bg-neutral-200 transition-colors hover:bg-blue-400 data-[resize-handle-state=drag]:bg-blue-500 dark:bg-neutral-800" />
+    <PanelResizeHandle className="w-px bg-line transition-colors hover:bg-accent data-[resize-handle-state=drag]:bg-accent" />
   );
 }
 
@@ -20,7 +20,7 @@ export function IdeLayout({
   return (
     <PanelGroup direction="horizontal" autoSaveId="carrier-ide" className="h-full">
       <Panel defaultSize={18} minSize={12} className="overflow-hidden">
-        <div className="h-full border-r border-neutral-200 dark:border-neutral-800">{tree}</div>
+        <div className="h-full border-r border-line">{tree}</div>
       </Panel>
       <Handle />
       <Panel defaultSize={52} minSize={25} className="overflow-hidden">
@@ -28,7 +28,7 @@ export function IdeLayout({
       </Panel>
       <Handle />
       <Panel defaultSize={30} minSize={20} className="overflow-hidden">
-        <div className="h-full border-l border-neutral-200 dark:border-neutral-800">{agent}</div>
+        <div className="h-full border-l border-line">{agent}</div>
       </Panel>
     </PanelGroup>
   );

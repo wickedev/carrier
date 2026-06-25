@@ -2,7 +2,7 @@ import * as React from "react";
 import type { ConfigScope, HookEvent, ModelParams } from "@carrier/contract";
 import { Button } from "@carrier/ui";
 import { Plus, Loader2 } from "lucide-react";
-import { Card, Badge, Input, Loading } from "../components/primitives";
+import { Card, Badge, Input, Loading, SELECT_CLASS } from "../components/primitives";
 import { ConfigSection, DeleteButton, EnableToggle } from "../components/config-controls";
 import { useToast } from "../components/toast";
 import {
@@ -30,10 +30,8 @@ export interface SectionProps {
 
 // ── Shared styling helpers (mirror settings.tsx form controls) ────────────────
 
-const SELECT_CLASS =
-  "h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950";
 const TEXTAREA_CLASS =
-  "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm outline-none placeholder:text-fg-subtle focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950";
+  "w-full border border-line bg-transparent px-3 py-2 text-sm text-fg outline-none placeholder:text-fg-subtle focus-ring";
 
 /** Parse a comma/space-separated list into trimmed, non-empty tokens. */
 function splitList(raw: string): string[] {

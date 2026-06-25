@@ -100,6 +100,62 @@ describe("session CRUD + Carrier brokering", () => {
     expect(h.carrier.interrupts.length).toBe(1);
   });
 
+  it("input heals a missing Carrier session (stillborn id) instead of 409", async () => {
+    const h = await makeHarness();
+    const { cookie, project } = await setup(h);
+    const { body } = await createSession(h, cookie, project.id);
+
+    // Simulate a stillborn session: createSession failed at create time, so the
+    // stored carrier id is null (or the runtime was restarted and forgot it).
+    await h.db
+      .update(sessionTable)
+      .set({ carrierSessionId: null })
+      .where(eq(sessionTable.id, body.id));
+
+    h.carrier.nextSessionId = "carrier-session-healed";
+    const inputRes = await h.app.request(`/sessions/${body.id}/input`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ text: "do it" }),
+    });
+    expect(inputRes.status).toBe(200);
+    // The message reached the freshly (re)created Carrier session…
+    expect(h.carrier.inputs.at(-1)).toMatchObject({
+      id: "carrier-session-healed",
+      text: "do it",
+    });
+    // …and the healed id was persisted, so the next request reuses it.
+    const rows = await h.db
+      .select()
+      .from(sessionTable)
+      .where(eq(sessionTable.id, body.id));
+    expect(rows[0]?.carrierSessionId).toBe("carrier-session-healed");
+  });
+
+  it("events heals a missing Carrier session and streams instead of 409", async () => {
+    const h = await makeHarness();
+    const { cookie, project } = await setup(h);
+    const { body } = await createSession(h, cookie, project.id);
+
+    await h.db
+      .update(sessionTable)
+      .set({ carrierSessionId: null })
+      .where(eq(sessionTable.id, body.id));
+    h.carrier.nextSessionId = "carrier-session-healed";
+    h.carrier.events = [{ seq: 0, kind: "status", state: "running" }];
+
+    const res = await h.app.request(`/sessions/${body.id}/events`, {
+      headers: { cookie },
+    });
+    expect(res.status).toBe(200);
+    await res.text(); // drain
+    const rows = await h.db
+      .select()
+      .from(sessionTable)
+      .where(eq(sessionTable.id, body.id));
+    expect(rows[0]?.carrierSessionId).toBe("carrier-session-healed");
+  });
+
   it("tree/file read the session working copy", async () => {
     const h = await makeHarness();
     const { cookie, project } = await setup(h);

@@ -21,7 +21,8 @@ import {
   type Session,
 } from "@carrier/contract";
 import { z } from "zod";
-import type { AppEnv } from "../context.js";
+import type { AppDeps, AppEnv } from "../context.js";
+import type { Db } from "../db/client.js";
 import {
   permissionRule,
   project,
@@ -71,6 +72,88 @@ export async function toSessionDto(
     createdAt: s.createdAt,
     archived: s.archived,
   };
+}
+
+// ── carrier session healing ──────────────────────────────────────────────────
+//
+// The Carrier runtime keeps its session registry (owners/hubs/Flights) in memory
+// only — it is the volatile execution tier. The BFF (durable PGlite) is the
+// control plane and owns the session config. So a Carrier session id can go dead
+// two ways: it was never created (createSession failed at session-create time, so
+// we stored null) or it is stale (the runtime restarted and forgot it → 404). In
+// both cases the BFF can re-create a Flight over the SAME working copy and persist
+// the new id, which is what `ensureCarrierSession` does. Without this, a dead id
+// makes /events relay nothing and /input 409 forever, which the browser surfaces
+// as a permanent "reconnecting…".
+
+/** Coalesces concurrent (re)creations per session into one createSession so a
+ *  racing /events + /input never spawn two Flights. The BFF is one process, so a
+ *  module Map is sufficient. */
+const ensuringCarrier = new Map<string, Promise<string | null>>();
+
+async function currentCarrierId(db: Db, sessionId: string): Promise<string | null> {
+  const rows = await db
+    .select({ cid: sessionTable.carrierSessionId })
+    .from(sessionTable)
+    .where(eq(sessionTable.id, sessionId))
+    .limit(1);
+  return rows[0]?.cid ?? null;
+}
+
+/**
+ * Ensure the session has a LIVE Carrier session id, (re)creating a Flight over the
+ * session's existing working copy when the stored id is missing or stale, and
+ * persisting the fresh id. Returns null only when the Carrier runtime is genuinely
+ * unreachable — a transient condition the caller surfaces as 503 so the client
+ * keeps retrying (which is now honest: it only "reconnects" while Carrier is down).
+ *
+ * @param staleId the id the caller just saw rejected with 404; pass it so a value
+ *   already healed by a concurrent request is reused instead of spawning a Flight.
+ */
+export async function ensureCarrierSession(
+  deps: AppDeps,
+  session: SessionRow,
+  project: ProjectRow,
+  staleId: string | null = null,
+): Promise<string | null> {
+  const { db } = deps;
+  const current = await currentCarrierId(db, session.id);
+  if (current && current !== staleId) return current;
+
+  const inflight = ensuringCarrier.get(session.id);
+  if (inflight) return inflight;
+
+  const p = (async (): Promise<string | null> => {
+    // Re-read under the single-flight: a racer may have healed already.
+    const again = await currentCarrierId(db, session.id);
+    if (again && again !== staleId) return again;
+
+    const cfg = await assembleSessionConfig(db, deps.crypto, project);
+    const planMode = (cfg.planMode ?? false) || session.planMode;
+    let cid: string | null = null;
+    try {
+      cid = await deps.carrier().createSession({
+        cwd: session.workingCopyPath,
+        ...cfg,
+        planMode,
+      });
+    } catch {
+      cid = null; // Carrier unreachable — caller retries.
+    }
+    if (cid) {
+      await db
+        .update(sessionTable)
+        .set({ carrierSessionId: cid })
+        .where(eq(sessionTable.id, session.id));
+    }
+    return cid;
+  })();
+  ensuringCarrier.set(session.id, p);
+  try {
+    return await p;
+  } finally {
+    ensuringCarrier.delete(session.id);
+  }
 }
 
 export function projectRoutes(): Hono<AppEnv> {

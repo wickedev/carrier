@@ -40,6 +40,9 @@ export function AgentPanel({
 
   return (
     <div className="flex h-full flex-col">
+      <div className="border-b border-line px-3 py-2 text-2xs uppercase tracking-[0.15em] text-fg-subtle">
+        Agent stream
+      </div>
       <div ref={scrollRef} className="flex-1 overflow-auto" data-testid="agent-scroll">
         {events.length === 0 && approvals.length === 0 ? (
           <EmptyState title="No activity yet" description="Send a message to start the session." />

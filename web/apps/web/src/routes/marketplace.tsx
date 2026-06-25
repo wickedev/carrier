@@ -22,6 +22,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { Card, Badge, Input, Loading, ErrorState, EmptyState } from "../components/primitives";
+import { PageFrame } from "../components/PageFrame";
+import { Breadcrumb, BreadcrumbSep } from "../components/Breadcrumb";
 import { ConfigSection, DeleteButton, EnableToggle } from "../components/config-controls";
 import { useToast } from "../components/toast";
 import {
@@ -57,18 +59,21 @@ export function MarketplacePage() {
   const search = useMarketplaceSearch(query);
 
   return (
-    <div className="mx-auto max-w-3xl p-6">
-      <div className="mb-4 text-sm text-fg-muted">
-        <Link to={`/${org}`} className="hover:underline">
-          {org}
-        </Link>{" "}
-        / <span className="text-neutral-800 dark:text-neutral-100">Marketplace</span>
-      </div>
-      <h1 className="mb-4 text-lg font-semibold">Plugin marketplace</h1>
+    <PageFrame>
+        <div className="mb-3">
+          <Breadcrumb>
+            <Link to={`/${org}`} className="hover:underline focus-ring">
+              {org}
+            </Link>
+            <BreadcrumbSep />
+            <span className="font-medium text-accent">Marketplace</span>
+          </Breadcrumb>
+        </div>
+        <h1 className="mb-4 font-display text-2xl font-bold">PLUGIN MARKETPLACE</h1>
 
       <div className="relative mb-6">
         <Search
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400"
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle"
           aria-hidden
         />
         <Input
@@ -85,9 +90,12 @@ export function MarketplacePage() {
       ) : search.isError ? (
         <ErrorState message={(search.error as Error).message} onRetry={() => search.refetch()} />
       ) : search.data && search.data.length > 0 ? (
-        <ul className="grid gap-3 sm:grid-cols-2" data-testid="marketplace-list">
+        <ul
+          className="grid gap-px border border-line bg-line sm:grid-cols-2"
+          data-testid="marketplace-list"
+        >
           {search.data.map((p) => (
-            <li key={p.name}>
+            <li key={p.name} className="bg-panel">
               <PluginCard org={org} plugin={p} />
             </li>
           ))}
@@ -98,31 +106,28 @@ export function MarketplacePage() {
           description="Try a different search, or check back later for new plugins."
         />
       )}
-    </div>
+    </PageFrame>
   );
 }
 
 function PluginCard({ org, plugin }: { org: string; plugin: MarketplacePlugin }) {
   return (
-    <Link to={`/${org}/marketplace/${encodeURIComponent(plugin.name)}`}>
-      <Card
-        className="flex h-full flex-col gap-1 p-3 transition-colors hover:border-neutral-300 dark:hover:border-neutral-700"
-        data-testid="plugin-card"
-      >
-        <div className="flex items-center gap-2">
-          <Package className="h-4 w-4 text-blue-500" aria-hidden />
-          <span className="truncate font-medium">{plugin.name}</span>
-          {plugin.verified ? <VerifiedBadge /> : null}
-        </div>
-        <p className="text-xs text-fg-muted">
-          {plugin.publisher} · v{plugin.latestVersion}
-        </p>
-        {plugin.description ? (
-          <p className="line-clamp-2 text-sm text-neutral-600 dark:text-neutral-300">
-            {plugin.description}
-          </p>
-        ) : null}
-      </Card>
+    <Link
+      to={`/${org}/marketplace/${encodeURIComponent(plugin.name)}`}
+      className="flex h-full flex-col gap-1 p-3 transition-colors hover:bg-bg focus-ring"
+      data-testid="plugin-card"
+    >
+      <div className="flex items-center gap-2">
+        <Package className="h-4 w-4 text-info" aria-hidden />
+        <span className="truncate font-medium">{plugin.name}</span>
+        {plugin.verified ? <VerifiedBadge /> : null}
+      </div>
+      <p className="text-xs text-fg-muted">
+        {plugin.publisher} · v{plugin.latestVersion}
+      </p>
+      {plugin.description ? (
+        <p className="line-clamp-2 text-sm text-fg-muted">{plugin.description}</p>
+      ) : null}
     </Link>
   );
 }
@@ -154,13 +159,16 @@ export function PluginDetailPage() {
   const manifest = detail.data?.manifest ?? current?.manifest;
 
   return (
-    <div className="mx-auto max-w-3xl p-6">
-      <div className="mb-4 text-sm text-fg-muted">
-        <Link to={`/${org}/marketplace`} className="hover:underline">
-          Marketplace
-        </Link>{" "}
-        / <span className="text-neutral-800 dark:text-neutral-100">{name}</span>
-      </div>
+    <PageFrame>
+        <div className="mb-4">
+          <Breadcrumb>
+            <Link to={`/${org}/marketplace`} className="hover:underline focus-ring">
+              Marketplace
+            </Link>
+            <BreadcrumbSep />
+            <span className="font-medium text-accent">{name}</span>
+          </Breadcrumb>
+        </div>
 
       {versions.isLoading ? (
         <Loading />
@@ -172,7 +180,7 @@ export function PluginDetailPage() {
         <>
           <div className="mb-4 flex items-start justify-between gap-3">
             <div>
-              <h1 className="flex items-center gap-2 text-lg font-semibold">
+              <h1 className="flex items-center gap-2 font-display text-2xl font-bold uppercase">
                 {name}
               </h1>
               <p className="text-sm text-fg-muted">
@@ -213,7 +221,7 @@ export function PluginDetailPage() {
           ) : null}
         </>
       )}
-    </div>
+    </PageFrame>
   );
 }
 
@@ -228,8 +236,8 @@ function VersionPicker({
 }) {
   return (
     <Card className="mb-4 p-4" data-testid="versions-section">
-      <h2 className="mb-2 text-sm font-medium">Versions</h2>
-      <ul className="divide-y divide-neutral-200 text-sm dark:divide-neutral-800">
+      <h2 className="mb-2 text-xs font-bold uppercase tracking-[0.15em] text-fg">Versions</h2>
+      <ul className="divide-y divide-line text-sm">
         {versions.map((v) => (
           <li key={v.version} className="flex items-center gap-2 py-1.5">
             <label className="flex flex-1 items-center gap-2">
@@ -271,7 +279,7 @@ function CapabilitiesCard({ manifest }: { manifest: PluginManifest }) {
   const allow = manifest.declarative?.permissions ?? [];
   return (
     <Card className="mb-4 p-4" data-testid="capabilities-section">
-      <h2 className="mb-2 text-sm font-medium">Requested capabilities</h2>
+      <h2 className="mb-2 text-xs font-bold uppercase tracking-[0.15em] text-fg">Requested capabilities</h2>
       <dl className="space-y-3 text-sm">
         <CapabilityRow
           icon={<Globe className="h-4 w-4" aria-hidden />}
@@ -286,12 +294,12 @@ function CapabilitiesCard({ manifest }: { manifest: PluginManifest }) {
           empty="No secrets requested"
         />
         <div className="flex items-center gap-2">
-          <Database className="h-4 w-4 text-neutral-500" aria-hidden />
+          <Database className="h-4 w-4 text-fg-subtle" aria-hidden />
           <span className="font-medium">KV store</span>
           <span className="text-fg-muted">{caps.kv ? "requested" : "not requested"}</span>
         </div>
         <div className="flex items-center gap-2">
-          <ShieldAlert className="h-4 w-4 text-amber-500" aria-hidden />
+          <ShieldAlert className="h-4 w-4 text-warning" aria-hidden />
           <span className="font-medium">permissions.allow</span>
           <span className="text-fg-muted">
             {caps.permissionsAllow ? "opt-in requested" : "not requested"}
@@ -307,11 +315,11 @@ function CapabilitiesCard({ manifest }: { manifest: PluginManifest }) {
         ) : null}
       </dl>
 
-      <h2 className="mb-2 mt-4 text-sm font-medium">Seams</h2>
+      <h2 className="mb-2 mt-4 text-xs font-bold uppercase tracking-[0.15em] text-fg">Seams</h2>
       {manifest.seams.length > 0 ? (
         <div className="flex flex-wrap gap-1.5" data-testid="seams-list">
           {manifest.seams.map((s: SeamKind) => (
-            <Badge key={s} className="bg-neutral-100 font-mono dark:bg-neutral-800">
+            <Badge key={s} className="border border-line px-1.5 font-mono normal-case text-fg-muted">
               {s}
             </Badge>
           ))}
@@ -336,8 +344,8 @@ function CapabilityRow({
 }) {
   return (
     <div>
-      <dt className="flex items-center gap-2 font-medium text-neutral-700 dark:text-neutral-200">
-        <span className="text-neutral-500">{icon}</span>
+      <dt className="flex items-center gap-2 font-medium text-fg">
+        <span className="text-fg-subtle">{icon}</span>
         {label}
       </dt>
       <dd className="ml-6 mt-1">
@@ -345,7 +353,7 @@ function CapabilityRow({
           <ul className="flex flex-wrap gap-1.5">
             {items.map((it) => (
               <li key={it}>
-                <Badge className="bg-neutral-100 font-mono dark:bg-neutral-800">{it}</Badge>
+                <Badge className="border border-line px-1.5 font-mono normal-case text-fg-muted">{it}</Badge>
               </li>
             ))}
           </ul>
@@ -442,7 +450,7 @@ function InstallConsentDialog({
           {caps.network.length > 0 ? (
             <fieldset>
               <legend className="mb-1 flex items-center gap-2 text-sm font-medium">
-                <Globe className="h-4 w-4 text-neutral-500" aria-hidden /> Network hosts
+                <Globe className="h-4 w-4 text-fg-subtle" aria-hidden /> Network hosts
               </legend>
               {caps.network.map((h) => (
                 <label key={h} className="flex items-center gap-2 py-0.5 text-sm">
@@ -461,7 +469,7 @@ function InstallConsentDialog({
           {caps.secrets.length > 0 ? (
             <fieldset>
               <legend className="mb-1 flex items-center gap-2 text-sm font-medium">
-                <KeyRound className="h-4 w-4 text-neutral-500" aria-hidden /> Secret keys
+                <KeyRound className="h-4 w-4 text-fg-subtle" aria-hidden /> Secret keys
               </legend>
               {caps.secrets.map((k) => (
                 <label key={k} className="flex items-center gap-2 py-0.5 text-sm">
@@ -485,13 +493,13 @@ function InstallConsentDialog({
                 onChange={(e) => setKv(e.target.checked)}
                 aria-label="Grant kv store"
               />
-              <Database className="h-4 w-4 text-neutral-500" aria-hidden />
+              <Database className="h-4 w-4 text-fg-subtle" aria-hidden />
               KV store access
             </label>
           ) : null}
 
           {caps.permissionsAllow ? (
-            <label className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-sm dark:border-amber-900 dark:bg-amber-900/20">
+            <label className="flex items-start gap-2 border border-amber-300 bg-amber-50 p-2 text-sm dark:border-amber-900 dark:bg-amber-900/20">
               <input
                 type="checkbox"
                 checked={allowPermissions}
@@ -503,7 +511,7 @@ function InstallConsentDialog({
                 <span className="flex items-center gap-1 font-medium text-amber-700 dark:text-amber-300">
                   <ShieldAlert className="h-4 w-4" aria-hidden /> Honor permissions.allow
                 </span>
-                <span className="text-neutral-600 dark:text-neutral-300">
+                <span className="text-fg-muted">
                   Lets this plugin's <span className="font-mono">permission_ask</span> grant an
                   "allow" decision. Off by default — only tick if you trust it.
                 </span>

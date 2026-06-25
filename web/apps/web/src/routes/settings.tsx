@@ -3,7 +3,9 @@ import { useParams, useRouteLoaderData, Link, useNavigate } from "react-router";
 import type { Me, Org, Role } from "@carrier/contract";
 import { Button } from "@carrier/ui";
 import { Plus, UserPlus, Github, Loader2 } from "lucide-react";
-import { Card, EmptyState, Loading, ErrorState, Input } from "../components/primitives";
+import { Card, EmptyState, Loading, ErrorState, Input, SELECT_CLASS } from "../components/primitives";
+import { PageFrame } from "../components/PageFrame";
+import { Breadcrumb, BreadcrumbSep } from "../components/Breadcrumb";
 import { ConfigSection, DeleteButton } from "../components/config-controls";
 import { useToast } from "../components/toast";
 import {
@@ -37,17 +39,20 @@ export function OrgSettingsPage() {
   const current = me?.orgs.find((o) => o.slug === org);
 
   return (
-    <div className="mx-auto max-w-3xl p-6">
-      <div className="mb-4 text-sm text-fg-muted">
-        <Link to={`/${org}`} className="hover:underline">
-          {org}
-        </Link>{" "}
-        / <span className="text-neutral-800 dark:text-neutral-100">Settings</span>
-      </div>
-      <h1 className="mb-4 text-lg font-semibold">Org settings</h1>
+    <PageFrame>
+        <div className="mb-3">
+          <Breadcrumb>
+            <Link to={`/${org}`} className="hover:underline focus-ring">
+              {org}
+            </Link>
+            <BreadcrumbSep />
+            <span className="font-medium text-accent">Settings</span>
+          </Breadcrumb>
+        </div>
+        <h1 className="mb-4 font-display text-2xl font-bold">ORG SETTINGS</h1>
 
       <Card className="mb-4 p-4">
-        <h2 className="mb-2 text-sm font-medium">Context</h2>
+        <h2 className="mb-2 text-xs font-bold uppercase tracking-[0.15em] text-fg">Context</h2>
         <dl className="space-y-1 text-sm">
           <div className="flex justify-between">
             <dt className="text-fg-muted">Name</dt>
@@ -67,10 +72,12 @@ export function OrgSettingsPage() {
       <MembersSection orgSlug={org} current={current} />
       <InstallationsSection orgSlug={org} />
 
-      <h2 className="mb-4 mt-8 text-lg font-semibold">Configuration</h2>
+      <h2 className="mb-4 mt-8 font-display text-lg font-bold uppercase tracking-[0.1em]">
+        Configuration
+      </h2>
       <ConfigSections scope="org" ownerKey={org} manage={canManage(current?.role)} />
       <InstalledPluginsSection scope="org" ownerKey={org} manage={canManage(current?.role)} />
-    </div>
+    </PageFrame>
   );
 }
 
@@ -119,7 +126,7 @@ function MembersSection({ orgSlug, current }: { orgSlug: string; current?: Org }
                 value={role}
                 onChange={(e) => setRole(e.target.value as Role)}
                 aria-label="Member role"
-                className="h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950"
+                className={SELECT_CLASS}
               >
                 <option value="member">member</option>
                 <option value="admin">admin</option>
@@ -160,7 +167,7 @@ function InstallationsSection({ orgSlug }: { orgSlug: string }) {
   const installs = useInstallations(orgSlug);
   return (
     <Card className="p-4" data-testid="installations-section">
-      <h2 className="mb-2 flex items-center gap-1.5 text-sm font-medium">
+      <h2 className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.15em] text-fg">
         <Github className="h-4 w-4" aria-hidden /> GitHub App installations
       </h2>
       {installs.isLoading ? (
@@ -170,7 +177,7 @@ function InstallationsSection({ orgSlug }: { orgSlug: string }) {
       ) : installs.data && installs.data.length > 0 ? (
         <ul className="space-y-2 text-sm">
           {installs.data.map((i) => (
-            <li key={i.installationId} className="rounded border border-neutral-200 p-2 dark:border-neutral-800">
+            <li key={i.installationId} className="border border-line p-2">
               <p className="font-medium">{i.accountLogin}</p>
               <p className="text-xs text-fg-muted">
                 {i.repos.length} repo{i.repos.length === 1 ? "" : "s"} · installation #{i.installationId}
@@ -198,25 +205,30 @@ export function ProjectSettingsPage() {
   const manage = canManage(currentOrg?.role);
 
   return (
-    <div className="mx-auto max-w-3xl p-6">
-      <div className="mb-4 text-sm text-fg-muted">
-        <Link to={`/${org}/${project}`} className="hover:underline">
-          {projectQ.data?.name ?? project}
-        </Link>{" "}
-        / <span className="text-neutral-800 dark:text-neutral-100">Settings</span>
-      </div>
-      <h1 className="mb-4 text-lg font-semibold">Project settings</h1>
+    <PageFrame>
+        <div className="mb-3">
+          <Breadcrumb>
+            <Link to={`/${org}/${project}`} className="hover:underline focus-ring">
+              {projectQ.data?.name ?? project}
+            </Link>
+            <BreadcrumbSep />
+            <span className="font-medium text-accent">Settings</span>
+          </Breadcrumb>
+        </div>
+        <h1 className="mb-4 font-display text-2xl font-bold">PROJECT SETTINGS</h1>
 
       <RepoBindingSection orgSlug={currentOrg?.slug ?? org} projectId={project} manage={manage} />
 
-      <h2 className="mb-4 mt-8 text-lg font-semibold">Configuration</h2>
+      <h2 className="mb-4 mt-8 font-display text-lg font-bold uppercase tracking-[0.1em]">
+        Configuration
+      </h2>
       <ConfigSections scope="project" ownerKey={project} manage={manage} />
       <InstalledPluginsSection scope="project" ownerKey={project} manage={manage} />
       <PermissionsSection projectId={project} manage={manage} />
 
       <UsageSection projectId={project} />
       <DangerZone orgSlug={org} projectId={project} manage={manage} />
-    </div>
+    </PageFrame>
   );
 }
 
@@ -254,7 +266,7 @@ function RepoBindingSection({ orgSlug, projectId, manage }: { orgSlug: string; p
 
   return (
     <Card className="mb-4 p-4" data-testid="repo-binding-section">
-      <h2 className="mb-2 text-sm font-medium">Repository binding</h2>
+      <h2 className="mb-2 text-xs font-bold uppercase tracking-[0.15em] text-fg">Repository binding</h2>
       {projectQ.isLoading ? (
         <Loading />
       ) : projectQ.data?.repo ? (
@@ -296,7 +308,7 @@ function RepoBindingSection({ orgSlug, projectId, manage }: { orgSlug: string; p
                   setRepoFullName("");
                   setBranch("");
                 }}
-                className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950"
+                className={`${SELECT_CLASS} w-full`}
               >
                 <option value="">Select installation…</option>
                 {installs.data?.map((i) => (
@@ -313,7 +325,7 @@ function RepoBindingSection({ orgSlug, projectId, manage }: { orgSlug: string; p
                   setRepoFullName(e.target.value);
                   setBranch("");
                 }}
-                className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950"
+                className={`${SELECT_CLASS} w-full disabled:opacity-50`}
               >
                 <option value="">Select repository…</option>
                 {selected?.repos.map((r) => (
@@ -372,7 +384,7 @@ function PermissionsSection({ projectId, manage }: { projectId: string; manage: 
 
   return (
     <Card className="mb-4 p-4" data-testid="permissions-section">
-      <h2 className="mb-2 text-sm font-medium">Permission rules</h2>
+      <h2 className="mb-2 text-xs font-bold uppercase tracking-[0.15em] text-fg">Permission rules</h2>
 
       {manage ? (
         <form onSubmit={submit} className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -380,7 +392,7 @@ function PermissionsSection({ projectId, manage }: { projectId: string; manage: 
             value={action}
             onChange={(e) => setAction(e.target.value)}
             aria-label="Rule action"
-            className="h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950"
+            className={SELECT_CLASS}
           >
             {ACTIONS.map((a) => (
               <option key={a} value={a}>
@@ -398,7 +410,7 @@ function PermissionsSection({ projectId, manage }: { projectId: string; manage: 
             value={effect}
             onChange={(e) => setEffect(e.target.value as "allow" | "deny" | "ask")}
             aria-label="Rule effect"
-            className="h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950"
+            className={SELECT_CLASS}
           >
             <option value="allow">allow</option>
             <option value="deny">deny</option>
@@ -418,7 +430,7 @@ function PermissionsSection({ projectId, manage }: { projectId: string; manage: 
       ) : perms.isError ? (
         <ErrorState message={(perms.error as Error).message} onRetry={() => perms.refetch()} />
       ) : perms.data && perms.data.length > 0 ? (
-        <ul className="divide-y divide-neutral-200 text-sm dark:divide-neutral-800">
+        <ul className="divide-y divide-line text-sm">
           {perms.data.map((r) => (
             <li key={r.id} className="flex items-center gap-2 py-1.5">
               <span className="w-16 font-mono text-xs">{r.action}</span>
@@ -426,10 +438,10 @@ function PermissionsSection({ projectId, manage }: { projectId: string; manage: 
               <span
                 className={
                   r.effect === "deny"
-                    ? "text-red-500"
+                    ? "text-danger"
                     : r.effect === "allow"
-                      ? "text-green-600 dark:text-green-400"
-                      : "text-amber-500"
+                      ? "text-success"
+                      : "text-warning"
                 }
               >
                 {r.effect}
@@ -456,7 +468,7 @@ function UsageSection({ projectId }: { projectId: string }) {
   if (usage.isError || (!usage.isLoading && !usage.data)) return null;
   return (
     <Card className="mb-4 p-4" data-testid="project-usage-section">
-      <h2 className="mb-2 text-sm font-medium">Usage</h2>
+      <h2 className="mb-2 text-xs font-bold uppercase tracking-[0.15em] text-fg">Usage</h2>
       {usage.isLoading ? (
         <Loading />
       ) : usage.data ? (
@@ -499,8 +511,8 @@ function DangerZone({
   };
 
   return (
-    <Card className="border-red-300 p-4 dark:border-red-900">
-      <h2 className="mb-2 text-sm font-medium text-red-600 dark:text-red-400">Danger zone</h2>
+    <Card className="border-danger p-4">
+      <h2 className="mb-2 text-xs font-bold uppercase tracking-[0.15em] text-danger">Danger zone</h2>
       <p className="mb-2 text-sm text-fg-muted">
         Archiving a project stops new sessions while preserving its workspace and history.
       </p>
@@ -513,7 +525,7 @@ function DangerZone({
           <Button
             variant="outline"
             size="sm"
-            className="border-red-400 text-red-600 dark:text-red-400"
+            className="border-danger text-danger"
             disabled={archive.isPending}
             onClick={doArchive}
           >
@@ -528,7 +540,7 @@ function DangerZone({
         <Button
           variant="outline"
           size="sm"
-          className="border-red-400 text-red-600 dark:text-red-400"
+          className="border-danger text-danger"
           onClick={() => setConfirming(true)}
         >
           Archive project

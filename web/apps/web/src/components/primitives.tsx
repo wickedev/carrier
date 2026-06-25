@@ -13,10 +13,7 @@ export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
     return (
       <div
         ref={ref}
-        className={cn(
-          "rounded-lg border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900",
-          className,
-        )}
+        className={cn("border border-line bg-surface", className)}
         {...props}
       />
     );
@@ -30,7 +27,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium",
+        "inline-flex items-center px-1.5 py-0.5 text-xs font-bold uppercase tracking-[0.1em]",
         className,
       )}
       {...props}
@@ -62,10 +59,10 @@ export function CardHeader({
   return (
     <div
       className={cn(
-        "flex items-center gap-2 border-b",
+        "flex items-center gap-2 border-b border-line uppercase tracking-[0.15em]",
         tone === "neutral"
-          ? "border-neutral-200 bg-neutral-50 px-3 py-1.5 text-xs font-medium dark:border-neutral-800 dark:bg-neutral-800/50"
-          : "border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300",
+          ? "bg-panel px-3 py-1.5 text-2xs font-bold text-fg-muted"
+          : "bg-panel px-3 py-2 text-xs font-bold text-warning",
       )}
     >
       {icon}
@@ -106,14 +103,14 @@ export function Toggle<T extends string>({
         className={
           variant === "subtle"
             ? cn(
-                "inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs",
-                active ? "bg-neutral-200 dark:bg-neutral-800" : "text-fg-muted",
+                "inline-flex items-center gap-1 border-b-2 px-2 py-0.5 text-xs focus-ring",
+                active
+                  ? "border-accent text-accent"
+                  : "border-transparent text-fg-muted",
               )
             : cn(
-                "px-2 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400",
-                active
-                  ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
-                  : "text-fg-muted",
+                "px-2 py-0.5 focus-ring",
+                active ? "bg-accent text-accent-fg" : "text-fg-muted",
               )
         }
       >
@@ -125,7 +122,7 @@ export function Toggle<T extends string>({
 
   if (grouped) {
     return (
-      <div className="inline-flex overflow-hidden rounded-md border border-neutral-300 dark:border-neutral-700">
+      <div className="inline-flex overflow-hidden border border-line">
         {buttons}
       </div>
     );
@@ -139,7 +136,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
       <input
         ref={ref}
         className={cn(
-          "h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm outline-none placeholder:text-fg-subtle focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950",
+          "h-9 w-full border border-line bg-transparent px-3 text-sm text-fg outline-none placeholder:text-fg-subtle focus-ring",
           className,
         )}
         {...props}
@@ -147,6 +144,10 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
     );
   },
 );
+
+/** Industrial select control: transparent, 1px line, radius 0, amber focus. */
+export const SELECT_CLASS =
+  "h-9 border border-line bg-transparent px-2 text-sm text-fg focus-ring";
 
 export function Loading({ label = "Loading…" }: { label?: string }) {
   return (
@@ -171,7 +172,7 @@ export function EmptyState({
 }) {
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-8 text-center">
-      <p className="text-sm font-medium text-neutral-700 dark:text-neutral-200">{title}</p>
+      <p className="text-xs font-bold uppercase tracking-[0.15em] text-fg">{title}</p>
       {description ? (
         <p className="max-w-sm text-sm text-fg-muted">{description}</p>
       ) : null}
@@ -181,7 +182,7 @@ export function EmptyState({
 }
 
 export function ErrorState({
-  title = "Something went wrong",
+  title = "Error",
   message,
   onRetry,
 }: {
@@ -195,12 +196,12 @@ export function ErrorState({
       role="alert"
     >
       <AlertTriangle className="h-6 w-6 text-danger" aria-hidden />
-      <p className="text-sm font-medium text-neutral-700 dark:text-neutral-200">{title}</p>
+      <p className="text-xs font-bold uppercase tracking-[0.15em] text-fg">{title}</p>
       {message ? <p className="max-w-md text-sm text-fg-muted">{message}</p> : null}
       {onRetry ? (
         <button
           onClick={onRetry}
-          className="mt-2 text-sm font-medium text-blue-600 underline-offset-2 hover:underline dark:text-blue-400"
+          className="mt-2 text-sm font-medium text-info underline-offset-2 hover:underline"
         >
           Retry
         </button>

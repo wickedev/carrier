@@ -166,7 +166,7 @@ export function SessionPage() {
             }
             editor={
               <div className="flex h-full flex-col">
-                <div className="flex items-center gap-1 border-b border-neutral-200 px-2 py-1 dark:border-neutral-800">
+                <div className="flex items-center gap-1 border-b border-line px-2 py-1">
                   <Toggle
                     variant="subtle"
                     value={mode}
@@ -185,7 +185,7 @@ export function SessionPage() {
                     ]}
                   />
                   {selectedPath ? (
-                    <span className="ml-2 truncate font-mono text-xs text-fg-muted">
+                    <span className="ml-auto truncate font-mono text-xs text-fg-muted">
                       {selectedPath}
                     </span>
                   ) : null}

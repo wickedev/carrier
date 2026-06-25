@@ -2,47 +2,20 @@ import * as React from "react";
 import { Link } from "react-router";
 import { Button } from "@carrier/ui";
 import { cn } from "@carrier/ui";
-import {
-  GitBranch,
-  GitPullRequest,
-  GitMerge,
-  CircleDot,
-  Circle,
-  Loader2,
-  ChevronRight,
-} from "lucide-react";
+import { GitBranch, GitPullRequest, GitMerge } from "lucide-react";
 import type { Session, SessionStatus, Usage } from "@carrier/contract";
 import type { ConnectionState } from "../../session/stream";
 import { Spinner } from "../primitives";
+import { SessionStatusPill } from "../SessionStatusPill";
 import { UsagePill } from "./UsagePanel";
-
-function StatusDot({ status }: { status: SessionStatus }) {
-  if (status === "running")
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-        <Loader2 className="h-3 w-3 animate-spin motion-reduce:animate-none" aria-hidden /> running
-      </span>
-    );
-  if (status === "terminated")
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-fg-muted">
-        <Circle className="h-3 w-3" aria-hidden /> terminated
-      </span>
-    );
-  return (
-    <span className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
-      <CircleDot className="h-3 w-3" aria-hidden /> idle
-    </span>
-  );
-}
 
 function ConnectionPill({ connection }: { connection: ConnectionState }) {
   const map: Record<ConnectionState, { label: string; cls: string }> = {
     idle: { label: "idle", cls: "text-fg-muted" },
-    connecting: { label: "connecting…", cls: "text-amber-500" },
-    open: { label: "live", cls: "text-green-600 dark:text-green-400" },
-    reconnecting: { label: "reconnecting…", cls: "text-amber-500" },
-    closed: { label: "disconnected", cls: "text-red-500" },
+    connecting: { label: "connecting…", cls: "text-warning" },
+    open: { label: "live", cls: "text-success" },
+    reconnecting: { label: "reconnecting…", cls: "text-warning" },
+    closed: { label: "disconnected", cls: "text-danger" },
   };
   const { label, cls } = map[connection];
   return <span className={cn("text-2xs font-medium", cls)}>{label}</span>;
@@ -84,27 +57,32 @@ export function TopBar({
   // behind a two-step confirm (mirrors the settings.tsx DangerZone pattern).
   const [confirmingMerge, setConfirmingMerge] = React.useState(false);
   return (
-    <div className="flex items-center gap-3 border-b border-neutral-200 px-3 py-1.5 text-sm dark:border-neutral-800">
-      <nav className="flex items-center gap-1 text-fg-muted" aria-label="Breadcrumb">
+    <div className="flex items-center gap-3 border-b border-line bg-panel px-4 py-2 text-xs">
+      <nav
+        className="flex items-center gap-2 uppercase tracking-[0.1em] text-fg-muted"
+        aria-label="Breadcrumb"
+      >
         <Link to={`/${orgSlug}`} className="hover:underline">
           {orgSlug}
         </Link>
-        <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+        <span className="text-fg-subtle" aria-hidden>
+          /
+        </span>
         <Link to={`/${orgSlug}/${projectId}`} className="hover:underline">
           {projectId}
         </Link>
-        <ChevronRight className="h-3.5 w-3.5" aria-hidden />
-        <span className="text-neutral-800 dark:text-neutral-100">
-          {session?.title ?? "Session"}
+        <span className="text-fg-subtle" aria-hidden>
+          /
         </span>
+        <span className="font-bold text-fg">{session?.title ?? "Session"}</span>
       </nav>
 
       {branch ? (
-        <span className="inline-flex items-center gap-1 rounded border border-neutral-200 px-1.5 py-0.5 text-xs text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
+        <span className="inline-flex items-center gap-1 border border-line px-2 py-0.5 font-mono text-xs text-fg-muted">
           <GitBranch className="h-3 w-3" aria-hidden />
           {branch}
           {session?.workingCopy?.dirty ? (
-            <span className="text-amber-500" title="Uncommitted changes">
+            <span className="text-warning" title="Uncommitted changes">
               •
             </span>
           ) : null}
@@ -113,7 +91,7 @@ export function TopBar({
 
       {promoteStatus ? (
         <span
-          className="rounded bg-neutral-100 px-1.5 py-0.5 text-2xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+          className="border border-line px-2 py-0.5 text-2xs uppercase tracking-[0.1em] text-fg-muted"
           data-testid="promote-status"
         >
           {promoteStatus}
@@ -123,13 +101,13 @@ export function TopBar({
       <div className="ml-auto flex items-center gap-3">
         <UsagePill usage={usage} loading={usageLoading} />
         <ConnectionPill connection={connection} />
-        <StatusDot status={status} />
+        <SessionStatusPill status={status} />
         {prUrl ? (
           <a
             href={prUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline dark:text-blue-400"
+            className="inline-flex items-center gap-1 text-xs text-info hover:underline"
             data-testid="pr-link"
           >
             <GitPullRequest className="h-3.5 w-3.5" aria-hidden /> PR
@@ -149,7 +127,7 @@ export function TopBar({
         ) : repoBound ? (
           <Button
             size="sm"
-            variant="outline"
+            className="btn-primary"
             onClick={onPromote}
             disabled={promoting}
             title="Open a pull request from this session's branch"
@@ -161,7 +139,7 @@ export function TopBar({
           <div className="flex items-center gap-1.5">
             <Button
               size="sm"
-              variant="outline"
+              className="btn-primary"
               onClick={() => {
                 setConfirmingMerge(false);
                 onPromote();
@@ -179,7 +157,7 @@ export function TopBar({
         ) : (
           <Button
             size="sm"
-            variant="outline"
+            className="btn-primary"
             onClick={() => setConfirmingMerge(true)}
             disabled={promoting}
             title="Merge this session's changes into the base workspace"
