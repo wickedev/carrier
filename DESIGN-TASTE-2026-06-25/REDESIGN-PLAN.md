@@ -243,6 +243,29 @@ modal `role`/focus; keep `buttonVariants` usage in login (don't inline-duplicate
 
 ---
 
+## Execution status (2026-06-25, branch `design-taste-tokens`)
+
+All phases executed via `do` (subagent per phase, orchestrator verified + committed).
+
+| Phase | Commit | Result |
+|---|---|---|
+| baseline (token prework) | `3763788` | semantic tokens, focus-ring, toast |
+| 1 Foundation | `3e31783` | chrome+accent tokens, radius 0, Fontsource fonts |
+| 2 Primitives | `594b972` | Panel/Toggle/Input/Badge, .btn-primary |
+| 3 List screens | `ee15270` | Projects/Sessions full-bleed + divided rows |
+| 4 IDE shell | `4cd7e6b` | topbar/panes/composer, amber handles |
+| 5 Settings/mkt/login/shell | `8d2af6c` | full-bleed + Panel + square |
+| 6 Polish | `22b28ef` | toast squared |
+
+**Verification:** `tsc` clean · **54/54 tests** · `vite build` ok at every phase.
+**WCAG AA (on `#080808`):** all tokens ≥ 4.5:1 — accent 9.33, success 11.49,
+warning 12.0, info 7.88, untracked 7.36, danger 7.24, fg 16.05, fg-muted 5.96,
+fg-subtle 6.27, button text (black on amber) 9.78. No failures.
+**A11y:** all `animate-*` motion-reduce gated; testids/aria/roles/focus preserved;
+`packages/ui` untouched throughout.
+**Remaining:** visual screenshot diff vs comp (needs full dev stack) and optional
+`/code-review` — not yet run.
+
 ## Sequencing notes
 - Phases 1→2 are prerequisites for 3/4/5 (which are parallelizable across contexts).
 - Each of 3, 4, 5 is independently shippable and testable.
