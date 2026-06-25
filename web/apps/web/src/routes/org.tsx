@@ -174,6 +174,11 @@ function NewProjectDialog({ org, onClose }: { org: string; onClose: () => void }
             </p>
             {installs.isLoading ? (
               <Loading label="Loading installations…" />
+            ) : installs.isError ? (
+              <p className="text-xs text-danger">
+                Couldn&apos;t load GitHub installations. You can create the project now and bind a
+                repository later from project settings.
+              </p>
             ) : installs.data && installs.data.length > 0 ? (
               <>
                 <select

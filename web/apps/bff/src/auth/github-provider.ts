@@ -200,3 +200,46 @@ export class OctokitGithubProvider implements GithubProvider {
 function normalizePrivateKey(key: string): string {
   return key.includes("\\n") ? key.replace(/\\n/g, "\n") : key;
 }
+
+/**
+ * Whether a real GitHub App is configured. A genuine App private key is a PEM
+ * block ("-----BEGIN ... PRIVATE KEY-----"); the dev/test default is a
+ * placeholder string. Without a real key, authenticating to GitHub throws, so
+ * we fall back to {@link StubGithubProvider} rather than 500 on every call.
+ */
+export function isGithubAppConfigured(cfg: Config): boolean {
+  return normalizePrivateKey(cfg.githubPrivateKey).includes("PRIVATE KEY");
+}
+
+/**
+ * No-op provider used when the GitHub App is not configured (e.g. local dev with
+ * no GITHUB_* credentials). Listing endpoints return empty so the UI degrades to
+ * "no installations" instead of surfacing a 500 from Octokit trying to sign a
+ * JWT with a placeholder key. Operations that genuinely require GitHub fail with
+ * a clear, actionable message.
+ */
+export class StubGithubProvider implements GithubProvider {
+  private notConfigured(): never {
+    throw new Error(
+      "GitHub is not configured in this environment. Set GITHUB_APP_ID and GITHUB_PRIVATE_KEY (and GITHUB_CLIENT_ID/SECRET) to enable GitHub features.",
+    );
+  }
+  getAuthorizeUrl(): string {
+    this.notConfigured();
+  }
+  async exchangeCode(): Promise<{ user: GithubUser; orgs: GithubOrgRef[] }> {
+    this.notConfigured();
+  }
+  async listInstallations(): Promise<GithubInstallationRef[]> {
+    return [];
+  }
+  async listInstallationRepos(): Promise<GithubRepoRef[]> {
+    return [];
+  }
+  async getCloneInfo(): Promise<{ token: string; cloneUrl: string }> {
+    this.notConfigured();
+  }
+  async openPullRequest(): Promise<{ url: string }> {
+    this.notConfigured();
+  }
+}
