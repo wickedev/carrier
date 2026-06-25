@@ -42,10 +42,28 @@ export interface PendingApproval {
   receivedAt: number;
 }
 
+/** A message the local user sent. Carrier doesn't echo user input on the event
+ *  stream, so the transcript renders these from the client. Ordering is a
+ *  tuple, not a fudged seq: the message sorts right after all events present
+ *  when it was sent (`anchorSeq`) and before the agent's reply, with `ord`
+ *  preserving send order among messages queued against the same anchor. Using a
+ *  tuple (rather than `anchorSeq + 0.5`) avoids ever colliding with a real
+ *  integer event seq, which would tie the sort and misorder queued prompts. */
+export interface UserMessage {
+  id: string;
+  /** Highest event seq present when the message was sent (-1 if none). */
+  anchorSeq: number;
+  /** Monotonic send order, the tiebreak among same-anchor messages. */
+  ord: number;
+  text: string;
+}
+
 export interface SessionStreamState {
   sessionId: string | null;
   /** Ordered (by seq), seq-deduped event log. */
   events: SessionEvent[];
+  /** Locally-sent user messages, interleaved into the transcript by `seq`. */
+  userMessages: UserMessage[];
   /** Seen seq values, for O(1) dedupe. */
   seen: Set<number>;
   /** Derived run status from the latest `status` event. */
@@ -59,6 +77,7 @@ export interface SessionStreamState {
   // actions
   ingest: (raw: unknown) => void;
   ingestEvent: (event: SessionEvent) => void;
+  addUserMessage: (text: string) => void;
   resolveApproval: (reqId: string) => void;
   reset: (sessionId: string | null) => void;
   setConnection: (c: ConnectionState) => void;
@@ -129,6 +148,7 @@ export function reduce(
 const INITIAL = {
   sessionId: null as string | null,
   events: [] as SessionEvent[],
+  userMessages: [] as UserMessage[],
   seen: new Set<number>(),
   status: "idle" as SessionStatus,
   pendingApprovals: [] as PendingApproval[],
@@ -143,6 +163,7 @@ export const createSessionStreamStore = (): SessionStreamStore =>
     ...INITIAL,
     seen: new Set<number>(),
     events: [],
+    userMessages: [],
     pendingApprovals: [],
 
     ingest(raw) {
@@ -159,6 +180,18 @@ export const createSessionStreamStore = (): SessionStreamStore =>
       if (next) set(next);
     },
 
+    addUserMessage(text) {
+      set((s) => {
+        // Anchor to the highest event seq present now; the tuple sort then places
+        // this after those events and before the agent's reply (higher seqs).
+        const anchorSeq = s.events.length ? s.events[s.events.length - 1]!.seq : -1;
+        const ord = s.userMessages.length;
+        return {
+          userMessages: [...s.userMessages, { id: `u-${ord}`, anchorSeq, ord, text }],
+        };
+      });
+    },
+
     resolveApproval(reqId) {
       set((s) => ({
         pendingApprovals: s.pendingApprovals.filter((a) => a.reqId !== reqId),
@@ -169,6 +202,7 @@ export const createSessionStreamStore = (): SessionStreamStore =>
       set({
         sessionId,
         events: [],
+        userMessages: [],
         seen: new Set<number>(),
         status: "idle",
         pendingApprovals: [],

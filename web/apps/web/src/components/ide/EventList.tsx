@@ -1,5 +1,6 @@
 import * as React from "react";
 import type { SessionEvent } from "@carrier/contract";
+import type { UserMessage } from "../../session/stream";
 import { cn } from "@carrier/ui";
 import {
   Wrench,
@@ -118,13 +119,70 @@ export function EventCard({ event }: { event: SessionEvent }) {
   }
 }
 
-/** Scrollable, ordered event log. Approval requests are surfaced separately. */
-export function EventList({ events }: { events: SessionEvent[] }) {
-  // approval_request is surfaced separately; title is metadata (drives the
-  // TopBar / session list, not rendered inline in the event log).
-  const visible = events.filter(
-    (e) => e.kind !== "approval_request" && e.kind !== "title",
-  );
+/** One rendered row: a user prompt, a coalesced text/reasoning stream, or a
+ *  structured event card. */
+type Row =
+  | { kind: "user"; key: string; text: string }
+  | { kind: "text"; key: string; text: string }
+  | { kind: "reasoning"; key: string; text: string }
+  | { kind: "event"; key: string; event: SessionEvent };
+
+/** Merge user prompts and events into one seq-ordered transcript, coalescing
+ *  consecutive `text` (and `reasoning`) deltas into a single bubble so a streamed
+ *  reply renders as one growing message rather than one bubble per token. */
+function buildRows(events: SessionEvent[], userMessages: UserMessage[]): Row[] {
+  // Sort key is a tuple [seq, rank, ord]: an event ranks before a user message
+  // anchored at the same seq, and same-anchor user messages keep send order.
+  // This never ties a user message against a real (integer) event seq.
+  type Item =
+    | { seq: number; rank: 0; ord: number; event: SessionEvent }
+    | { seq: number; rank: 1; ord: number; user: UserMessage };
+  const items: Item[] = [
+    ...events
+      // approval_request is surfaced separately; title is metadata (TopBar /
+      // session list), not part of the inline transcript.
+      .filter((e) => e.kind !== "approval_request" && e.kind !== "title")
+      .map((event) => ({ seq: event.seq, rank: 0 as const, ord: 0, event })),
+    ...userMessages.map((m) => ({
+      seq: m.anchorSeq,
+      rank: 1 as const,
+      ord: m.ord,
+      user: m,
+    })),
+  ];
+  items.sort((a, b) => a.seq - b.seq || a.rank - b.rank || a.ord - b.ord);
+
+  const rows: Row[] = [];
+  for (const it of items) {
+    if ("user" in it) {
+      rows.push({ kind: "user", key: it.user.id, text: it.user.text });
+      continue;
+    }
+    const ev = it.event;
+    if (ev.kind === "text" || ev.kind === "reasoning") {
+      const last = rows[rows.length - 1];
+      if (last && last.kind === ev.kind) {
+        last.text += ev.text; // grow the in-progress stream bubble
+        continue;
+      }
+      rows.push({ kind: ev.kind, key: `${ev.kind}-${ev.seq}`, text: ev.text });
+      continue;
+    }
+    rows.push({ kind: "event", key: String(ev.seq), event: ev });
+  }
+  return rows;
+}
+
+/** Scrollable, ordered transcript: user prompts + coalesced agent stream +
+ *  structured event cards. Approval requests are surfaced separately. */
+export function EventList({
+  events,
+  userMessages = [],
+}: {
+  events: SessionEvent[];
+  userMessages?: UserMessage[];
+}) {
+  const rows = buildRows(events, userMessages);
   return (
     <div
       className="flex flex-col py-2"
@@ -133,9 +191,34 @@ export function EventList({ events }: { events: SessionEvent[] }) {
       aria-live="polite"
       aria-atomic="false"
     >
-      {visible.map((e) => (
-        <EventCard key={e.seq} event={e} />
-      ))}
+      {rows.map((row) => {
+        if (row.kind === "user") {
+          return (
+            <div key={row.key} className="flex justify-end px-3 py-2" data-kind="user">
+              <p className="max-w-[85%] whitespace-pre-wrap border border-line bg-panel px-3 py-1.5 text-sm text-fg">
+                {row.text}
+              </p>
+            </div>
+          );
+        }
+        if (row.kind === "text") {
+          return (
+            <div key={row.key} className="flex gap-2 px-3 py-2" data-kind="text">
+              <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-fg-subtle" aria-hidden />
+              <p className="whitespace-pre-wrap text-sm text-fg">{row.text}</p>
+            </div>
+          );
+        }
+        if (row.kind === "reasoning") {
+          return (
+            <div key={row.key} className="flex gap-2 px-3 py-2" data-kind="reasoning">
+              <Brain className="mt-0.5 h-4 w-4 shrink-0 text-untracked" aria-hidden />
+              <p className="whitespace-pre-wrap text-sm italic text-fg-muted">{row.text}</p>
+            </div>
+          );
+        }
+        return <EventCard key={row.key} event={row.event} />;
+      })}
     </div>
   );
 }
