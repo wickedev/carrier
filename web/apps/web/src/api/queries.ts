@@ -150,13 +150,23 @@ export function useCreateProject(orgSlug: string) {
   return useMutation({
     // Create the project, then optionally bind a GitHub repo in the same flow so
     // the dialog can offer repo selection at creation time (repo is optional).
+    // The project is created first: if the subsequent bind fails we keep the
+    // project (it already exists server-side) and surface the bind error to the
+    // caller via `bindError` rather than throwing — otherwise onSuccess would
+    // not fire, the projects list would never refresh, and the just-created
+    // project would be stranded/hidden behind an error.
     mutationFn: async (vars: {
       name: string;
       repo?: { installationId: number; repoFullName: string; defaultBranch?: string };
-    }) => {
+    }): Promise<{ project: Project; bindError?: Error }> => {
       const project = await api.createProject(orgSlug, vars.name);
-      if (vars.repo) return api.bindRepo(project.id, vars.repo);
-      return project;
+      if (!vars.repo) return { project };
+      try {
+        const bound = await api.bindRepo(project.id, vars.repo);
+        return { project: bound };
+      } catch (err) {
+        return { project, bindError: err as Error };
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.projects(orgSlug) }),
   });

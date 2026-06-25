@@ -4,6 +4,7 @@ import { Button } from "@carrier/ui";
 import { Plus, FolderGit2, Settings, Github, X, Loader2 } from "lucide-react";
 import { useProjects, useCreateProject, useInstallations } from "../api/queries";
 import { Card, Input, Loading, ErrorState, EmptyState } from "../components/primitives";
+import { useToast } from "../components/toast";
 
 /** /:org — project list within an org/personal context (Req 4). */
 export function OrgPage() {
@@ -72,6 +73,7 @@ export function OrgPage() {
 function NewProjectDialog({ org, onClose }: { org: string; onClose: () => void }) {
   const create = useCreateProject(org);
   const installs = useInstallations(org);
+  const toast = useToast();
   const [name, setName] = React.useState("");
   const [installationId, setInstallationId] = React.useState<number | "">("");
   const [repoFullName, setRepoFullName] = React.useState("");
@@ -106,7 +108,18 @@ function NewProjectDialog({ org, onClose }: { org: string; onClose: () => void }
               }
             : undefined,
       },
-      { onSuccess: () => onClose() },
+      {
+        onSuccess: (result) => {
+          // The project was created either way; if only the repo bind failed,
+          // keep the project and tell the user they can bind it from settings.
+          if (result.bindError) {
+            toast(
+              `Project created, but repository binding failed: ${result.bindError.message}. You can bind it in project settings.`,
+            );
+          }
+          onClose();
+        },
+      },
     );
   };
 

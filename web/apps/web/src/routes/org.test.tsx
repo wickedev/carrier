@@ -94,4 +94,26 @@ describe("OrgPage new-project modal", () => {
       }),
     );
   });
+
+  it("keeps the created project and closes the dialog when repo binding fails", async () => {
+    mockApi.bindRepo.mockRejectedValue(new Error("bind boom"));
+    renderPage();
+    fireEvent.click(screen.getByTestId("new-project-button"));
+    await screen.findByTestId("new-project-dialog");
+    fireEvent.change(screen.getByLabelText("Project name"), { target: { value: "demo" } });
+    fireEvent.change(await screen.findByLabelText("GitHub installation"), {
+      target: { value: "42" },
+    });
+    fireEvent.change(screen.getByLabelText("Repository"), { target: { value: "acme/web" } });
+    fireEvent.click(screen.getByRole("button", { name: /create/i }));
+
+    // Project was created and binding was attempted...
+    await waitFor(() => expect(mockApi.createProject).toHaveBeenCalledWith("acme", "demo"));
+    await waitFor(() => expect(mockApi.bindRepo).toHaveBeenCalled());
+    // ...and the bind failure must NOT strand the project behind an error modal:
+    // the dialog closes so the created project shows in the (refreshed) list.
+    await waitFor(() =>
+      expect(screen.queryByTestId("new-project-dialog")).not.toBeInTheDocument(),
+    );
+  });
 });
