@@ -102,6 +102,12 @@
     filter: brightness(1.1);
   }
 
+  /* Display headings (Space Grotesk). Copied from design-mockups/industrial.html
+     `.disp`. */
+  .font-display {
+    font-family: var(--font-display);
+  }
+
   /* Grid-rule background — list/landing views only (Projects, Sessions).
      Copied from design-mockups/industrial.html .grid-bg. */
   .grid-rule {

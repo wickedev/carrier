@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Link, useParams } from "react-router";
 import { Button } from "@carrier/ui";
-import { Plus, FolderGit2, Settings, Github, X, Loader2 } from "lucide-react";
+import { Plus, FolderGit2, Settings, Github, X, Loader2, ArrowRight } from "lucide-react";
 import { useProjects, useCreateProject, useInstallations } from "../api/queries";
 import { Card, Input, Loading, ErrorState, EmptyState } from "../components/primitives";
 import { useToast } from "../components/toast";
@@ -11,60 +11,92 @@ export function OrgPage() {
   const { org = "" } = useParams();
   const projects = useProjects(org);
   const [showNew, setShowNew] = React.useState(false);
+  const count = projects.data?.length ?? 0;
 
   return (
-    <div className="mx-auto max-w-3xl p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Projects</h1>
-        <div className="flex items-center gap-3">
-          <Link
-            to={`/${org}/settings`}
-            className="inline-flex items-center gap-1 text-sm text-fg-muted hover:underline"
-          >
-            <Settings className="h-4 w-4" aria-hidden /> Org settings
-          </Link>
-          <Button onClick={() => setShowNew(true)} data-testid="new-project-button">
-            <Plus className="h-4 w-4" aria-hidden /> New project
-          </Button>
-        </div>
-      </div>
-
-      {projects.isLoading ? (
-        <Loading />
-      ) : projects.isError ? (
-        <ErrorState message={(projects.error as Error).message} onRetry={() => projects.refetch()} />
-      ) : projects.data && projects.data.length > 0 ? (
-        <ul className="space-y-2">
-          {projects.data.map((p) => (
-            <li key={p.id}>
-              <Link to={`/${org}/${p.id}`}>
-                <Card className="flex items-center gap-3 p-3 transition-colors hover:border-neutral-300 dark:hover:border-neutral-700">
-                  <FolderGit2 className="h-5 w-5 text-info" aria-hidden />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{p.name}</p>
-                    <p className="truncate text-xs text-fg-muted">
-                      {p.repo ? p.repo.repoFullName : "Unbound workspace"}
-                      {p.archived ? " · archived" : ""}
-                    </p>
-                  </div>
-                </Card>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <EmptyState
-          title="No projects yet"
-          description="Create your first project to start a session."
-          action={
-            <Button onClick={() => setShowNew(true)}>
-              <Plus className="h-4 w-4" aria-hidden /> New project
+    <div className="grid-rule min-h-[calc(100vh-3.25rem)]">
+      <div className="mx-auto max-w-6xl px-6 py-8">
+        <div className="mb-0 flex items-end justify-between border-b border-line pb-3">
+          <div>
+            <h1 className="font-display text-2xl font-bold">PROJECTS</h1>
+            <p className="text-xs uppercase tracking-[0.1em] text-fg-muted">
+              {org} — {count} {count === 1 ? "project" : "projects"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <Link
+              to={`/${org}/settings`}
+              className="inline-flex items-center gap-1 border border-line px-3 py-1.5 uppercase text-fg-muted hover:border-fg-subtle focus-ring"
+            >
+              <Settings className="h-3.5 w-3.5" aria-hidden /> Org settings
+            </Link>
+            <Button
+              onClick={() => setShowNew(true)}
+              data-testid="new-project-button"
+              className="btn-primary px-3 py-1.5 text-xs"
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden /> New project
             </Button>
-          }
-        />
-      )}
+          </div>
+        </div>
 
-      {showNew ? <NewProjectDialog org={org} onClose={() => setShowNew(false)} /> : null}
+        {projects.isLoading ? (
+          <Loading />
+        ) : projects.isError ? (
+          <ErrorState
+            message={(projects.error as Error).message}
+            onRetry={() => projects.refetch()}
+          />
+        ) : projects.data && projects.data.length > 0 ? (
+          <>
+            <ul className="divide-y divide-line border-b border-line">
+              {projects.data.map((p) => (
+                <li key={p.id}>
+                  <Link
+                    to={`/${org}/${p.id}`}
+                    className="flex items-center gap-4 px-3 py-4 transition-colors hover:bg-panel focus-ring"
+                  >
+                    <FolderGit2 className="h-5 w-5 shrink-0 text-accent" aria-hidden />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate font-bold">{p.name}</span>
+                        {p.repo ? null : (
+                          <span className="border border-line px-1.5 text-2xs uppercase tracking-[0.1em] text-fg-subtle">
+                            Unbound
+                          </span>
+                        )}
+                      </div>
+                      <p className="truncate text-xs text-fg-muted">
+                        {p.repo ? p.repo.repoFullName : "no repo bound · workspace-local"}
+                        {p.archived ? " · archived" : ""}
+                      </p>
+                    </div>
+                    <div className="hidden items-center gap-6 text-xs text-fg-muted sm:flex">
+                      <span>{new Date(p.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-xs uppercase tracking-[0.1em] text-fg-subtle">
+              {count} {count === 1 ? "project" : "projects"} · bind a Git repo to enable PRs
+            </p>
+          </>
+        ) : (
+          <EmptyState
+            title="No projects yet"
+            description="Create your first project to start a session."
+            action={
+              <Button onClick={() => setShowNew(true)} className="btn-primary px-3 py-1.5 text-xs">
+                <Plus className="h-3.5 w-3.5" aria-hidden /> New project
+              </Button>
+            }
+          />
+        )}
+
+        {showNew ? <NewProjectDialog org={org} onClose={() => setShowNew(false)} /> : null}
+      </div>
     </div>
   );
 }
@@ -142,7 +174,7 @@ function NewProjectDialog({ org, onClose }: { org: string; onClose: () => void }
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded p-1 text-fg-muted hover:bg-neutral-100 focus-ring dark:hover:bg-neutral-800"
+            className="p-1 text-fg-muted hover:bg-panel focus-ring"
           >
             <X className="h-4 w-4" aria-hidden />
           </button>
@@ -188,7 +220,7 @@ function NewProjectDialog({ org, onClose }: { org: string; onClose: () => void }
                     setInstallationId(e.target.value ? Number(e.target.value) : "");
                     setRepoFullName("");
                   }}
-                  className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm focus-ring dark:border-neutral-700 dark:bg-neutral-950"
+                  className="h-9 w-full border border-line bg-transparent px-2 text-sm text-fg focus-ring"
                 >
                   <option value="">No repository (unbound workspace)</option>
                   {installs.data.map((i) => (
@@ -202,7 +234,7 @@ function NewProjectDialog({ org, onClose }: { org: string; onClose: () => void }
                   aria-label="Repository"
                   disabled={!selected}
                   onChange={(e) => setRepoFullName(e.target.value)}
-                  className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm focus-ring disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950"
+                  className="h-9 w-full border border-line bg-transparent px-2 text-sm text-fg focus-ring disabled:opacity-50"
                 >
                   <option value="">Select repository…</option>
                   {selected?.repos.map((r) => (
