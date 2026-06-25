@@ -5,6 +5,11 @@ import { ChevronRight, ChevronDown, File, Folder } from "lucide-react";
 import { api } from "../../api/client";
 import { Loading, ErrorState } from "../primitives";
 
+const INDENT_STEP = 12; // px per depth level (spacing-3)
+const ROW_PAD = 4; // base left pad (spacing-1)
+const TEXT_PAD = 8; // left pad for text-only rows (spacing-2)
+const ICON_GUTTER = 18; // chevron width reserved for file rows
+
 const gitColor: Record<GitStatus, string> = {
   A: "text-green-600 dark:text-green-400",
   M: "text-amber-600 dark:text-amber-400",
@@ -105,13 +110,13 @@ export function FileTree({
     if (!state) return null;
     if (state.loading && !state.entries)
       return (
-        <div style={{ paddingLeft: depth * 12 + 8 }} className="py-1 text-xs text-fg-muted">
+        <div style={{ paddingLeft: depth * INDENT_STEP + TEXT_PAD }} className="py-1 text-xs text-fg-muted">
           loading…
         </div>
       );
     if (state.error && !state.entries)
       return (
-        <div style={{ paddingLeft: depth * 12 + 8 }} className="py-1 text-xs text-danger">
+        <div style={{ paddingLeft: depth * INDENT_STEP + TEXT_PAD }} className="py-1 text-xs text-danger">
           {state.error}
         </div>
       );
@@ -130,7 +135,7 @@ export function FileTree({
             <button
               type="button"
               onClick={() => toggle(entry.path)}
-              style={{ paddingLeft: depth * 12 + 4 }}
+              style={{ paddingLeft: depth * INDENT_STEP + ROW_PAD }}
               className="flex w-full items-center gap-1 py-1 pr-2 text-left text-sm hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:hover:bg-neutral-800"
               aria-expanded={isOpen}
             >
@@ -152,7 +157,7 @@ export function FileTree({
           key={entry.path}
           type="button"
           onClick={() => onSelect(entry.path)}
-          style={{ paddingLeft: depth * 12 + 4 + 18 }}
+          style={{ paddingLeft: depth * INDENT_STEP + ROW_PAD + ICON_GUTTER }}
           className={cn(
             "flex w-full items-center gap-1 py-1 pr-2 text-left text-sm hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:hover:bg-neutral-800",
             selected && "bg-blue-50 dark:bg-blue-950/40",
@@ -163,7 +168,7 @@ export function FileTree({
           <span className={cn("truncate", git && gitColor[git])}>{entry.name}</span>
           {git && git !== "clean" ? (
             <span
-              className={cn("ml-auto text-[10px] font-bold", gitColor[git])}
+              className={cn("ml-auto text-3xs font-bold", gitColor[git])}
               title={gitTitle[git]}
             >
               {gitBadge[git]}

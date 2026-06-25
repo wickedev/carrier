@@ -87,7 +87,7 @@ export function EventCard({ event }: { event: SessionEvent }) {
     case "status":
       return (
         <div
-          className="px-3 py-1 text-center text-[11px] uppercase tracking-wide text-fg-muted"
+          className="px-3 py-1 text-center text-2xs uppercase tracking-wide text-fg-muted"
           data-kind="status"
         >
           {event.state}

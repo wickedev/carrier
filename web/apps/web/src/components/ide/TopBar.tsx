@@ -45,7 +45,7 @@ function ConnectionPill({ connection }: { connection: ConnectionState }) {
     closed: { label: "disconnected", cls: "text-red-500" },
   };
   const { label, cls } = map[connection];
-  return <span className={cn("text-[11px] font-medium", cls)}>{label}</span>;
+  return <span className={cn("text-2xs font-medium", cls)}>{label}</span>;
 }
 
 /** IDE top bar: breadcrumb, branch/PR, run status, promote + run controls (Req 15.3). */
@@ -113,7 +113,7 @@ export function TopBar({
 
       {promoteStatus ? (
         <span
-          className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+          className="rounded bg-neutral-100 px-1.5 py-0.5 text-2xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
           data-testid="promote-status"
         >
           {promoteStatus}
