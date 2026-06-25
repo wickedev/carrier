@@ -92,6 +92,16 @@
     box-shadow: 0 0 0 2px var(--accent);
   }
 
+  /* Primary action button (amber fill, black text, uppercase, square, no
+     shadow). Defined here for reuse; applied at call sites in later phases.
+     Copied from design-mockups/industrial.html `.bg-amber-500 … text-black`. */
+  .btn-primary {
+    @apply bg-accent font-bold uppercase text-accent-fg;
+  }
+  .btn-primary:hover {
+    filter: brightness(1.1);
+  }
+
   /* Grid-rule background — list/landing views only (Projects, Sessions).
      Copied from design-mockups/industrial.html .grid-bg. */
   .grid-rule {
