@@ -101,7 +101,14 @@ export function SessionPage() {
       } else if (e.kind === "tool_result") {
         const name = toolNames.current.get(e.id);
         // These can mutate the working copy → refresh tree + open file.
-        if (name === "edit" || name === "multi_edit" || name === "write" || name === "bash") {
+        const mutating =
+          name === "edit" ||
+          name === "multi_edit" ||
+          name === "apply_patch" ||
+          name === "notebook_edit" ||
+          name === "write" ||
+          name === "bash";
+        if (mutating) {
           setTreeRefreshToken((t) => t + 1);
           refreshOpenFile();
         }

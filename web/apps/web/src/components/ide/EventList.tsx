@@ -18,6 +18,8 @@ import {
   FilePlus,
   Pencil,
   FilePen,
+  FileStack,
+  NotebookPen,
   Globe,
   ListChecks,
 } from "lucide-react";
@@ -42,8 +44,11 @@ const TOOL_ICON: Record<string, typeof Wrench> = {
   write: FilePlus,
   edit: Pencil,
   multi_edit: FilePen,
+  apply_patch: FileStack,
+  notebook_edit: NotebookPen,
   web_fetch: Globe,
   todo_write: ListChecks,
+  todo_read: ListChecks,
 };
 
 /** A compact view of a tool call: a one-line `primary` arg for the header, and
@@ -71,12 +76,20 @@ function toolCallView(name: string, input: unknown): { primary: string; body: st
       const n = Array.isArray(o.edits) ? o.edits.length : 0;
       return { primary: `${s("path")}  (${n} edit${n === 1 ? "" : "s"})`, body: null };
     }
+    case "apply_patch": {
+      const n = Array.isArray(o.operations) ? o.operations.length : 0;
+      return { primary: `${n} operation${n === 1 ? "" : "s"}`, body: null };
+    }
+    case "notebook_edit":
+      return { primary: `${s("path")}  #${(o.cell_index as number) ?? 0} ${s("edit_mode") || "replace"}`, body: null };
     case "web_fetch":
       return { primary: s("url"), body: null };
     case "todo_write": {
       const n = Array.isArray(o.todos) ? o.todos.length : 0;
       return { primary: `${n} task${n === 1 ? "" : "s"}`, body: null };
     }
+    case "todo_read":
+      return { primary: "", body: null };
     default:
       return { primary: "", body: formatInput(input) };
   }
