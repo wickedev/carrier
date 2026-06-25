@@ -135,8 +135,15 @@ func TestFlightPerTurnOverride(t *testing.T) {
 		// PlanMode default false → the mutating tool is visible by default.
 	})
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go func() { _ = f.Run(ctx) }()
+	// Wait for Run to fully return on teardown so the Flight goroutine can't still
+	// be writing to the FileStore when t.TempDir's RemoveAll runs (a -race flake:
+	// "directory not empty"). t.Cleanup is LIFO, so this runs before TempDir's.
+	done := make(chan struct{})
+	go func() { defer close(done); _ = f.Run(ctx) }()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
 
 	recv := func() capture {
 		t.Helper()
