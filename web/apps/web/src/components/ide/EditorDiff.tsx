@@ -103,7 +103,7 @@ export function EditorDiff({
   return (
     <div className="h-full" key={path}>
       {file.data.truncated ? (
-        <div className="border-b border-amber-300 bg-amber-50 px-3 py-1 text-xs text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+        <div className="border-b border-line bg-panel px-3 py-1 text-xs text-warning">
           File truncated — showing a partial view.
         </div>
       ) : null}

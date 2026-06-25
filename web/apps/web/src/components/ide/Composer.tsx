@@ -38,7 +38,7 @@ export function Composer({
   };
 
   return (
-    <div className="border-t border-neutral-200 p-2 dark:border-neutral-800">
+    <div className="border-t border-line p-2">
       <div className="mb-2 flex items-center gap-1.5 text-xs">
         <span className="text-fg-muted">Delivery:</span>
         <Toggle
@@ -72,9 +72,14 @@ export function Composer({
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder="Message the agent…  (⌘/Ctrl+Enter to send)"
-          className="min-h-[2.5rem] flex-1 resize-y rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm outline-none placeholder:text-fg-subtle focus-ring disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950"
+          className="min-h-[2.5rem] flex-1 resize-y border border-line bg-transparent px-3 py-2 text-sm text-fg outline-none placeholder:text-fg-subtle focus-ring disabled:opacity-50"
         />
-        <Button onClick={submit} disabled={disabled || !text.trim()} aria-label="Send message">
+        <Button
+          className="btn-primary"
+          onClick={submit}
+          disabled={disabled || !text.trim()}
+          aria-label="Send message"
+        >
           {sending ? <Spinner /> : <Send className="h-4 w-4" aria-hidden />}
         </Button>
       </div>

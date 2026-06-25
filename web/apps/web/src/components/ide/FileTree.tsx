@@ -142,15 +142,15 @@ export function FileTree({
               role="treeitem"
               onClick={() => toggle(entry.path)}
               style={{ paddingLeft: depth * INDENT_STEP + ROW_PAD }}
-              className="flex w-full items-center gap-1 py-1 pr-2 text-left text-sm hover:bg-neutral-100 focus-ring dark:hover:bg-neutral-800"
+              className="flex w-full items-center gap-1 py-1 pr-2 text-left text-sm text-fg hover:bg-neutral-900 focus-ring"
               aria-expanded={isOpen}
             >
               {isOpen ? (
-                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-neutral-400" aria-hidden />
+                <ChevronDown className="h-3.5 w-3.5 shrink-0 text-fg-subtle" aria-hidden />
               ) : (
-                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-neutral-400" aria-hidden />
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-fg-subtle" aria-hidden />
               )}
-              <Folder className="h-3.5 w-3.5 shrink-0 text-info" aria-hidden />
+              <Folder className="h-3.5 w-3.5 shrink-0 text-accent" aria-hidden />
               <span className="truncate">{entry.name}</span>
             </button>
             {isOpen ? <div role="group">{renderDir(entry.path, depth + 1)}</div> : null}
@@ -166,12 +166,12 @@ export function FileTree({
           onClick={() => onSelect(entry.path)}
           style={{ paddingLeft: depth * INDENT_STEP + ROW_PAD + ICON_GUTTER }}
           className={cn(
-            "flex w-full items-center gap-1 py-1 pr-2 text-left text-sm hover:bg-neutral-100 focus-ring dark:hover:bg-neutral-800",
-            selected && "bg-blue-50 dark:bg-blue-950/40",
+            "flex w-full items-center gap-1 py-1 pr-2 text-left text-sm text-fg hover:bg-neutral-900 focus-ring",
+            selected && "bg-neutral-900 text-accent",
           )}
           aria-current={selected ? "true" : undefined}
         >
-          <File className="h-3.5 w-3.5 shrink-0 text-neutral-400" aria-hidden />
+          <File className="h-3.5 w-3.5 shrink-0 text-fg-subtle" aria-hidden />
           <span className={cn("truncate", git && gitColor[git])}>{entry.name}</span>
           {git && git !== "clean" ? (
             <span
@@ -192,8 +192,13 @@ export function FileTree({
     return <ErrorState message={root.error} onRetry={() => void load("")} />;
 
   return (
-    <div className="h-full overflow-auto py-1" role="tree" aria-label="File tree">
-      {renderDir("", 0)}
+    <div className="flex h-full flex-col">
+      <div className="border-b border-line px-3 py-2 text-2xs uppercase tracking-[0.15em] text-fg-subtle">
+        Working copy
+      </div>
+      <div className="flex-1 overflow-auto py-1" role="tree" aria-label="File tree">
+        {renderDir("", 0)}
+      </div>
     </div>
   );
 }

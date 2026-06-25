@@ -63,7 +63,7 @@ export function ApprovalCard({
     <Card
       ref={cardRef}
       tabIndex={-1}
-      className="mx-3 my-2 border-amber-300 dark:border-amber-800"
+      className="mx-3 my-2 border-warning"
       role="alertdialog"
       aria-label={`Approval request: ${approval.tool}`}
       data-testid="approval-card"
@@ -74,7 +74,7 @@ export function ApprovalCard({
         trailing={
           expired ? (
             <Badge
-              className="ml-auto bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+              className="ml-auto text-danger"
               data-testid="approval-expired"
             >
               <Clock className="mr-1 h-3 w-3" aria-hidden /> Expired
@@ -93,7 +93,7 @@ export function ApprovalCard({
           <span className="text-fg-muted">Resource:</span>{" "}
           <span className="font-mono">{approval.resource}</span>
         </p>
-        <p className="text-neutral-600 dark:text-neutral-300">{approval.reason}</p>
+        <p className="text-fg-muted">{approval.reason}</p>
         {expired ? (
           <p className="text-xs text-danger">
             This request timed out and was auto-denied.

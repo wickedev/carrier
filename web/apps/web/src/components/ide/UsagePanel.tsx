@@ -41,7 +41,7 @@ export function UsagePill({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded border border-neutral-200 px-1.5 py-0.5 text-2xs text-neutral-600 dark:border-neutral-700 dark:text-neutral-300",
+        "inline-flex items-center gap-1 border border-line px-1.5 py-0.5 font-mono text-2xs text-fg-muted",
         className,
       )}
       data-testid="usage-pill"
