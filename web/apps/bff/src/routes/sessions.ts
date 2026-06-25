@@ -153,6 +153,20 @@ export function sessionRoutes(): Hono<AppEnv> {
       const ac = new AbortController();
       // End the upstream when the client disconnects.
       stream.onAbort(() => ac.abort());
+
+      // Flush the response head immediately with an SSE comment so a
+      // (re)connecting EventSource reaches `open` even though an idle session
+      // emits no event for a while: Hono/the dev proxy buffer the head until the
+      // first body byte, otherwise leaving the pill stuck on "connecting…". A
+      // periodic comment then keeps idle connections from being reaped by
+      // intermediaries (which would otherwise force a reconnect loop). Comments
+      // (`:`-prefixed) are inert to EventSource, so they never reach the reducer.
+      await stream.write(": connected\n\n");
+      const heartbeat = setInterval(() => {
+        void stream.write(": ping\n\n").catch(() => {});
+      }, 15_000);
+      stream.onAbort(() => clearInterval(heartbeat));
+
       let lastSeq = -1;
 
       const forward = async (raw: Parameters<typeof normalizeEvent>[0]) => {
@@ -186,33 +200,37 @@ export function sessionRoutes(): Hono<AppEnv> {
       // same working copy, then the fresh Flight's stream takes over.
       let activeCid = initialCid;
       let healed = false;
-      for (;;) {
-        try {
-          for await (const raw of client.streamEvents(activeCid, ac.signal)) {
-            await forward(raw);
-          }
-          return; // upstream closed normally (e.g. the Flight ended)
-        } catch (e) {
-          if (
-            !healed &&
-            !ac.signal.aborted &&
-            e instanceof CarrierError &&
-            e.status === 404
-          ) {
-            healed = true;
-            const fresh = await ensureCarrierSession(
-              c.var.deps,
-              ctx.session,
-              ctx.project,
-              activeCid,
-            );
-            if (fresh) {
-              activeCid = fresh;
-              continue;
+      try {
+        for (;;) {
+          try {
+            for await (const raw of client.streamEvents(activeCid, ac.signal)) {
+              await forward(raw);
             }
+            return; // upstream closed normally (e.g. the Flight ended)
+          } catch (e) {
+            if (
+              !healed &&
+              !ac.signal.aborted &&
+              e instanceof CarrierError &&
+              e.status === 404
+            ) {
+              healed = true;
+              const fresh = await ensureCarrierSession(
+                c.var.deps,
+                ctx.session,
+                ctx.project,
+                activeCid,
+              );
+              if (fresh) {
+                activeCid = fresh;
+                continue;
+              }
+            }
+            return; // unreachable/aborted — end the SSE response; the client reconnects.
           }
-          return; // unreachable/aborted — end the SSE response; the client reconnects.
         }
+      } finally {
+        clearInterval(heartbeat);
       }
     });
   });
