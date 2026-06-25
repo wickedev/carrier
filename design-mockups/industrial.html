@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Carrier — Industrial / terminal</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#080808; --panel:#0e0e0e; --line:#242424; --fg:#e6e6e6; --muted:#8c8c8c; --subtle:#5a5a5a; --accent:#f59e0b; }
+  *{font-family:'JetBrains Mono',monospace}
+  .disp{font-family:'Space Grotesk',sans-serif}
+  body{background:var(--bg);color:var(--fg)}
+  .line{border-color:var(--line)}
+  .grid-bg{background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:40px 40px;background-position:-1px -1px}
+  .tabbtn[data-active="true"]{color:var(--accent);border-color:var(--accent)}
+  ::selection{background:var(--accent);color:#000}
+</style>
+</head>
+<body class="min-h-screen">
+<!-- top bar -->
+<header class="flex items-center gap-4 border-b line px-4 h-11 text-sm">
+  <span class="disp font-bold tracking-wide">CARRIER</span>
+  <span class="text-subtle" style="color:var(--subtle)">/</span>
+  <button class="border line px-2 py-0.5 text-xs hover:border-neutral-500">DEV USER ▾</button>
+  <div class="ml-auto flex items-center gap-4 text-xs" style="color:var(--muted)">
+    <span>◐ dev</span><span class="hover:text-amber-500 cursor-pointer">⎋ logout</span>
+  </div>
+</header>
+
+<!-- tabs -->
+<nav class="flex items-center gap-0 border-b line px-4 text-xs uppercase tracking-[0.15em]">
+  <button onclick="show('projects')" id="t-projects" class="tabbtn border-b-2 border-transparent px-3 py-2.5" style="color:var(--muted)" data-active="true">Projects</button>
+  <button onclick="show('sessions')" id="t-sessions" class="tabbtn border-b-2 border-transparent px-3 py-2.5" style="color:var(--muted)">Sessions</button>
+  <button onclick="show('session')" id="t-session" class="tabbtn border-b-2 border-transparent px-3 py-2.5" style="color:var(--muted)">Session / IDE</button>
+  <span class="ml-auto text-subtle" style="color:var(--subtle)">v0 · redesign comp</span>
+</nav>
+
+<!-- ============ PROJECTS ============ -->
+<section id="projects" class="screen">
+  <div class="grid-bg min-h-[calc(100vh-5.25rem)]">
+  <div class="mx-auto max-w-6xl px-6 py-8">
+    <div class="flex items-end justify-between border-b line pb-3">
+      <div>
+        <h1 class="disp text-2xl font-bold">PROJECTS</h1>
+        <p class="text-xs" style="color:var(--muted)">01 — dev organization</p>
+      </div>
+      <div class="flex items-center gap-2 text-xs">
+        <button class="border line px-3 py-1.5 hover:border-neutral-500" style="color:var(--muted)">⚙ ORG SETTINGS</button>
+        <button class="bg-amber-500 px-3 py-1.5 font-bold text-black hover:bg-amber-400">+ NEW PROJECT</button>
+      </div>
+    </div>
+    <!-- project rows -->
+    <div class="mt-0 divide-y line border-b line">
+      <a class="flex items-center gap-4 px-3 py-4 hover:bg-neutral-900 cursor-pointer">
+        <span class="text-amber-500">▸</span>
+        <span class="h-7 w-7 border line grid place-items-center text-amber-500">▣</span>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2"><span class="font-bold">ㅁㄴㅇㄹ</span><span class="border line px-1.5 text-[10px]" style="color:var(--subtle)">UNBOUND</span></div>
+          <div class="text-xs" style="color:var(--muted)">no repo bound · workspace-local</div>
+        </div>
+        <div class="hidden sm:flex items-center gap-6 text-xs" style="color:var(--muted)">
+          <span>3 SESSIONS</span><span class="text-emerald-500">● 3 IDLE</span><span>2026.06.23</span>
+        </div>
+        <span style="color:var(--subtle)">→</span>
+      </a>
+    </div>
+    <p class="mt-3 text-xs" style="color:var(--subtle)">1 PROJECT · bind a Git repo to enable PRs</p>
+  </div>
+  </div>
+</section>
+
+<!-- ============ SESSIONS ============ -->
+<section id="sessions" class="screen hidden">
+  <div class="grid-bg min-h-[calc(100vh-5.25rem)]">
+  <div class="mx-auto max-w-6xl px-6 py-8">
+    <!-- breadcrumb -->
+    <div class="flex items-center gap-2 text-xs uppercase tracking-wide" style="color:var(--muted)">
+      <span>DEV</span><span style="color:var(--subtle)">/</span><span class="text-amber-500">ㅁㄴㅇㄹ</span>
+      <span class="border line px-1.5 text-[10px]">UNBOUND WORKSPACE</span>
+    </div>
+    <div class="mt-3 flex items-end justify-between border-b line pb-3">
+      <h1 class="disp text-2xl font-bold">SESSIONS</h1>
+      <div class="flex items-center gap-2 text-xs">
+        <button class="border line px-3 py-1.5 hover:border-neutral-500" style="color:var(--muted)">⚙ SETTINGS</button>
+        <button class="bg-amber-500 px-3 py-1.5 font-bold text-black hover:bg-amber-400">+ NEW SESSION</button>
+      </div>
+    </div>
+
+    <!-- column header -->
+    <div class="mt-4 grid grid-cols-[2.5rem_1fr_6rem_8rem_2rem] gap-3 px-3 pb-1 text-[10px] uppercase tracking-[0.15em]" style="color:var(--subtle)">
+      <span>#</span><span>Title</span><span>Status</span><span>Created</span><span></span>
+    </div>
+    <div class="divide-y line border-y line">
+      <a class="grid grid-cols-[2.5rem_1fr_6rem_8rem_2rem] items-center gap-3 px-3 py-3.5 hover:bg-neutral-900 cursor-pointer">
+        <span class="text-amber-500">01</span>
+        <div><div class="font-bold">untitled session</div><div class="text-[10px]" style="color:var(--subtle)">⌥ no branch · 0 changes</div></div>
+        <span class="text-blue-400">◌ IDLE</span>
+        <span class="text-xs" style="color:var(--muted)">06.25 14:20:11</span>
+        <span style="color:var(--subtle)">→</span>
+      </a>
+      <a class="grid grid-cols-[2.5rem_1fr_6rem_8rem_2rem] items-center gap-3 px-3 py-3.5 hover:bg-neutral-900 cursor-pointer">
+        <span class="text-amber-500">02</span>
+        <div><div class="font-bold">untitled session</div><div class="text-[10px]" style="color:var(--subtle)">⌥ no branch · 0 changes</div></div>
+        <span class="text-blue-400">◌ IDLE</span>
+        <span class="text-xs" style="color:var(--muted)">06.24 00:14:21</span>
+        <span style="color:var(--subtle)">→</span>
+      </a>
+      <a class="grid grid-cols-[2.5rem_1fr_6rem_8rem_2rem] items-center gap-3 px-3 py-3.5 hover:bg-neutral-900 cursor-pointer">
+        <span class="text-amber-500">03</span>
+        <div><div class="font-bold">ㅁㄴㅇㄹ</div><div class="text-[10px]" style="color:var(--subtle)">⌥ carrier/3f30f5e · 4 changes</div></div>
+        <span class="text-blue-400">◌ IDLE</span>
+        <span class="text-xs" style="color:var(--muted)">06.23 15:25:32</span>
+        <span style="color:var(--subtle)">→</span>
+      </a>
+    </div>
+    <p class="mt-3 text-xs" style="color:var(--subtle)">3 SESSIONS</p>
+  </div>
+  </div>
+</section>
+
+<!-- ============ SESSION / IDE ============ -->
+<section id="session" class="screen hidden">
+  <!-- session topbar -->
+  <div class="flex items-center gap-3 border-b line px-4 py-2 text-xs">
+    <div class="flex items-center gap-2" style="color:var(--muted)">
+      <span>DEV</span><span style="color:var(--subtle)">/</span><span>5b0b3201…34654</span><span style="color:var(--subtle)">/</span><span class="font-bold" style="color:var(--fg)">UNTITLED</span>
+    </div>
+    <span class="border line px-2 py-0.5">⌥ carrier/3f30f5e0-4be0-47c0</span>
+    <div class="ml-auto flex items-center gap-3">
+      <span style="color:var(--muted)">◷ 12.4k tok · $0.08</span>
+      <span class="text-emerald-500">● LIVE</span>
+      <span class="text-blue-400">◌ RUNNING</span>
+      <button class="bg-amber-500 px-2.5 py-1 font-bold text-black hover:bg-amber-400">⤢ MERGE TO BASE</button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-[240px_1fr_380px] h-[calc(100vh-8.5rem)]">
+    <!-- file tree -->
+    <aside class="border-r line overflow-auto text-xs">
+      <div class="flex items-center justify-between border-b line px-3 py-2 uppercase tracking-wide" style="color:var(--subtle)">
+        <span>Working copy</span><span>4 ±</span>
+      </div>
+      <div class="py-1">
+        <div class="px-3 py-1 hover:bg-neutral-900 cursor-pointer">▾ <span class="text-amber-500">▣</span> internal</div>
+        <div class="px-6 py-1 hover:bg-neutral-900 cursor-pointer flex justify-between"><span>▾ engine</span></div>
+        <div class="px-9 py-1 hover:bg-neutral-900 cursor-pointer flex justify-between bg-neutral-900"><span>codex.go</span><span class="text-emerald-500 font-bold">A</span></div>
+        <div class="px-9 py-1 hover:bg-neutral-900 cursor-pointer flex justify-between"><span>codex_test.go</span><span class="text-emerald-500 font-bold">A</span></div>
+        <div class="px-6 py-1 hover:bg-neutral-900 cursor-pointer flex justify-between"><span>server.go</span><span class="text-amber-500 font-bold">M</span></div>
+        <div class="px-3 py-1 hover:bg-neutral-900 cursor-pointer">▸ <span class="text-amber-500">▣</span> web</div>
+        <div class="px-3 py-1 hover:bg-neutral-900 cursor-pointer flex justify-between"><span>README.md</span><span class="text-violet-400 font-bold">U</span></div>
+      </div>
+    </aside>
+
+    <!-- editor / diff -->
+    <main class="border-r line overflow-auto">
+      <div class="flex items-center gap-0 border-b line text-xs">
+        <button class="border-r line px-3 py-2 text-amber-500 border-b-2 border-amber-500">▤ FILE</button>
+        <button class="px-3 py-2" style="color:var(--muted)">⇄ DIFF</button>
+        <span class="ml-auto px-3" style="color:var(--subtle)">internal/engine/codex.go · +362</span>
+      </div>
+      <pre class="p-4 text-[12px] leading-relaxed"><span style="color:var(--subtle)"> 1</span> <span class="text-blue-400">package</span> engine
+<span style="color:var(--subtle)"> 2</span>
+<span style="color:var(--subtle)"> 3</span> <span class="text-blue-400">import</span> (
+<span style="color:var(--subtle)"> 4</span>   <span class="text-emerald-500">"context"</span>
+<span style="color:var(--subtle)"> 5</span>   <span class="text-emerald-500">"encoding/json"</span>
+<span style="color:var(--subtle)"> 6</span> )
+<span style="color:var(--subtle)"> 7</span>
+<span style="color:var(--subtle)"> 8</span> <span style="color:var(--subtle)">// Codex drives an external agent over stdio.</span>
+<span style="color:var(--subtle)"> 9</span> <span class="text-blue-400">type</span> Codex <span class="text-blue-400">struct</span> {
+<span style="color:var(--subtle)">10</span>   bin     <span class="text-blue-400">string</span>
+<span style="color:var(--subtle)">11</span>   timeout time.Duration
+<span style="color:var(--subtle)">12</span> }</pre>
+    </main>
+
+    <!-- agent activity -->
+    <aside class="flex flex-col overflow-hidden">
+      <div class="border-b line px-3 py-2 text-xs uppercase tracking-wide" style="color:var(--subtle)">Agent stream</div>
+      <div class="flex-1 overflow-auto p-3 space-y-3 text-xs">
+        <div><span class="text-amber-500">▸ YOU</span><p class="mt-1" style="color:var(--fg)">codex 엔진 어댑터 추가하고 테스트 붙여줘.</p></div>
+        <div class="border-l-2 border-violet-400 pl-2"><span class="text-violet-400">⛬ THINKING</span><p class="mt-1" style="color:var(--muted)">engine 인터페이스 확인 → stdio 어댑터 작성 → 테이블 테스트…</p></div>
+        <div class="border line p-2">
+          <div class="flex items-center gap-2 border-b line pb-1.5 text-amber-500"><span>⚒ TOOL</span><span class="mono">write_file</span></div>
+          <p class="mt-1.5" style="color:var(--muted)">internal/engine/codex.go (+362)</p>
+        </div>
+        <div class="border line p-2">
+          <div class="flex items-center gap-2 border-b line pb-1.5 text-emerald-500"><span>✓ RESULT</span></div>
+          <p class="mt-1.5" style="color:var(--muted)">go test ./... → ok (231 tests)</p>
+        </div>
+        <div class="flex items-center gap-2 text-blue-400"><span class="animate-pulse">◌</span> agent running…</div>
+      </div>
+      <!-- composer -->
+      <div class="border-t line p-2">
+        <div class="mb-2 flex items-center gap-2 text-[10px] uppercase tracking-wide" style="color:var(--muted)">
+          <span>Delivery:</span>
+          <div class="flex border line">
+            <button class="bg-amber-500 px-2 py-0.5 font-bold text-black">Queue</button>
+            <button class="px-2 py-0.5">Steer</button>
+          </div>
+          <button class="ml-auto border line px-2 py-0.5 hover:border-neutral-500">■ INTERRUPT</button>
+        </div>
+        <div class="flex items-end gap-2">
+          <textarea rows="2" placeholder="message the agent…  ⌘/Ctrl+Enter" class="flex-1 resize-none border line bg-transparent px-2 py-1.5 text-xs outline-none focus:border-amber-500" style="color:var(--fg)"></textarea>
+          <button class="bg-amber-500 px-3 py-2 font-bold text-black hover:bg-amber-400">↑</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<script>
+  function show(id){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+    document.getElementById(id).classList.remove('hidden');
+    document.querySelectorAll('.tabbtn').forEach(b=>b.dataset.active="false");
+    document.getElementById('t-'+id).dataset.active="true";
+  }
+</script>
+</body>
+</html>

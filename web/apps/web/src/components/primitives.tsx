@@ -110,7 +110,7 @@ export function Toggle<T extends string>({
                 active ? "bg-neutral-200 dark:bg-neutral-800" : "text-fg-muted",
               )
             : cn(
-                "px-2 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400",
+                "px-2 py-0.5 focus-ring",
                 active
                   ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
                   : "text-fg-muted",
@@ -139,7 +139,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
       <input
         ref={ref}
         className={cn(
-          "h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm outline-none placeholder:text-fg-subtle focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950",
+          "h-9 w-full rounded-md border border-neutral-300 bg-white px-3 text-sm outline-none placeholder:text-fg-subtle focus-ring dark:border-neutral-700 dark:bg-neutral-950",
           className,
         )}
         {...props}
@@ -200,7 +200,7 @@ export function ErrorState({
       {onRetry ? (
         <button
           onClick={onRetry}
-          className="mt-2 text-sm font-medium text-blue-600 underline-offset-2 hover:underline dark:text-blue-400"
+          className="mt-2 text-sm font-medium text-info underline-offset-2 hover:underline"
         >
           Retry
         </button>

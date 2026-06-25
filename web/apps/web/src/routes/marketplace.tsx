@@ -110,7 +110,7 @@ function PluginCard({ org, plugin }: { org: string; plugin: MarketplacePlugin })
         data-testid="plugin-card"
       >
         <div className="flex items-center gap-2">
-          <Package className="h-4 w-4 text-blue-500" aria-hidden />
+          <Package className="h-4 w-4 text-info" aria-hidden />
           <span className="truncate font-medium">{plugin.name}</span>
           {plugin.verified ? <VerifiedBadge /> : null}
         </div>
@@ -291,7 +291,7 @@ function CapabilitiesCard({ manifest }: { manifest: PluginManifest }) {
           <span className="text-fg-muted">{caps.kv ? "requested" : "not requested"}</span>
         </div>
         <div className="flex items-center gap-2">
-          <ShieldAlert className="h-4 w-4 text-amber-500" aria-hidden />
+          <ShieldAlert className="h-4 w-4 text-warning" aria-hidden />
           <span className="font-medium">permissions.allow</span>
           <span className="text-fg-muted">
             {caps.permissionsAllow ? "opt-in requested" : "not requested"}

@@ -19,7 +19,7 @@ import { UsagePill } from "./UsagePanel";
 function StatusDot({ status }: { status: SessionStatus }) {
   if (status === "running")
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+      <span className="inline-flex items-center gap-1 text-xs text-success">
         <Loader2 className="h-3 w-3 animate-spin motion-reduce:animate-none" aria-hidden /> running
       </span>
     );
@@ -30,7 +30,7 @@ function StatusDot({ status }: { status: SessionStatus }) {
       </span>
     );
   return (
-    <span className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
+    <span className="inline-flex items-center gap-1 text-xs text-info">
       <CircleDot className="h-3 w-3" aria-hidden /> idle
     </span>
   );
@@ -39,10 +39,10 @@ function StatusDot({ status }: { status: SessionStatus }) {
 function ConnectionPill({ connection }: { connection: ConnectionState }) {
   const map: Record<ConnectionState, { label: string; cls: string }> = {
     idle: { label: "idle", cls: "text-fg-muted" },
-    connecting: { label: "connecting…", cls: "text-amber-500" },
-    open: { label: "live", cls: "text-green-600 dark:text-green-400" },
-    reconnecting: { label: "reconnecting…", cls: "text-amber-500" },
-    closed: { label: "disconnected", cls: "text-red-500" },
+    connecting: { label: "connecting…", cls: "text-warning" },
+    open: { label: "live", cls: "text-success" },
+    reconnecting: { label: "reconnecting…", cls: "text-warning" },
+    closed: { label: "disconnected", cls: "text-danger" },
   };
   const { label, cls } = map[connection];
   return <span className={cn("text-2xs font-medium", cls)}>{label}</span>;
@@ -104,7 +104,7 @@ export function TopBar({
           <GitBranch className="h-3 w-3" aria-hidden />
           {branch}
           {session?.workingCopy?.dirty ? (
-            <span className="text-amber-500" title="Uncommitted changes">
+            <span className="text-warning" title="Uncommitted changes">
               •
             </span>
           ) : null}
@@ -129,7 +129,7 @@ export function TopBar({
             href={prUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline dark:text-blue-400"
+            className="inline-flex items-center gap-1 text-xs text-info hover:underline"
             data-testid="pr-link"
           >
             <GitPullRequest className="h-3.5 w-3.5" aria-hidden /> PR

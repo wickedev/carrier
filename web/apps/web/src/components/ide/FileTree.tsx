@@ -5,16 +5,21 @@ import { ChevronRight, ChevronDown, File, Folder } from "lucide-react";
 import { api } from "../../api/client";
 import { Loading, ErrorState } from "../primitives";
 
-const INDENT_STEP = 12; // px per depth level (spacing-3)
-const ROW_PAD = 4; // base left pad (spacing-1)
-const TEXT_PAD = 8; // left pad for text-only rows (spacing-2)
-const ICON_GUTTER = 18; // chevron width reserved for file rows
+// Indentation is depth-driven, so it must be an inline px value (no static
+// utility class can express arbitrary depth). All values are derived from the
+// 4px spacing unit + the 14px (h-3.5) chevron icon, so they stay on-scale.
+const UNIT = 4; // Tailwind spacing-1
+const ICON = 14; // lucide h-3.5 / w-3.5
+const INDENT_STEP = UNIT * 3; // 12px per depth level (spacing-3)
+const ROW_PAD = UNIT; // 4px base left pad (spacing-1)
+const TEXT_PAD = UNIT * 2; // 8px left pad for text-only rows (spacing-2)
+const ICON_GUTTER = ICON + UNIT; // 18px: chevron icon + gap, reserved on file rows
 
 const gitColor: Record<GitStatus, string> = {
-  A: "text-green-600 dark:text-green-400",
-  M: "text-amber-600 dark:text-amber-400",
-  D: "text-red-600 dark:text-red-400 line-through",
-  U: "text-violet-600 dark:text-violet-400",
+  A: "text-success",
+  M: "text-warning",
+  D: "text-danger line-through",
+  U: "text-untracked",
   clean: "",
 };
 
@@ -137,7 +142,7 @@ export function FileTree({
               role="treeitem"
               onClick={() => toggle(entry.path)}
               style={{ paddingLeft: depth * INDENT_STEP + ROW_PAD }}
-              className="flex w-full items-center gap-1 py-1 pr-2 text-left text-sm hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:hover:bg-neutral-800"
+              className="flex w-full items-center gap-1 py-1 pr-2 text-left text-sm hover:bg-neutral-100 focus-ring dark:hover:bg-neutral-800"
               aria-expanded={isOpen}
             >
               {isOpen ? (
@@ -145,7 +150,7 @@ export function FileTree({
               ) : (
                 <ChevronRight className="h-3.5 w-3.5 shrink-0 text-neutral-400" aria-hidden />
               )}
-              <Folder className="h-3.5 w-3.5 shrink-0 text-blue-400" aria-hidden />
+              <Folder className="h-3.5 w-3.5 shrink-0 text-info" aria-hidden />
               <span className="truncate">{entry.name}</span>
             </button>
             {isOpen ? <div role="group">{renderDir(entry.path, depth + 1)}</div> : null}
@@ -161,7 +166,7 @@ export function FileTree({
           onClick={() => onSelect(entry.path)}
           style={{ paddingLeft: depth * INDENT_STEP + ROW_PAD + ICON_GUTTER }}
           className={cn(
-            "flex w-full items-center gap-1 py-1 pr-2 text-left text-sm hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:hover:bg-neutral-800",
+            "flex w-full items-center gap-1 py-1 pr-2 text-left text-sm hover:bg-neutral-100 focus-ring dark:hover:bg-neutral-800",
             selected && "bg-blue-50 dark:bg-blue-950/40",
           )}
           aria-current={selected ? "true" : undefined}

@@ -63,9 +63,6 @@ export function Composer({
           </Button>
         ) : null}
       </div>
-      <p className="mb-2 text-xs text-fg-muted">
-        Queue: send after the current step · Steer: interrupt and redirect now
-      </p>
       <div className="flex items-end gap-2">
         <textarea
           aria-label="Message to agent"
@@ -75,7 +72,7 @@ export function Composer({
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder="Message the agent…  (⌘/Ctrl+Enter to send)"
-          className="min-h-[2.5rem] flex-1 resize-y rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm outline-none placeholder:text-fg-subtle focus-visible:ring-2 focus-visible:ring-neutral-400 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950"
+          className="min-h-[2.5rem] flex-1 resize-y rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm outline-none placeholder:text-fg-subtle focus-ring disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950"
         />
         <Button onClick={submit} disabled={disabled || !text.trim()} aria-label="Send message">
           {sending ? <Spinner /> : <Send className="h-4 w-4" aria-hidden />}

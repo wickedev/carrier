@@ -8,9 +8,9 @@ import { useProject, useSessions, useCreateSession } from "../api/queries";
 import { Card, Loading, ErrorState, EmptyState } from "../components/primitives";
 
 function StatusIcon({ status }: { status: SessionStatus }) {
-  if (status === "running") return <Loader2 className="h-3.5 w-3.5 animate-spin text-green-500 motion-reduce:animate-none" aria-hidden />;
+  if (status === "running") return <Loader2 className="h-3.5 w-3.5 animate-spin text-success motion-reduce:animate-none" aria-hidden />;
   if (status === "terminated") return <Circle className="h-3.5 w-3.5 text-neutral-400" aria-hidden />;
-  return <CircleDot className="h-3.5 w-3.5 text-blue-500" aria-hidden />;
+  return <CircleDot className="h-3.5 w-3.5 text-info" aria-hidden />;
 }
 
 /** /:org/:project — session list + project overview (Req 7). */

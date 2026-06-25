@@ -6,7 +6,12 @@
   --fg:        var(--color-neutral-900);
   --fg-muted:  var(--color-neutral-600);  /* AA on white */
   --fg-subtle: var(--color-neutral-500);
+  /* Semantic state accents. Light = -600, dark = -400 (mirrors --danger). */
   --danger:    var(--color-red-600);      /* AA on white */
+  --success:   var(--color-green-600);
+  --warning:   var(--color-amber-600);
+  --info:      var(--color-blue-600);
+  --untracked: var(--color-violet-600);
   color-scheme: light;
 }
 .dark {
@@ -14,6 +19,10 @@
   --fg-muted:  var(--color-neutral-400);  /* AA on neutral-950 */
   --fg-subtle: #909090;                    /* AA on neutral-950 (6.20:1) */
   --danger:    var(--color-red-400);
+  --success:   var(--color-green-400);
+  --warning:   var(--color-amber-400);
+  --info:      var(--color-blue-400);
+  --untracked: var(--color-violet-400);
   color-scheme: dark;
 }
 @theme inline {
@@ -21,11 +30,22 @@
   --color-fg-muted:  var(--fg-muted);
   --color-fg-subtle: var(--fg-subtle);
   --color-danger:    var(--danger);
+  --color-success:   var(--success);
+  --color-warning:   var(--warning);
+  --color-info:      var(--info);
+  --color-untracked: var(--untracked);
 }
 
 @theme {
   --text-2xs: 0.6875rem; /* 11px @ 16px root */
   --text-3xs: 0.625rem;  /* 10px @ 16px root */
+}
+
+/* Single source of truth for the app-wide keyboard focus ring. */
+@layer components {
+  .focus-ring:focus-visible {
+    @apply outline-none ring-2 ring-neutral-400;
+  }
 }
 
 html,

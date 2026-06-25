@@ -39,7 +39,7 @@ export function OrgPage() {
             <li key={p.id}>
               <Link to={`/${org}/${p.id}`}>
                 <Card className="flex items-center gap-3 p-3 transition-colors hover:border-neutral-300 dark:hover:border-neutral-700">
-                  <FolderGit2 className="h-5 w-5 text-blue-500" aria-hidden />
+                  <FolderGit2 className="h-5 w-5 text-info" aria-hidden />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{p.name}</p>
                     <p className="truncate text-xs text-fg-muted">
@@ -142,7 +142,7 @@ function NewProjectDialog({ org, onClose }: { org: string; onClose: () => void }
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded p-1 text-fg-muted hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:hover:bg-neutral-800"
+            className="rounded p-1 text-fg-muted hover:bg-neutral-100 focus-ring dark:hover:bg-neutral-800"
           >
             <X className="h-4 w-4" aria-hidden />
           </button>
@@ -188,7 +188,7 @@ function NewProjectDialog({ org, onClose }: { org: string; onClose: () => void }
                     setInstallationId(e.target.value ? Number(e.target.value) : "");
                     setRepoFullName("");
                   }}
-                  className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950"
+                  className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm focus-ring dark:border-neutral-700 dark:bg-neutral-950"
                 >
                   <option value="">No repository (unbound workspace)</option>
                   {installs.data.map((i) => (
@@ -202,7 +202,7 @@ function NewProjectDialog({ org, onClose }: { org: string; onClose: () => void }
                   aria-label="Repository"
                   disabled={!selected}
                   onChange={(e) => setRepoFullName(e.target.value)}
-                  className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950"
+                  className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm focus-ring disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950"
                 >
                   <option value="">Select repository…</option>
                   {selected?.repos.map((r) => (

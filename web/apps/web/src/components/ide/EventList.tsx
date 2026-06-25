@@ -36,7 +36,7 @@ export function EventCard({ event }: { event: SessionEvent }) {
     case "reasoning":
       return (
         <div className="flex gap-2 px-3 py-2" data-kind="reasoning">
-          <Brain className="mt-0.5 h-4 w-4 shrink-0 text-violet-400" aria-hidden />
+          <Brain className="mt-0.5 h-4 w-4 shrink-0 text-untracked" aria-hidden />
           <p className="whitespace-pre-wrap text-sm italic text-fg-muted">{event.text}</p>
         </div>
       );
@@ -46,7 +46,7 @@ export function EventCard({ event }: { event: SessionEvent }) {
           <CardHeader
             tone="neutral"
             mono
-            icon={<Wrench className="h-3.5 w-3.5 text-amber-500" aria-hidden />}
+            icon={<Wrench className="h-3.5 w-3.5 text-warning" aria-hidden />}
           >
             {event.name}
           </CardHeader>
@@ -70,7 +70,7 @@ export function EventCard({ event }: { event: SessionEvent }) {
               event.isError ? (
                 <XCircle className="h-3.5 w-3.5 text-danger" aria-hidden />
               ) : (
-                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" aria-hidden />
+                <CheckCircle2 className="h-3.5 w-3.5 text-success" aria-hidden />
               )
             }
           >
@@ -84,7 +84,7 @@ export function EventCard({ event }: { event: SessionEvent }) {
     case "file_changed":
       return (
         <div className="flex items-center gap-2 px-3 py-1.5 text-xs" data-kind="file_changed">
-          <FileCog className="h-3.5 w-3.5 text-blue-500" aria-hidden />
+          <FileCog className="h-3.5 w-3.5 text-info" aria-hidden />
           <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
             {event.status}
           </Badge>
@@ -107,7 +107,7 @@ export function EventCard({ event }: { event: SessionEvent }) {
           data-kind="error"
           role="alert"
         >
-          <div className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+          <div className="flex items-center gap-2 px-3 py-2 text-sm text-danger">
             <AlertCircle className="h-4 w-4" aria-hidden />
             {event.message}
           </div>

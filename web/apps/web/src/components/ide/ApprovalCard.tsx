@@ -95,7 +95,7 @@ export function ApprovalCard({
         </p>
         <p className="text-neutral-600 dark:text-neutral-300">{approval.reason}</p>
         {expired ? (
-          <p className="text-xs text-red-600 dark:text-red-400">
+          <p className="text-xs text-danger">
             This request timed out and was auto-denied.
           </p>
         ) : null}

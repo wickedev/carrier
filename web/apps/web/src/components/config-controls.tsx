@@ -29,7 +29,7 @@ export function EnableToggle({
         disabled={disabled}
         aria-label={label}
         onChange={(e) => onChange(e.target.checked)}
-        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400"
+        className="focus-ring"
       />
       {enabled ? "on" : "off"}
     </label>
@@ -52,7 +52,7 @@ export function DeleteButton({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="rounded text-neutral-400 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400"
+      className="rounded text-neutral-400 hover:text-danger focus-ring"
     >
       <Trash2 className="h-4 w-4" aria-hidden />
     </button>

@@ -119,7 +119,7 @@ function MembersSection({ orgSlug, current }: { orgSlug: string; current?: Org }
                 value={role}
                 onChange={(e) => setRole(e.target.value as Role)}
                 aria-label="Member role"
-                className="h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950"
+                className="h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm focus-ring dark:border-neutral-700 dark:bg-neutral-950"
               >
                 <option value="member">member</option>
                 <option value="admin">admin</option>
@@ -296,7 +296,7 @@ function RepoBindingSection({ orgSlug, projectId, manage }: { orgSlug: string; p
                   setRepoFullName("");
                   setBranch("");
                 }}
-                className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950"
+                className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm focus-ring dark:border-neutral-700 dark:bg-neutral-950"
               >
                 <option value="">Select installation…</option>
                 {installs.data?.map((i) => (
@@ -313,7 +313,7 @@ function RepoBindingSection({ orgSlug, projectId, manage }: { orgSlug: string; p
                   setRepoFullName(e.target.value);
                   setBranch("");
                 }}
-                className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950"
+                className="h-9 w-full rounded-md border border-neutral-300 bg-white px-2 text-sm focus-ring disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-950"
               >
                 <option value="">Select repository…</option>
                 {selected?.repos.map((r) => (
@@ -380,7 +380,7 @@ function PermissionsSection({ projectId, manage }: { projectId: string; manage: 
             value={action}
             onChange={(e) => setAction(e.target.value)}
             aria-label="Rule action"
-            className="h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950"
+            className="h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm focus-ring dark:border-neutral-700 dark:bg-neutral-950"
           >
             {ACTIONS.map((a) => (
               <option key={a} value={a}>
@@ -398,7 +398,7 @@ function PermissionsSection({ projectId, manage }: { projectId: string; manage: 
             value={effect}
             onChange={(e) => setEffect(e.target.value as "allow" | "deny" | "ask")}
             aria-label="Rule effect"
-            className="h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:border-neutral-700 dark:bg-neutral-950"
+            className="h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm focus-ring dark:border-neutral-700 dark:bg-neutral-950"
           >
             <option value="allow">allow</option>
             <option value="deny">deny</option>
@@ -426,10 +426,10 @@ function PermissionsSection({ projectId, manage }: { projectId: string; manage: 
               <span
                 className={
                   r.effect === "deny"
-                    ? "text-red-500"
+                    ? "text-danger"
                     : r.effect === "allow"
-                      ? "text-green-600 dark:text-green-400"
-                      : "text-amber-500"
+                      ? "text-success"
+                      : "text-warning"
                 }
               >
                 {r.effect}
@@ -500,7 +500,7 @@ function DangerZone({
 
   return (
     <Card className="border-red-300 p-4 dark:border-red-900">
-      <h2 className="mb-2 text-sm font-medium text-red-600 dark:text-red-400">Danger zone</h2>
+      <h2 className="mb-2 text-sm font-medium text-danger">Danger zone</h2>
       <p className="mb-2 text-sm text-fg-muted">
         Archiving a project stops new sessions while preserving its workspace and history.
       </p>
@@ -513,7 +513,7 @@ function DangerZone({
           <Button
             variant="outline"
             size="sm"
-            className="border-red-400 text-red-600 dark:text-red-400"
+            className="border-danger text-danger"
             disabled={archive.isPending}
             onClick={doArchive}
           >
@@ -528,7 +528,7 @@ function DangerZone({
         <Button
           variant="outline"
           size="sm"
-          className="border-red-400 text-red-600 dark:text-red-400"
+          className="border-danger text-danger"
           onClick={() => setConfirming(true)}
         >
           Archive project
