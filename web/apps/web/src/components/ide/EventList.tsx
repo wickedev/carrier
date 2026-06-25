@@ -10,6 +10,13 @@ import {
   Brain,
   MessageSquare,
   AlertCircle,
+  Terminal,
+  FileText,
+  FolderTree,
+  FolderSearch,
+  Search,
+  FilePlus,
+  Pencil,
 } from "lucide-react";
 import { Card, Badge, CardHeader } from "../primitives";
 
@@ -19,6 +26,43 @@ function formatInput(input: unknown): string {
     return JSON.stringify(input, null, 2);
   } catch {
     return String(input);
+  }
+}
+
+/** Per-tool icon for the first-class file tools (others fall back to Wrench). */
+const TOOL_ICON: Record<string, typeof Wrench> = {
+  bash: Terminal,
+  read: FileText,
+  ls: FolderTree,
+  glob: FolderSearch,
+  grep: Search,
+  write: FilePlus,
+  edit: Pencil,
+};
+
+/** A compact view of a tool call: a one-line `primary` arg for the header, and
+ *  an optional `body` block (kept only where the full args matter, e.g. bash). */
+function toolCallView(name: string, input: unknown): { primary: string; body: string | null } {
+  const o = (input && typeof input === "object" ? (input as Record<string, unknown>) : {}) ?? {};
+  const s = (k: string) => (typeof o[k] === "string" ? (o[k] as string) : "");
+  switch (name) {
+    case "bash":
+      return { primary: "", body: s("command") || formatInput(input) };
+    case "read": {
+      const range = o.offset || o.limit ? ` :${(o.offset as number) ?? 1}+${(o.limit as number) ?? ""}` : "";
+      return { primary: s("path") + range, body: null };
+    }
+    case "ls":
+      return { primary: s("path") || ".", body: null };
+    case "glob":
+      return { primary: s("pattern") + (s("path") ? ` in ${s("path")}` : ""), body: null };
+    case "grep":
+      return { primary: s("pattern") + (s("include") ? `  (${s("include")})` : ""), body: null };
+    case "write":
+    case "edit":
+      return { primary: s("path"), body: null };
+    default:
+      return { primary: "", body: formatInput(input) };
   }
 }
 
@@ -41,21 +85,27 @@ export function EventCard({ event }: { event: SessionEvent }) {
           <p className="whitespace-pre-wrap text-sm italic text-fg-muted">{event.text}</p>
         </div>
       );
-    case "tool_call":
+    case "tool_call": {
+      const Icon = TOOL_ICON[event.name] ?? Wrench;
+      const { primary, body } = toolCallView(event.name, event.input);
       return (
         <Card className="mx-3 my-1.5 overflow-hidden" data-kind="tool_call">
           <CardHeader
             tone="neutral"
             mono
-            icon={<Wrench className="h-3.5 w-3.5 text-warning" aria-hidden />}
+            icon={<Icon className="h-3.5 w-3.5 text-warning" aria-hidden />}
           >
-            {event.name}
+            <span className="text-fg">{event.name}</span>
+            {primary ? <span className="ml-2 text-fg-muted">{primary}</span> : null}
           </CardHeader>
-          <pre className="max-h-48 overflow-auto px-3 py-2 text-xs text-fg-muted">
-            {formatInput(event.input)}
-          </pre>
+          {body ? (
+            <pre className="max-h-48 overflow-auto px-3 py-2 text-xs text-fg-muted">
+              {body}
+            </pre>
+          ) : null}
         </Card>
       );
+    }
     case "tool_result":
       return (
         <Card

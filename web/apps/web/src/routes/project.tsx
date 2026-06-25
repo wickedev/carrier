@@ -52,14 +52,14 @@ export function ProjectPage() {
           <div className="flex items-center gap-2 text-xs">
             <Link
               to={`/${org}/${project}/settings`}
-              className="inline-flex items-center gap-1 border border-line px-3 py-1.5 uppercase text-fg-muted hover:border-fg-subtle focus-ring"
+              className="inline-flex h-9 items-center gap-2 border border-line px-3 uppercase text-fg-muted hover:border-fg-subtle focus-ring"
             >
               <Settings className="h-3.5 w-3.5" aria-hidden /> Settings
             </Link>
             <Button
               onClick={startSession}
               disabled={create.isPending}
-              className="btn-primary px-3 py-1.5 text-xs"
+              className="btn-primary px-3 text-xs"
             >
               <Plus className="h-3.5 w-3.5" aria-hidden />
               {create.isPending ? "Starting…" : "New session"}

@@ -69,21 +69,43 @@ export function SessionPage() {
   const [promoting, setPromoting] = React.useState(false);
   const [promoteStatus, setPromoteStatus] = React.useState<string | null>(null);
 
+  // Names of dispatched tool calls, keyed by call id, so a tool_result can tell
+  // whether the working copy may have changed (edit/write/bash).
+  const toolNames = React.useRef<Map<string, string>>(new Map());
+  const lastSeq = React.useRef<number>(-1);
+
   // Reset + connect the stream when the session changes.
   React.useEffect(() => {
     stream.getState().reset(sessionId);
+    lastSeq.current = -1;
+    toolNames.current.clear();
     const dispose = connectSessionStream(eventsUrl(sessionId), { store: stream });
     return dispose;
   }, [sessionId, stream]);
 
-  // React to file_changed events: refresh tree always; refresh the editor when
-  // the open file is the one that changed.
-  const lastSeq = React.useRef<number>(-1);
+  // React to stream events: refresh the working copy when a file may have
+  // changed (file_changed, or a mutating tool finishing), and pick up titles.
+  const refreshOpenFile = React.useCallback(() => {
+    if (!selectedPath) return;
+    setFileRefreshToken((t) => t + 1);
+    void qc.invalidateQueries({ queryKey: qk.file(sessionId, selectedPath) });
+    void qc.invalidateQueries({ queryKey: qk.diff(sessionId, selectedPath) });
+  }, [selectedPath, sessionId, qc]);
+
   React.useEffect(() => {
     for (const e of events) {
       if (e.seq <= lastSeq.current) continue;
       lastSeq.current = e.seq;
-      if (e.kind === "file_changed") {
+      if (e.kind === "tool_call") {
+        toolNames.current.set(e.id, e.name);
+      } else if (e.kind === "tool_result") {
+        const name = toolNames.current.get(e.id);
+        // edit/write/bash can mutate the working copy → refresh tree + open file.
+        if (name === "edit" || name === "write" || name === "bash") {
+          setTreeRefreshToken((t) => t + 1);
+          refreshOpenFile();
+        }
+      } else if (e.kind === "file_changed") {
         setTreeRefreshToken((t) => t + 1);
         if (e.path === selectedPath) {
           setFileRefreshToken((t) => t + 1);
@@ -99,7 +121,7 @@ export function SessionPage() {
         void qc.invalidateQueries({ queryKey: qk.sessions(project) });
       }
     }
-  }, [events, selectedPath, sessionId, project, qc]);
+  }, [events, selectedPath, sessionId, project, qc, refreshOpenFile]);
 
   const onSend = async (
     text: string,
@@ -188,7 +210,7 @@ export function SessionPage() {
             }
             editor={
               <div className="flex h-full flex-col">
-                <div className="flex items-center gap-1 border-b border-line px-2 py-1">
+                <div className="flex h-9 items-center gap-1 border-b border-line px-2">
                   <Toggle
                     variant="subtle"
                     value={mode}
