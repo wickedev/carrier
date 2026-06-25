@@ -1,4 +1,5 @@
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { Button, cn } from "@carrier/ui";
 import {
   Send,
@@ -6,6 +7,7 @@ import {
   SlidersHorizontal,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Check,
   Brain,
   Play,
@@ -65,8 +67,9 @@ const MODE_ITEMS: { plan: boolean; label: string; Icon: typeof Play }[] = [
 ];
 
 const SECTION = "px-3 pb-1 pt-2 text-2xs uppercase tracking-wide text-fg-subtle";
+// Items use a left indicator gutter (check / chevron) and right-aligned text.
 const ITEM =
-  "flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-sm text-fg hover:bg-bg focus-ring";
+  "flex w-full items-center gap-2 px-3 py-1.5 text-sm text-fg hover:bg-bg focus-ring";
 const DIVIDER = "my-1 border-t border-line";
 
 /**
@@ -100,7 +103,29 @@ export function Composer({
   const [effortOverride, setEffortOverride] = React.useState<string | null>(null);
   const [planOverride, setPlanOverride] = React.useState<boolean | null>(null);
   const [menuOpen, setMenuOpen] = React.useState(false);
+  // The menu renders in a portal (below) so it escapes the IDE panes'
+  // `overflow-hidden`, which otherwise clips the model submenu against the pane
+  // edge. We anchor it to the trigger button's viewport rect.
+  const [menuPos, setMenuPos] = React.useState<{
+    left: number;
+    bottom: number;
+    subRight: boolean;
+  } | null>(null);
+  const btnRef = React.useRef<HTMLButtonElement | null>(null);
   const menuRef = React.useRef<HTMLDivElement | null>(null);
+
+  const openMenu = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (r) {
+      const MENU_W = 224; // w-56
+      const SUB_W = 184; // min-w-44 + border
+      // Open the model submenu to the right by default; flip to the left when the
+      // right flyout would overflow the viewport.
+      const subRight = r.left + MENU_W + SUB_W <= window.innerWidth;
+      setMenuPos({ left: r.left, bottom: window.innerHeight - r.top + 6, subRight });
+    }
+    setMenuOpen(true);
+  };
 
   // Effective (displayed) values: the override if set, else the real default.
   const effModel = modelOverride ?? defaults.model;
@@ -118,18 +143,26 @@ export function Composer({
     return groups;
   }, [defaults.model]);
 
-  // Close the popover on outside click / Escape.
+  // Close on outside click / Escape; also close on scroll/resize since the
+  // portal is positioned from a one-time rect snapshot.
   React.useEffect(() => {
     if (!menuOpen) return;
     const onDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+      const t = e.target as Node;
+      if (menuRef.current?.contains(t) || btnRef.current?.contains(t)) return;
+      setMenuOpen(false);
     };
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuOpen(false);
+    const close = () => setMenuOpen(false);
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
     };
   }, [menuOpen]);
 
@@ -148,40 +181,65 @@ export function Composer({
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // ⌘/Ctrl+Enter uses the default delivery (Queue while running, immediate
-    // when idle) — Steer is always an explicit click.
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+    if (e.key !== "Enter") return;
+    // Never send mid-IME-composition — Enter is confirming the candidate (e.g.
+    // Korean/Japanese input), not submitting.
+    if (e.nativeEvent.isComposing) return;
+    if (e.metaKey || e.ctrlKey) {
+      // ⌘/Ctrl+Enter inserts a newline at the caret.
       e.preventDefault();
-      submit(false);
+      const ta = e.currentTarget;
+      const { selectionStart: start, selectionEnd: end } = ta;
+      setText(text.slice(0, start) + "\n" + text.slice(end));
+      requestAnimationFrame(() => {
+        ta.selectionStart = ta.selectionEnd = start + 1;
+      });
+      return;
     }
+    if (e.shiftKey) return; // Shift+Enter → newline (default).
+    // Plain Enter sends (Queue while running, immediate when idle); Steer is an
+    // explicit click.
+    e.preventDefault();
+    submit(false);
   };
 
   const canSend = !disabled && !!text.trim();
+
+  // Left indicator gutter: a check when selected, else an empty fixed-width slot
+  // so every row's text aligns to the same right edge.
+  const checkSlot = (on: boolean) => (
+    <span className="w-4 shrink-0">
+      {on ? <Check className="h-4 w-4" aria-hidden /> : null}
+    </span>
+  );
 
   return (
     <div className="border-t border-line p-2">
       <div className="mb-2 flex items-center gap-2 text-xs">
         {/* Single button → multi-level menu, exposing the real effective config. */}
-        <div className="relative" ref={menuRef}>
-          <button
-            type="button"
-            onClick={() => setMenuOpen((o) => !o)}
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            className="inline-flex items-center gap-1.5 border border-line px-2 py-1 text-2xs text-fg-muted hover:text-fg focus-ring"
-            title="Model · effort · mode for messages (defaults from settings)"
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
-            <span className="font-mono">
-              {shortModel(effModel)} · {effortLabel(effEffort)} · {effPlan ? "Plan" : "Normal"}
-            </span>
-            <ChevronDown className="h-3 w-3" aria-hidden />
-          </button>
-          {menuOpen ? (
-            <div
-              role="menu"
-              className="absolute bottom-full left-0 z-20 mb-1 w-56 border border-line bg-panel py-1"
-            >
+        <button
+          ref={btnRef}
+          type="button"
+          onClick={() => (menuOpen ? setMenuOpen(false) : openMenu())}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          className="inline-flex items-center gap-1.5 border border-line px-2 py-1 text-2xs text-fg-muted hover:text-fg focus-ring"
+          title="Model · effort · mode for messages (defaults from settings)"
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+          <span className="font-mono">
+            {shortModel(effModel)} · {effortLabel(effEffort)} · {effPlan ? "Plan" : "Normal"}
+          </span>
+          <ChevronDown className="h-3 w-3" aria-hidden />
+        </button>
+        {menuOpen && menuPos
+          ? createPortal(
+              <div
+                ref={menuRef}
+                role="menu"
+                style={{ position: "fixed", left: menuPos.left, bottom: menuPos.bottom }}
+                className="z-50 w-56 border border-line bg-panel py-1"
+              >
               {/* MODE */}
               <p className={SECTION}>Mode</p>
               {MODE_ITEMS.map(({ plan, label, Icon }) => (
@@ -193,10 +251,10 @@ export function Composer({
                   onClick={() => setPlanOverride(plan)}
                   className={cn(ITEM, effPlan === plan && "text-accent")}
                 >
-                  <span className="flex items-center gap-2">
+                  {checkSlot(effPlan === plan)}
+                  <span className="ml-auto flex items-center gap-2">
                     <Icon className="h-4 w-4" aria-hidden /> {label}
                   </span>
-                  {effPlan === plan ? <Check className="h-4 w-4" aria-hidden /> : null}
                 </button>
               ))}
 
@@ -213,8 +271,8 @@ export function Composer({
                   onClick={() => setEffortOverride(e)}
                   className={cn(ITEM, effEffort === e && "text-accent")}
                 >
-                  <span>{effortLabel(e)}</span>
-                  {effEffort === e ? <Check className="h-4 w-4" aria-hidden /> : null}
+                  {checkSlot(effEffort === e)}
+                  <span className="ml-auto">{effortLabel(e)}</span>
                 </button>
               ))}
 
@@ -231,15 +289,25 @@ export function Composer({
                       aria-haspopup="menu"
                       className={cn(ITEM, groupActive && "text-accent")}
                     >
-                      <span className="flex items-center gap-2">
+                      <span className="w-4 shrink-0">
+                        {menuPos.subRight ? (
+                          <ChevronRight className="h-4 w-4 text-fg-muted" aria-hidden />
+                        ) : (
+                          <ChevronLeft className="h-4 w-4 text-fg-muted" aria-hidden />
+                        )}
+                      </span>
+                      <span className="ml-auto flex items-center gap-2">
                         <Bot className="h-4 w-4" aria-hidden /> {g.provider}
                       </span>
-                      <ChevronRight className="h-4 w-4 text-fg-muted" aria-hidden />
                     </button>
-                    {/* -ml-px keeps the hover bridge gapless so the flyout stays open. */}
+                    {/* Side flips with available space (computed in openMenu);
+                        the negative margin keeps the hover bridge gapless. */}
                     <div
                       role="menu"
-                      className="absolute left-full top-0 z-30 -ml-px hidden min-w-44 border border-line bg-panel py-1 group-hover:block"
+                      className={cn(
+                        "absolute top-0 z-30 hidden min-w-44 border border-line bg-panel py-1 group-hover:block",
+                        menuPos.subRight ? "left-full -ml-px" : "right-full -mr-px",
+                      )}
                     >
                       {g.models.map((m) => (
                         <button
@@ -250,8 +318,8 @@ export function Composer({
                           onClick={() => setModelOverride(m)}
                           className={cn(ITEM, effModel === m && "text-accent")}
                         >
-                          <span>{shortModel(m)}</span>
-                          {effModel === m ? <Check className="h-4 w-4" aria-hidden /> : null}
+                          {checkSlot(effModel === m)}
+                          <span className="ml-auto">{shortModel(m)}</span>
                         </button>
                       ))}
                     </div>
@@ -270,15 +338,17 @@ export function Composer({
                     }}
                     className={cn(ITEM, "text-danger")}
                   >
-                    <span className="flex items-center gap-2">
+                    <span className="w-4 shrink-0" />
+                    <span className="ml-auto flex items-center gap-2">
                       <Square className="h-3.5 w-3.5" aria-hidden /> Interrupt agent
                     </span>
                   </button>
                 </>
               ) : null}
-            </div>
-          ) : null}
-        </div>
+              </div>,
+              document.body,
+            )
+          : null}
         {running ? (
           <span className="ml-auto inline-flex items-center gap-1.5 text-2xs uppercase tracking-wide text-success">
             <Spinner /> Agent running
@@ -294,7 +364,7 @@ export function Composer({
           disabled={disabled}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Message the agent…  (⌘/Ctrl+Enter to send)"
+          placeholder="Message the agent…  (Enter to send · ⌘/Ctrl+Enter for newline)"
           // A free-form prose field, not a form input: suppress browser/OS
           // autofill (incl. macOS "fill code" / one-time-code) and password-
           // manager overlays that otherwise pop up while typing.
