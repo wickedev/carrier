@@ -3,7 +3,6 @@ import { useParams } from "react-router";
 import { useStore } from "zustand";
 import { useQueryClient } from "@tanstack/react-query";
 import { Files, GitCompareArrows } from "lucide-react";
-import { cn } from "@carrier/ui";
 
 import { api, eventsUrl } from "../api/client";
 import { useSession, useSessionUsage, useProject, qk } from "../api/queries";
@@ -17,6 +16,7 @@ import { EditorDiff } from "../components/ide/EditorDiff";
 import { AgentPanel } from "../components/ide/AgentPanel";
 import { TopBar } from "../components/ide/TopBar";
 import { ErrorBoundary } from "../components/ErrorBoundary";
+import { Toggle } from "../components/primitives";
 
 /** /:org/:project/s/:session — the IDE split-view (Req 8–11). */
 export function SessionPage() {
@@ -167,30 +167,23 @@ export function SessionPage() {
             editor={
               <div className="flex h-full flex-col">
                 <div className="flex items-center gap-1 border-b border-neutral-200 px-2 py-1 dark:border-neutral-800">
-                  <button
-                    onClick={() => setMode("file")}
-                    aria-pressed={mode === "file"}
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs",
-                      mode === "file"
-                        ? "bg-neutral-200 dark:bg-neutral-800"
-                        : "text-fg-muted",
-                    )}
-                  >
-                    <Files className="h-3.5 w-3.5" aria-hidden /> File
-                  </button>
-                  <button
-                    onClick={() => setMode("diff")}
-                    aria-pressed={mode === "diff"}
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs",
-                      mode === "diff"
-                        ? "bg-neutral-200 dark:bg-neutral-800"
-                        : "text-fg-muted",
-                    )}
-                  >
-                    <GitCompareArrows className="h-3.5 w-3.5" aria-hidden /> Diff
-                  </button>
+                  <Toggle
+                    variant="subtle"
+                    value={mode}
+                    onChange={setMode}
+                    options={[
+                      {
+                        value: "file",
+                        label: " File",
+                        icon: <Files className="h-3.5 w-3.5" aria-hidden />,
+                      },
+                      {
+                        value: "diff",
+                        label: " Diff",
+                        icon: <GitCompareArrows className="h-3.5 w-3.5" aria-hidden />,
+                      },
+                    ]}
+                  />
                   {selectedPath ? (
                     <span className="ml-2 truncate font-mono text-xs text-fg-muted">
                       {selectedPath}

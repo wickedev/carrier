@@ -10,7 +10,7 @@ import {
   MessageSquare,
   AlertCircle,
 } from "lucide-react";
-import { Card, Badge } from "../primitives";
+import { Card, Badge, CardHeader } from "../primitives";
 
 function formatInput(input: unknown): string {
   if (typeof input === "string") return input;
@@ -43,10 +43,13 @@ export function EventCard({ event }: { event: SessionEvent }) {
     case "tool_call":
       return (
         <Card className="mx-3 my-1.5 overflow-hidden" data-kind="tool_call">
-          <div className="flex items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-1.5 text-xs font-medium dark:border-neutral-800 dark:bg-neutral-800/50">
-            <Wrench className="h-3.5 w-3.5 text-amber-500" aria-hidden />
-            <span className="font-mono">{event.name}</span>
-          </div>
+          <CardHeader
+            tone="neutral"
+            mono
+            icon={<Wrench className="h-3.5 w-3.5 text-amber-500" aria-hidden />}
+          >
+            {event.name}
+          </CardHeader>
           <pre className="max-h-48 overflow-auto px-3 py-2 text-xs text-neutral-700 dark:text-neutral-300">
             {formatInput(event.input)}
           </pre>
@@ -61,14 +64,18 @@ export function EventCard({ event }: { event: SessionEvent }) {
           )}
           data-kind="tool_result"
         >
-          <div className="flex items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-1.5 text-xs font-medium dark:border-neutral-800 dark:bg-neutral-800/50">
-            {event.isError ? (
-              <XCircle className="h-3.5 w-3.5 text-danger" aria-hidden />
-            ) : (
-              <CheckCircle2 className="h-3.5 w-3.5 text-green-500" aria-hidden />
-            )}
+          <CardHeader
+            tone="neutral"
+            icon={
+              event.isError ? (
+                <XCircle className="h-3.5 w-3.5 text-danger" aria-hidden />
+              ) : (
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" aria-hidden />
+              )
+            }
+          >
             <span>{event.isError ? "Error" : "Result"}</span>
-          </div>
+          </CardHeader>
           <pre className="max-h-48 overflow-auto px-3 py-2 text-xs text-neutral-700 dark:text-neutral-300">
             {event.content}
           </pre>

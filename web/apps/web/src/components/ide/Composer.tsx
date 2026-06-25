@@ -1,8 +1,7 @@
 import * as React from "react";
 import { Button } from "@carrier/ui";
-import { cn } from "@carrier/ui";
 import { Send, Square } from "lucide-react";
-import { Spinner } from "../primitives";
+import { Spinner, Toggle } from "../primitives";
 
 /**
  * Composer — message input with steer/queue toggle and interrupt (Req 10.3/10.4).
@@ -42,34 +41,16 @@ export function Composer({
     <div className="border-t border-neutral-200 p-2 dark:border-neutral-800">
       <div className="mb-2 flex items-center gap-1.5 text-xs">
         <span className="text-fg-muted">Delivery:</span>
-        <div className="inline-flex overflow-hidden rounded-md border border-neutral-300 dark:border-neutral-700">
-          <button
-            type="button"
-            aria-pressed={!steer}
-            onClick={() => setSteer(false)}
-            className={cn(
-              "px-2 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400",
-              !steer
-                ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
-                : "text-fg-muted",
-            )}
-          >
-            Queue
-          </button>
-          <button
-            type="button"
-            aria-pressed={steer}
-            onClick={() => setSteer(true)}
-            className={cn(
-              "px-2 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400",
-              steer
-                ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
-                : "text-fg-muted",
-            )}
-          >
-            Steer
-          </button>
-        </div>
+        <Toggle
+          variant="solid"
+          grouped
+          value={steer ? "steer" : "queue"}
+          onChange={(v) => setSteer(v === "steer")}
+          options={[
+            { value: "queue", label: "Queue" },
+            { value: "steer", label: "Steer" },
+          ]}
+        />
         {running ? (
           <Button
             variant="outline"

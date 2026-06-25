@@ -38,6 +38,100 @@ export function Badge({
   );
 }
 
+/**
+ * CardHeader — the bordered, tinted top strip shared by tool_call / tool_result /
+ * approval cards. `tone` picks the color + padding + text-size preset; the icon
+ * element is passed by the caller so its own size travels with it (h-3.5 vs h-4).
+ * `mono` wraps the label in a font-mono span (tool_call); otherwise the label is
+ * rendered as-is. `trailing` is placed after the label with `ml-auto` spacing
+ * (the approval "Expired" badge already carries `ml-auto`).
+ */
+export function CardHeader({
+  tone,
+  icon,
+  mono,
+  trailing,
+  children,
+}: {
+  tone: "neutral" | "amber";
+  icon: React.ReactNode;
+  mono?: boolean;
+  trailing?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-2 border-b",
+        tone === "neutral"
+          ? "border-neutral-200 bg-neutral-50 px-3 py-1.5 text-xs font-medium dark:border-neutral-800 dark:bg-neutral-800/50"
+          : "border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300",
+      )}
+    >
+      {icon}
+      {mono ? <span className="font-mono">{children}</span> : children}
+      {trailing}
+    </div>
+  );
+}
+
+/**
+ * Toggle — a segmented two-or-more option control unifying the File/Diff
+ * (`variant="subtle"`) and Queue/Steer (`variant="solid"`, `grouped`) toggles.
+ * Each button keeps `type="button"` + `aria-pressed`. `grouped` wraps the
+ * buttons in the bordered, rounded container the solid variant uses.
+ */
+export function Toggle<T extends string>({
+  value,
+  onChange,
+  variant,
+  grouped,
+  options,
+}: {
+  value: T;
+  onChange: (value: T) => void;
+  variant: "subtle" | "solid";
+  grouped?: boolean;
+  options: { value: T; label: React.ReactNode; icon?: React.ReactNode }[];
+}) {
+  const buttons = options.map((opt) => {
+    const active = value === opt.value;
+    return (
+      <button
+        key={opt.value}
+        type="button"
+        aria-pressed={active}
+        onClick={() => onChange(opt.value)}
+        className={
+          variant === "subtle"
+            ? cn(
+                "inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs",
+                active ? "bg-neutral-200 dark:bg-neutral-800" : "text-fg-muted",
+              )
+            : cn(
+                "px-2 py-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400",
+                active
+                  ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
+                  : "text-fg-muted",
+              )
+        }
+      >
+        {opt.icon}
+        {opt.label}
+      </button>
+    );
+  });
+
+  if (grouped) {
+    return (
+      <div className="inline-flex overflow-hidden rounded-md border border-neutral-300 dark:border-neutral-700">
+        {buttons}
+      </div>
+    );
+  }
+  return <>{buttons}</>;
+}
+
 export function Input({ className, ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input

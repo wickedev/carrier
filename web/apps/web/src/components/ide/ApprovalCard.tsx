@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Button } from "@carrier/ui";
 import { ShieldAlert, Clock } from "lucide-react";
-import { Card, Badge } from "../primitives";
+import { Card, Badge, CardHeader } from "../primitives";
 import type { PendingApproval } from "../../session/stream";
 
 /** Default approval timeout: after this, the request is treated as auto-denied. */
@@ -68,18 +68,22 @@ export function ApprovalCard({
       aria-label={`Approval request: ${approval.tool}`}
       data-testid="approval-card"
     >
-      <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
-        <ShieldAlert className="h-4 w-4" aria-hidden />
+      <CardHeader
+        tone="amber"
+        icon={<ShieldAlert className="h-4 w-4" aria-hidden />}
+        trailing={
+          expired ? (
+            <Badge
+              className="ml-auto bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+              data-testid="approval-expired"
+            >
+              <Clock className="mr-1 h-3 w-3" aria-hidden /> Expired
+            </Badge>
+          ) : null
+        }
+      >
         Approval required
-        {expired ? (
-          <Badge
-            className="ml-auto bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
-            data-testid="approval-expired"
-          >
-            <Clock className="mr-1 h-3 w-3" aria-hidden /> Expired
-          </Badge>
-        ) : null}
-      </div>
+      </CardHeader>
       <div className="space-y-1 px-3 py-2 text-sm">
         <p>
           <span className="text-fg-muted">Tool:</span>{" "}
