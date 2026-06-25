@@ -21,11 +21,11 @@ import (
 // copy (ExecContext.Cwd).
 
 const (
-	defaultReadLimit = 2000  // lines
-	maxLineLen       = 2000  // chars per line in `read`
-	maxGrepMatches   = 200   // total matches returned by `grep`
-	maxGlobResults   = 500   // paths returned by `glob`
-	maxListEntries   = 1000  // entries returned by `ls`
+	defaultReadLimit = 2000    // lines
+	maxLineLen       = 2000    // chars per line in `read`
+	maxGrepMatches   = 200     // total matches returned by `grep`
+	maxGlobResults   = 500     // paths returned by `glob`
+	maxListEntries   = 1000    // entries returned by `ls`
 	maxScanFileBytes = 5 << 20 // skip files larger than this in grep
 )
 
@@ -540,6 +540,12 @@ func obj(p props, required ...string) map[string]any {
 	return m
 }
 
-func strProp(desc string) map[string]any  { return map[string]any{"type": "string", "description": desc} }
-func intProp(desc string) map[string]any  { return map[string]any{"type": "integer", "description": desc} }
-func boolProp(desc string) map[string]any { return map[string]any{"type": "boolean", "description": desc} }
+func strProp(desc string) map[string]any {
+	return map[string]any{"type": "string", "description": desc}
+}
+func intProp(desc string) map[string]any {
+	return map[string]any{"type": "integer", "description": desc}
+}
+func boolProp(desc string) map[string]any {
+	return map[string]any{"type": "boolean", "description": desc}
+}
