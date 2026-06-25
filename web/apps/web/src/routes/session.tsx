@@ -5,7 +5,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Files, GitCompareArrows } from "lucide-react";
 
 import { api, eventsUrl } from "../api/client";
-import { useSession, useSessionUsage, useProject, qk } from "../api/queries";
+import {
+  useSession,
+  useSessionUsage,
+  useSessionModelDefaults,
+  useProject,
+  qk,
+} from "../api/queries";
 import {
   useSessionStream,
   connectSessionStream,
@@ -29,6 +35,16 @@ export function SessionPage() {
   // definite (destructive) promote action before the binding is known.
   const projectQ = useProject(project);
   const repoBound = projectQ.data ? Boolean(projectQ.data.repo) : undefined;
+  // Effective model-param defaults shown (as real values) in the composer. The
+  // BFF resolves them exactly as session creation does (org⊕project⊕plugins,
+  // engine default filled in), so the composer never shows the wrong model when
+  // the default lives at org scope. A loading fallback keeps the face stable.
+  const modelDefaultsQ = useSessionModelDefaults(sessionId, { retry: false });
+  const composerDefaults = modelDefaultsQ.data ?? {
+    model: "claude-opus-4-8",
+    effort: "" as const,
+    planMode: sessionQ.data?.planMode ?? false,
+  };
   // Per-session usage/cost (Req 20). Poll while the session is running; tolerate
   // the endpoint being unavailable (don't surface a hard error in the IDE).
   const usageQ = useSessionUsage(sessionId, {
@@ -214,6 +230,7 @@ export function SessionPage() {
                 onDecide={onDecide}
                 decidingReqId={deciding}
                 onApprovalExpire={onApprovalExpire}
+                defaults={composerDefaults}
               />
             }
           />

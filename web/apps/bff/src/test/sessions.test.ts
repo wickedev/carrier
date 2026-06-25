@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { writeFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
-import { session as sessionTable } from "../db/schema.js";
+import { session as sessionTable, configModelParams } from "../db/schema.js";
 import { makeHarness, type Harness } from "./harness.js";
 
 async function setup(h: Harness, repoBound = false) {
@@ -135,6 +135,60 @@ describe("session CRUD + Carrier brokering", () => {
     expect(last.model).toBeUndefined();
     expect(last.effort).toBeUndefined();
     expect(last.planMode).toBeUndefined();
+  });
+
+  it("input forwards an explicit empty-effort (auto) override", async () => {
+    const h = await makeHarness();
+    const { cookie, project } = await setup(h);
+    const { body } = await createSession(h, cookie, project.id);
+
+    // effort:"" is the adaptive "auto" override — it must reach Carrier, not be
+    // dropped as "no override" (that would strand the composer's "auto" choice).
+    const res = await h.app.request(`/sessions/${body.id}/input`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ text: "go", effort: "" }),
+    });
+    expect(res.status).toBe(200);
+    expect(h.carrier.inputs.at(-1)).toMatchObject({ text: "go", effort: "" });
+  });
+
+  it("model-params resolves ORG-scope defaults when the project has none", async () => {
+    const h = await makeHarness();
+    const { cookie, project } = await setup(h);
+    const { body } = await createSession(h, cookie, project.id);
+
+    // Default configured at ORG scope only (no project row) — the composer must
+    // still show it, not the engine fallback. Mirrors assembleSessionConfig's
+    // project ?? org resolution.
+    await h.db.insert(configModelParams).values({
+      id: "mp-org",
+      scope: "org",
+      ownerId: project.orgId,
+      model: "org-scope-model",
+      effort: "high",
+    });
+
+    const res = await h.app.request(`/sessions/${body.id}/model-params`, {
+      headers: { cookie },
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      model: "org-scope-model",
+      effort: "high",
+    });
+  });
+
+  it("model-params falls back to the runtime default model when unconfigured", async () => {
+    const h = await makeHarness();
+    const { cookie, project } = await setup(h);
+    const { body } = await createSession(h, cookie, project.id);
+    const res = await h.app.request(`/sessions/${body.id}/model-params`, {
+      headers: { cookie },
+    });
+    const mp = await res.json();
+    expect(mp.model).toBe("claude-opus-4-8");
+    expect(mp.effort).toBe("");
   });
 
   it("input heals a missing Carrier session (stillborn id) instead of 409", async () => {

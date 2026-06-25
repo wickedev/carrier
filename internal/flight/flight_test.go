@@ -118,7 +118,7 @@ func TestFlightPerTurnOverride(t *testing.T) {
 		caps <- capture{in.Model, in.Effort, len(in.Tools)}
 		return agent.StepResult{Done: true}, nil
 	}
-	eng := &fakeEngine{name: "fake", steps: []func(agent.StepInput) (agent.StepResult, error){step, step}}
+	eng := &fakeEngine{name: "fake", steps: []func(agent.StepInput) (agent.StepResult, error){step, step, step}}
 
 	reg := tool.NewRegistry()
 	reg.Register(echoTool{tool.Base{ToolName: "echo"}}) // mutating (ReadOnly=false), Direct exposure
@@ -151,9 +151,10 @@ func TestFlightPerTurnOverride(t *testing.T) {
 
 	// Turn 1: full overrides, including planMode=true (hides the mutating tool).
 	planOn := true
+	effMax := "max"
 	if err := f.Queues().Submit(ctx, sq.Input{
 		Msg: agent.Message{Role: agent.RoleUser, Text: "a"}, Delivery: sq.Queue,
-		Model: "turbo", Effort: "max", PlanMode: &planOn,
+		Model: "turbo", Effort: &effMax, PlanMode: &planOn,
 	}); err != nil {
 		t.Fatalf("submit 1: %v", err)
 	}
@@ -177,6 +178,21 @@ func TestFlightPerTurnOverride(t *testing.T) {
 	}
 	if c2.tools != 1 {
 		t.Fatalf("turn2 should show the mutating tool (planMode reverted), got %d visible", c2.tools)
+	}
+
+	// Turn 3: an EXPLICIT empty-string effort ("auto") must override the non-empty
+	// session default — a nil Effort would instead keep the default. This is the
+	// case a plain string field could not express.
+	effAuto := ""
+	if err := f.Queues().Submit(ctx, sq.Input{
+		Msg: agent.Message{Role: agent.RoleUser, Text: "c"}, Delivery: sq.Queue,
+		Effort: &effAuto,
+	}); err != nil {
+		t.Fatalf("submit 3: %v", err)
+	}
+	c3 := recv()
+	if c3.effort != "" {
+		t.Fatalf("turn3 effort = %q, want \"\" (explicit auto override of sess-effort)", c3.effort)
 	}
 }
 

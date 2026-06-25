@@ -64,14 +64,16 @@ func (d Delivery) String() string {
 // Input is one piece of inbound user input plus its delivery semantics.
 //
 // Model, Effort, and PlanMode are OPTIONAL per-turn overrides of the
-// session-default model parameters: an empty Model/Effort or a nil PlanMode
-// means "use the session default". They take effect for the turn sequence the
-// input drives (the Flight folds them in [Flight.foldPending]).
+// session-default model parameters: an empty Model or a nil Effort/PlanMode
+// means "use the session default". Effort is a pointer so an EXPLICIT empty
+// string (the provider's adaptive "auto" effort) can override a non-empty
+// session default. They take effect for the turn sequence the input drives (the
+// Flight folds them in [Flight.foldPending]).
 type Input struct {
 	Msg      agent.Message
 	Delivery Delivery
 	Model    string
-	Effort   string
+	Effort   *string
 	PlanMode *bool
 }
 

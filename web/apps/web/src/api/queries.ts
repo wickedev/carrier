@@ -24,6 +24,7 @@ import type {
   PermissionRule,
   ConfigScope,
   ModelParams,
+  SessionModelDefaults,
   MarketplacePlugin,
   PluginVersion,
   PluginInstall,
@@ -38,6 +39,7 @@ export const qk = {
   project: (id: string) => ["project", id] as const,
   sessions: (projectId: string) => ["sessions", projectId] as const,
   session: (id: string) => ["session", id] as const,
+  sessionModelDefaults: (id: string) => ["session", id, "model-params"] as const,
   tree: (sessionId: string, path: string) => ["tree", sessionId, path] as const,
   file: (sessionId: string, path: string) => ["file", sessionId, path] as const,
   diff: (sessionId: string, path: string) => ["diff", sessionId, path] as const,
@@ -276,6 +278,17 @@ export function useArchiveProject(projectId: string) {
   return useMutation({
     mutationFn: () => api.archiveProject(projectId),
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.project(projectId) }),
+  });
+}
+
+export function useSessionModelDefaults(
+  sessionId: string,
+  opts?: Partial<UseQueryOptions<SessionModelDefaults>>,
+) {
+  return useQuery({
+    queryKey: qk.sessionModelDefaults(sessionId),
+    queryFn: ({ signal }) => api.sessionModelDefaults(sessionId, signal),
+    ...opts,
   });
 }
 
