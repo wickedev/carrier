@@ -279,10 +279,15 @@ func (r *createRequest) toOptions() SessionOptions {
 	return opts
 }
 
-// inputRequest is the body of POST /v1/sessions/{id}/input.
+// inputRequest is the body of POST /v1/sessions/{id}/input. Model, Effort, and
+// PlanMode are OPTIONAL per-turn overrides of the session-default model params
+// (empty/absent = use the session default).
 type inputRequest struct {
-	Text  string `json:"text"`
-	Steer bool   `json:"steer"`
+	Text     string `json:"text"`
+	Steer    bool   `json:"steer"`
+	Model    string `json:"model"`
+	Effort   string `json:"effort"`
+	PlanMode *bool  `json:"plan_mode"`
 }
 
 // eventDTO is one SSE line: a small, JSON-able projection of a StreamEvent.
@@ -401,6 +406,9 @@ func (s *Server) handleInput(w http.ResponseWriter, r *http.Request) {
 	in := sq.Input{
 		Msg:      agent.Message{Role: agent.RoleUser, Text: req.Text},
 		Delivery: delivery,
+		Model:    req.Model,
+		Effort:   req.Effort,
+		PlanMode: req.PlanMode,
 	}
 	if err := f.Queues().Submit(r.Context(), in); err != nil {
 		writeError(w, http.StatusServiceUnavailable, "submit failed: "+err.Error())

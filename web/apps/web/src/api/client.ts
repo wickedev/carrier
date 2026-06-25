@@ -480,10 +480,25 @@ export const api = {
   },
 
   // ── Session control ──────────────────────────────────────────────────────
-  sendInput(sessionId: string, text: string, steer = false): Promise<void> {
+  sendInput(
+    sessionId: string,
+    text: string,
+    opts: {
+      steer?: boolean;
+      model?: string;
+      effort?: string;
+      planMode?: boolean;
+    } = {},
+  ): Promise<void> {
+    // Only include overrides that are set, so the runtime falls back to the
+    // session defaults for anything left at "Default" in the composer.
+    const body: Record<string, unknown> = { text, steer: opts.steer ?? false };
+    if (opts.model) body.model = opts.model;
+    if (opts.effort) body.effort = opts.effort;
+    if (opts.planMode !== undefined) body.planMode = opts.planMode;
     return request(`/sessions/${encodeURIComponent(sessionId)}/input`, VoidSchema, {
       method: "POST",
-      body: { text, steer },
+      body,
     });
   },
 

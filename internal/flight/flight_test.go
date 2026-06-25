@@ -105,6 +105,81 @@ func TestFlightSimpleTurn(t *testing.T) {
 	}
 }
 
+// TestFlightPerTurnOverride verifies that an input's optional Model/Effort/
+// PlanMode overrides take effect for that turn and that a later input without
+// overrides reverts to the session defaults.
+func TestFlightPerTurnOverride(t *testing.T) {
+	type capture struct {
+		model, effort string
+		tools         int
+	}
+	caps := make(chan capture, 4)
+	step := func(in agent.StepInput) (agent.StepResult, error) {
+		caps <- capture{in.Model, in.Effort, len(in.Tools)}
+		return agent.StepResult{Done: true}, nil
+	}
+	eng := &fakeEngine{name: "fake", steps: []func(agent.StepInput) (agent.StepResult, error){step, step}}
+
+	reg := tool.NewRegistry()
+	reg.Register(echoTool{tool.Base{ToolName: "echo"}}) // mutating (ReadOnly=false), Direct exposure
+
+	st, err := store.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("store: %v", err)
+	}
+	f := New(Config{
+		ID: "test", System: "sys", Engine: eng, Store: st, Tools: reg,
+		Exec:   tool.ExecContext{Executor: bay.NewLocalExecutor()},
+		Model:  "sess-model",
+		Effort: "sess-effort",
+		// PlanMode default false → the mutating tool is visible by default.
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = f.Run(ctx) }()
+
+	recv := func() capture {
+		t.Helper()
+		select {
+		case c := <-caps:
+			return c
+		case <-time.After(2 * time.Second):
+			t.Fatal("timed out waiting for a turn")
+			return capture{}
+		}
+	}
+
+	// Turn 1: full overrides, including planMode=true (hides the mutating tool).
+	planOn := true
+	if err := f.Queues().Submit(ctx, sq.Input{
+		Msg: agent.Message{Role: agent.RoleUser, Text: "a"}, Delivery: sq.Queue,
+		Model: "turbo", Effort: "max", PlanMode: &planOn,
+	}); err != nil {
+		t.Fatalf("submit 1: %v", err)
+	}
+	c1 := recv()
+	if c1.model != "turbo" || c1.effort != "max" {
+		t.Fatalf("turn1 model/effort = %q/%q, want turbo/max", c1.model, c1.effort)
+	}
+	if c1.tools != 0 {
+		t.Fatalf("turn1 planMode override should hide the mutating tool, got %d visible", c1.tools)
+	}
+
+	// Turn 2: no overrides → revert to the session defaults (tool visible again).
+	if err := f.Queues().Submit(ctx, sq.Input{
+		Msg: agent.Message{Role: agent.RoleUser, Text: "b"}, Delivery: sq.Queue,
+	}); err != nil {
+		t.Fatalf("submit 2: %v", err)
+	}
+	c2 := recv()
+	if c2.model != "sess-model" || c2.effort != "sess-effort" {
+		t.Fatalf("turn2 model/effort = %q/%q, want sess-model/sess-effort", c2.model, c2.effort)
+	}
+	if c2.tools != 1 {
+		t.Fatalf("turn2 should show the mutating tool (planMode reverted), got %d visible", c2.tools)
+	}
+}
+
 func TestFlightToolLoop(t *testing.T) {
 	reg := tool.NewRegistry()
 	reg.Register(tool.NewBash())

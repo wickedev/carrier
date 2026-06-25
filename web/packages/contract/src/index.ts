@@ -176,9 +176,18 @@ export type SessionEvent = z.infer<typeof SessionEventSchema>;
 
 // ── Session input / approvals ─────────────────────────────────────────────────
 
+/** Reasoning-effort levels ("" = the engine/provider default). */
+export const EffortSchema = z.enum(["", "low", "medium", "high", "xhigh", "max"]);
+export type Effort = z.infer<typeof EffortSchema>;
+
 export const SendInputSchema = z.object({
   text: z.string().min(1),
   steer: z.boolean().optional(),
+  // Optional per-turn overrides of the session-default model params. Absent =
+  // use the session default. `model` empty/absent means "session default".
+  model: z.string().optional(),
+  effort: EffortSchema.optional(),
+  planMode: z.boolean().optional(),
 });
 export const ApprovalDecisionSchema = z.object({ allow: z.boolean() });
 
@@ -303,7 +312,7 @@ export type EnvVar = z.infer<typeof EnvVarSchema>;
 /** Model + run parameters for a scope (a single row per scope). */
 export const ModelParamsSchema = z.object({
   model: z.string(),
-  effort: z.enum(["", "low", "medium", "high", "xhigh", "max"]),
+  effort: EffortSchema,
   maxSteps: z.number().int().min(0),
   contextBudget: z.number().int().min(0),
   planMode: z.boolean(),

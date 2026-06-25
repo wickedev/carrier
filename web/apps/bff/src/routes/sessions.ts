@@ -105,15 +105,21 @@ export function sessionRoutes(): Hono<AppEnv> {
     }
     const text = body.data.text;
     const steer = body.data.steer ?? false;
+    // Optional per-turn model-param overrides (absent → session defaults).
+    const overrides = {
+      model: body.data.model,
+      effort: body.data.effort,
+      planMode: body.data.planMode,
+    };
     try {
-      await carrier().sendInput(cid, text, steer);
+      await carrier().sendInput(cid, text, steer, overrides);
     } catch (e) {
       // A stale id (Carrier restarted and forgot the session) yields 404 — heal
       // once over the same working copy and retry.
       if (e instanceof CarrierError && e.status === 404) {
         const healed = await ensureCarrierSession(c.var.deps, ctx.session, ctx.project, cid);
         if (!healed) return c.json({ error: "carrier_unavailable" }, 503);
-        await carrier().sendInput(healed, text, steer);
+        await carrier().sendInput(healed, text, steer, overrides);
       } else {
         throw e;
       }
@@ -187,8 +193,12 @@ export function sessionRoutes(): Hono<AppEnv> {
         }
         if (ev.seq <= lastSeq) return; // dedupe / ordering guard (forwarding)
         lastSeq = ev.seq;
+        // Emit on the DEFAULT (unnamed `message`) channel — do NOT set `event:`.
+        // The web subscribes via native EventSource.onmessage, which fires only
+        // for unnamed events; a per-kind `event:` name would route every frame to
+        // a listener the client never registers, so nothing would render. The
+        // kind is already carried in the JSON payload (ev.kind) for the reducer.
         await stream.writeSSE({
-          event: ev.kind,
           id: String(ev.seq),
           data: JSON.stringify(ev),
         });

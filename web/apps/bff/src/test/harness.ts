@@ -96,7 +96,14 @@ export class FakeCarrier {
   createdWith: Array<{ cwd?: string; planMode?: boolean }> = [];
   /** Full parsed create-session wire bodies (snake_cased), in order. */
   createBodies: Array<Record<string, unknown>> = [];
-  inputs: Array<{ id: string; text: string; steer: boolean }> = [];
+  inputs: Array<{
+    id: string;
+    text: string;
+    steer: boolean;
+    model?: string;
+    effort?: string;
+    planMode?: boolean;
+  }> = [];
   interrupts: string[] = [];
   approvals: Array<{ id: string; reqId: string; allow: boolean }> = [];
   nextSessionId = "carrier-session-1";
@@ -115,7 +122,14 @@ export class FakeCarrier {
     if (url.includes("/input") && method === "POST") {
       const id = url.split("/v1/sessions/")[1]!.split("/")[0]!;
       const body = JSON.parse(String(init?.body ?? "{}"));
-      this.inputs.push({ id, text: body.text, steer: !!body.steer });
+      this.inputs.push({
+        id,
+        text: body.text,
+        steer: !!body.steer,
+        model: body.model,
+        effort: body.effort,
+        planMode: body.plan_mode,
+      });
       return jsonResponse({ ok: true });
     }
     if (url.includes("/interrupt") && method === "POST") {

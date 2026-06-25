@@ -101,5 +101,10 @@ describe("SSE relay: history-then-live ordering + dedupe", () => {
     const seqs = datas.map((d) => d.seq);
     expect(seqs).toEqual([1, 2, 3, 4]); // duplicate seq=2 dropped, order preserved
     expect(datas[2]).toMatchObject({ kind: "tool_result", isError: false });
+
+    // Frames must ride the DEFAULT (unnamed) SSE channel: the web reads them via
+    // native EventSource.onmessage, which never fires for `event:`-named frames.
+    // A per-kind name here would render an empty agent panel (kind lives in data).
+    expect(text).not.toMatch(/^event:/m);
   });
 });

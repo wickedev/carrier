@@ -100,6 +100,43 @@ describe("session CRUD + Carrier brokering", () => {
     expect(h.carrier.interrupts.length).toBe(1);
   });
 
+  it("input forwards per-turn model/effort/planMode overrides to Carrier", async () => {
+    const h = await makeHarness();
+    const { cookie, project } = await setup(h);
+    const { body } = await createSession(h, cookie, project.id);
+
+    const res = await h.app.request(`/sessions/${body.id}/input`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({
+        text: "go",
+        model: "claude-opus-4-8",
+        effort: "max",
+        planMode: true,
+      }),
+    });
+    expect(res.status).toBe(200);
+    // Carrier receives them snake-cased (plan_mode); absent → session default.
+    expect(h.carrier.inputs.at(-1)).toMatchObject({
+      text: "go",
+      model: "claude-opus-4-8",
+      effort: "max",
+      planMode: true,
+    });
+
+    // A plain message carries no overrides (runtime falls back to defaults).
+    await h.app.request(`/sessions/${body.id}/input`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ text: "plain" }),
+    });
+    const last = h.carrier.inputs.at(-1)!;
+    expect(last.text).toBe("plain");
+    expect(last.model).toBeUndefined();
+    expect(last.effort).toBeUndefined();
+    expect(last.planMode).toBeUndefined();
+  });
+
   it("input heals a missing Carrier session (stillborn id) instead of 409", async () => {
     const h = await makeHarness();
     const { cookie, project } = await setup(h);

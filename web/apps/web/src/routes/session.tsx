@@ -84,10 +84,13 @@ export function SessionPage() {
     }
   }, [events, selectedPath, sessionId, project, qc]);
 
-  const onSend = async (text: string, steer: boolean) => {
+  const onSend = async (
+    text: string,
+    opts: { steer: boolean; model?: string; effort?: string; planMode?: boolean },
+  ) => {
     setSending(true);
     try {
-      await api.sendInput(sessionId, text, steer);
+      await api.sendInput(sessionId, text, opts);
     } finally {
       setSending(false);
     }

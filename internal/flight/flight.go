@@ -121,6 +121,16 @@ type Flight struct {
 	budget      int
 	planMode    bool
 
+	// curModel/curEffort/curPlanMode are the EFFECTIVE model params for the turn
+	// sequence currently being processed. They default to the session values
+	// (model/effort/planMode) and are recomputed from each folded input's
+	// optional per-turn overrides in foldPending. runTurn, decide, and
+	// visibleTools read these so a single message can run on a different model,
+	// effort, or plan mode without disturbing the session defaults.
+	curModel    string
+	curEffort   string
+	curPlanMode bool
+
 	queues *sq.Queues
 
 	// pending holds inputs consumed mid-turn (during the steer/idle watchdog)
@@ -153,6 +163,9 @@ func New(cfg Config) *Flight {
 		maxParallel: orDefault(cfg.MaxParallel, defaultMaxParallel),
 		budget:      cfg.ContextBudget,
 		planMode:    cfg.PlanMode,
+		curModel:    cfg.Model,
+		curEffort:   cfg.Effort,
+		curPlanMode: cfg.PlanMode,
 	}
 	f.queues = sq.New(orDefault(cfg.SQCap, defaultSQCap), orDefault(cfg.EQCap, defaultEQCap), sq.Shed)
 	return f
@@ -218,6 +231,23 @@ func (f *Flight) foldPending(ctx context.Context) error {
 		rec := store.Record{Kind: store.KindTurn, Role: agent.RoleUser, Text: in.Msg.Text}
 		if err := f.store.Append(ctx, f.sid(), rec); err != nil {
 			return err
+		}
+		// Resolve the effective model params for the upcoming turns from this
+		// input's optional overrides, falling back to the session defaults. When
+		// several inputs are folded together (queued/steered mid-turn), the most
+		// recent one wins — each starts from the defaults so an unset field never
+		// inherits a prior message's override.
+		f.curModel = f.model
+		if in.Model != "" {
+			f.curModel = in.Model
+		}
+		f.curEffort = f.effort
+		if in.Effort != "" {
+			f.curEffort = in.Effort
+		}
+		f.curPlanMode = f.planMode
+		if in.PlanMode != nil {
+			f.curPlanMode = *in.PlanMode
 		}
 	}
 	f.pending = f.pending[:0]
@@ -308,8 +338,8 @@ func (f *Flight) runTurn(ctx context.Context, msgs []agent.Message) (agent.StepR
 		System:   f.effectiveSystem(),
 		Messages: msgs,
 		Tools:    f.visibleTools(),
-		Model:    f.model,
-		Effort:   f.effort,
+		Model:    f.curModel,
+		Effort:   f.curEffort,
 		OnEvent: func(ev agent.StreamEvent) {
 			select {
 			case activity <- struct{}{}:
@@ -427,7 +457,7 @@ func deniedResult(id, reason string) agent.ToolResult {
 // forceAsk reflects a tool_before plugin decision of "ask", which raises an
 // otherwise-Allow effect to Ask.
 func (f *Flight) decide(ctx context.Context, c agent.ToolCall, forceAsk bool) perm.Effect {
-	if f.planMode && !f.toolReadOnly(c) {
+	if f.curPlanMode && !f.toolReadOnly(c) {
 		return perm.Deny // plan mode forbids mutating actions
 	}
 	eff := perm.Allow // permissive default; a server installs a policy
@@ -533,7 +563,7 @@ func (f *Flight) visibleTools() []agent.Tool {
 	}
 	var defs []agent.Tool
 	for _, t := range f.tools.Visible() {
-		if f.planMode && !t.IsReadOnly(nil) {
+		if f.curPlanMode && !t.IsReadOnly(nil) {
 			continue
 		}
 		defs = append(defs, agent.Tool{

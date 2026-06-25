@@ -2,7 +2,7 @@ import * as React from "react";
 import type { SessionEvent } from "@carrier/contract";
 import { EventList } from "./EventList";
 import { ApprovalCard } from "./ApprovalCard";
-import { Composer } from "./Composer";
+import { Composer, type SendOptions } from "./Composer";
 import { EmptyState } from "../primitives";
 import type { PendingApproval } from "../../session/stream";
 
@@ -24,7 +24,7 @@ export function AgentPanel({
   approvals: PendingApproval[];
   running: boolean;
   sending?: boolean;
-  onSend: (text: string, steer: boolean) => void;
+  onSend: (text: string, opts: SendOptions) => void;
   onInterrupt: () => void;
   onDecide: (reqId: string, allow: boolean) => void;
   decidingReqId?: string | null;
