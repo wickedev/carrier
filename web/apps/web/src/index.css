@@ -100,13 +100,14 @@
     font-family: var(--font-display);
   }
 
-  /* Grid-rule background — list/landing views only (Projects, Sessions).
-     Copied from design-mockups/industrial.html .grid-bg. */
+  /* Grid-rule background — faint ambient texture for list/landing views.
+     Uses a dimmer line than --line (which is reserved for 1px borders) so the
+     grid recedes and content surfaces read clearly on top of it. */
   .grid-rule {
     background-image:
-      linear-gradient(var(--line) 1px, transparent 1px),
-      linear-gradient(90deg, var(--line) 1px, transparent 1px);
-    background-size: 40px 40px;
+      linear-gradient(#131313 1px, transparent 1px),
+      linear-gradient(90deg, #131313 1px, transparent 1px);
+    background-size: 44px 44px;
     background-position: -1px -1px;
   }
 }

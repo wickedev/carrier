@@ -49,12 +49,12 @@ export function OrgPage() {
           />
         ) : projects.data && projects.data.length > 0 ? (
           <>
-            <ul className="divide-y divide-line border-b border-line">
+            <ul className="divide-y divide-line border border-line bg-panel">
               {projects.data.map((p) => (
                 <li key={p.id}>
                   <Link
                     to={`/${org}/${p.id}`}
-                    className="flex items-center gap-4 px-3 py-4 transition-colors hover:bg-panel focus-ring"
+                    className="flex items-center gap-4 px-4 py-4 transition-colors hover:bg-white/[0.04] focus-ring"
                   >
                     <FolderGit2 className="h-5 w-5 shrink-0 text-accent" aria-hidden />
                     <div className="min-w-0 flex-1">

@@ -106,7 +106,7 @@ export function ProjectPage() {
         ) : sessions.data && sessions.data.length > 0 ? (
           <>
             <div
-              className={`${SESSION_COLS} mt-4 px-3 pb-1 text-2xs uppercase tracking-[0.15em] text-fg-subtle`}
+              className={`${SESSION_COLS} mt-4 px-4 pb-1 text-2xs uppercase tracking-[0.15em] text-fg-subtle`}
             >
               <span>#</span>
               <span>Title</span>
@@ -114,12 +114,12 @@ export function ProjectPage() {
               <span>Created</span>
               <span></span>
             </div>
-            <ul className="divide-y divide-line border-y border-line">
+            <ul className="divide-y divide-line border border-line bg-panel">
               {sessions.data.map((s, i) => (
                 <li key={s.id}>
                   <Link
                     to={`/${org}/${project}/s/${s.id}`}
-                    className={`${SESSION_COLS} px-3 py-3.5 transition-colors hover:bg-panel focus-ring ${
+                    className={`${SESSION_COLS} px-4 py-3.5 transition-colors hover:bg-white/[0.04] focus-ring ${
                       s.archived ? "opacity-60" : ""
                     }`}
                   >
