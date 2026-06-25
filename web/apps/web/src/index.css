@@ -12,7 +12,7 @@
 .dark {
   --fg:        var(--color-neutral-100);
   --fg-muted:  var(--color-neutral-400);  /* AA on neutral-950 */
-  --fg-subtle: var(--color-neutral-500);
+  --fg-subtle: #909090;                    /* AA on neutral-950 (6.20:1) */
   --danger:    var(--color-red-400);
   color-scheme: dark;
 }
