@@ -143,14 +143,14 @@ function ToastItem({
         focused.current = false;
         sync();
       }}
-      className="pointer-events-auto flex items-start gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm shadow-md dark:border-neutral-800 dark:bg-neutral-900"
+      className="pointer-events-auto flex items-start gap-2 border border-line bg-panel px-3 py-2 text-sm text-fg"
     >
       <span>{toast.message}</span>
       <button
         type="button"
         aria-label="Dismiss notification"
         onClick={() => onDismiss(toast.id)}
-        className="-mr-1 rounded text-fg-subtle hover:text-fg focus-ring"
+        className="-mr-1 text-fg-subtle hover:text-fg focus-ring"
       >
         <X className="h-3.5 w-3.5" aria-hidden />
       </button>
