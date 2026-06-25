@@ -2,7 +2,7 @@ import * as React from "react";
 import type { SessionEvent } from "@carrier/contract";
 import { EventList } from "./EventList";
 import { ApprovalCard } from "./ApprovalCard";
-import { Composer, type SendOptions } from "./Composer";
+import { Composer, type SendOptions, type SessionDefaults } from "./Composer";
 import { EmptyState } from "../primitives";
 import type { PendingApproval } from "../../session/stream";
 
@@ -19,6 +19,7 @@ export function AgentPanel({
   onDecide,
   decidingReqId,
   onApprovalExpire,
+  defaults,
 }: {
   events: SessionEvent[];
   approvals: PendingApproval[];
@@ -29,6 +30,7 @@ export function AgentPanel({
   onDecide: (reqId: string, allow: boolean) => void;
   decidingReqId?: string | null;
   onApprovalExpire?: (reqId: string) => void;
+  defaults: SessionDefaults;
 }) {
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -66,6 +68,7 @@ export function AgentPanel({
         sending={sending}
         onSend={onSend}
         onInterrupt={onInterrupt}
+        defaults={defaults}
       />
     </div>
   );

@@ -189,7 +189,9 @@ export class CarrierClient {
     // back to the session defaults (snake_case `plan_mode` on the wire).
     const body: Record<string, unknown> = { text, steer };
     if (overrides.model) body.model = overrides.model;
-    if (overrides.effort) body.effort = overrides.effort;
+    // Send effort whenever present, including "" — the runtime treats an explicit
+    // empty string as the adaptive "auto" override of a non-empty session default.
+    if (overrides.effort !== undefined) body.effort = overrides.effort;
     if (overrides.planMode !== undefined) body.plan_mode = overrides.planMode;
     const res = await this.fetchImpl(`${this.baseUrl}/v1/sessions/${sessionId}/input`, {
       method: "POST",

@@ -191,6 +191,16 @@ export const SendInputSchema = z.object({
 });
 export const ApprovalDecisionSchema = z.object({ allow: z.boolean() });
 
+/** A session's RESOLVED effective model params — the values the runtime actually
+ *  uses by default (org⊕project⊕plugins merge, with the engine's built-in model
+ *  filled in when none is configured). Shown as real values in the composer. */
+export const SessionModelDefaultsSchema = z.object({
+  model: z.string(),
+  effort: EffortSchema,
+  planMode: z.boolean(),
+});
+export type SessionModelDefaults = z.infer<typeof SessionModelDefaultsSchema>;
+
 // ── Usage / cost ──────────────────────────────────────────────────────────────
 
 export const UsageSchema = z.object({

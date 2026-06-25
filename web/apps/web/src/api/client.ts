@@ -15,6 +15,7 @@ import {
   HookDefSchema,
   EnvVarSchema,
   ModelParamsSchema,
+  SessionModelDefaultsSchema,
   MarketplacePluginSchema,
   PluginVersionSchema,
   PluginManifestSchema,
@@ -35,6 +36,7 @@ import {
   type HookDef,
   type EnvVar,
   type ModelParams,
+  type SessionModelDefaults,
   type ConfigScope,
   type MarketplacePlugin,
   type PluginVersion,
@@ -457,6 +459,19 @@ export const api = {
     return request(`/sessions/${encodeURIComponent(sessionId)}`, SessionSchema, { signal });
   },
 
+  /** The session's RESOLVED effective model params (org⊕project⊕plugins), shown
+   *  as the real defaults in the composer. */
+  sessionModelDefaults(
+    sessionId: string,
+    signal?: AbortSignal,
+  ): Promise<SessionModelDefaults> {
+    return request(
+      `/sessions/${encodeURIComponent(sessionId)}/model-params`,
+      SessionModelDefaultsSchema,
+      { signal },
+    );
+  },
+
   // ── Files / tree / diff (session-scoped working copy) ────────────────────
   tree(sessionId: string, path = "", signal?: AbortSignal): Promise<TreeEntry[]> {
     const q = path ? `?path=${encodeURIComponent(path)}` : "";
@@ -490,11 +505,12 @@ export const api = {
       planMode?: boolean;
     } = {},
   ): Promise<void> {
-    // Only include overrides that are set, so the runtime falls back to the
-    // session defaults for anything left at "Default" in the composer.
+    // Only include overrides the user actually set, so the runtime falls back to
+    // the session defaults for the rest. Effort is sent even when "" — that's the
+    // explicit adaptive "auto" override of a non-empty default.
     const body: Record<string, unknown> = { text, steer: opts.steer ?? false };
     if (opts.model) body.model = opts.model;
-    if (opts.effort) body.effort = opts.effort;
+    if (opts.effort !== undefined) body.effort = opts.effort;
     if (opts.planMode !== undefined) body.planMode = opts.planMode;
     return request(`/sessions/${encodeURIComponent(sessionId)}/input`, VoidSchema, {
       method: "POST",

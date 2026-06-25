@@ -283,11 +283,11 @@ func (r *createRequest) toOptions() SessionOptions {
 // PlanMode are OPTIONAL per-turn overrides of the session-default model params
 // (empty/absent = use the session default).
 type inputRequest struct {
-	Text     string `json:"text"`
-	Steer    bool   `json:"steer"`
-	Model    string `json:"model"`
-	Effort   string `json:"effort"`
-	PlanMode *bool  `json:"plan_mode"`
+	Text     string  `json:"text"`
+	Steer    bool    `json:"steer"`
+	Model    string  `json:"model"`
+	Effort   *string `json:"effort"`
+	PlanMode *bool   `json:"plan_mode"`
 }
 
 // eventDTO is one SSE line: a small, JSON-able projection of a StreamEvent.

@@ -10,6 +10,7 @@ import {
   FileContentSchema,
   FileDiffSchema,
   SendInputSchema,
+  SessionModelDefaultsSchema,
   SessionSchema,
   TreeEntrySchema,
   UsageSchema,
@@ -22,6 +23,12 @@ import { CarrierError } from "@carrier/carrier-client";
 import { orgById, resolveSession } from "./authz.js";
 import { orgOwnsRepo } from "./github.js";
 import { ensureCarrierSession, toSessionDto } from "./projects.js";
+import { assembleSessionConfig } from "../config-assembly.js";
+
+// Mirrors the Carrier runtime's built-in model (internal/engine/anthropic.go
+// `defaultAnthropicModel`) so the composer shows a real model when none is
+// configured at any scope.
+const RUNTIME_DEFAULT_MODEL = "claude-opus-4-8";
 import { normalizeEvent } from "../carrier.js";
 import { usageDeltaFromRaw } from "../usage.js";
 import {
@@ -41,6 +48,24 @@ export function sessionRoutes(): Hono<AppEnv> {
       .workingCopyState(ctx.session.workingCopyPath, ctx.session.workingBranch)
       .catch(() => null);
     return c.json(SessionSchema.parse(await toSessionDto(ctx.session, wc)));
+  });
+
+  // ── resolved model defaults (for the composer) ──────────────────────────────
+  // The EFFECTIVE model params the runtime uses by default, resolved the same way
+  // session creation does (org⊕project⊕plugins). planMode is the session's own
+  // persisted value. The web shows these as the real current values.
+  app.get("/:id/model-params", async (c) => {
+    const { db, crypto } = c.var.deps;
+    const ctx = await resolveSession(db, c.var.account.id, c.req.param("id"));
+    if (!ctx) return c.json({ error: "not_found" }, 404);
+    const cfg = await assembleSessionConfig(db, crypto, ctx.project);
+    return c.json(
+      SessionModelDefaultsSchema.parse({
+        model: cfg.model && cfg.model.length > 0 ? cfg.model : RUNTIME_DEFAULT_MODEL,
+        effort: cfg.effort ?? "",
+        planMode: ctx.session.planMode,
+      }),
+    );
   });
 
   // ── working-copy tree / file / diff ────────────────────────────────────────

@@ -242,8 +242,8 @@ func (f *Flight) foldPending(ctx context.Context) error {
 			f.curModel = in.Model
 		}
 		f.curEffort = f.effort
-		if in.Effort != "" {
-			f.curEffort = in.Effort
+		if in.Effort != nil {
+			f.curEffort = *in.Effort
 		}
 		f.curPlanMode = f.planMode
 		if in.PlanMode != nil {
