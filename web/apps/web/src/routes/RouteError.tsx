@@ -16,7 +16,7 @@ export function RouteError() {
   }
 
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 bg-neutral-50 dark:bg-neutral-950">
+    <div className="flex h-full flex-col items-center justify-center gap-4 bg-bg">
       <ErrorState title={title} message={message} />
       <Link to="/" className="text-sm text-info hover:underline">
         Go home

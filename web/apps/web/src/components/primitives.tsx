@@ -13,7 +13,7 @@ export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
     return (
       <div
         ref={ref}
-        className={cn("border border-line bg-panel", className)}
+        className={cn("border border-line bg-surface", className)}
         {...props}
       />
     );
@@ -27,7 +27,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center text-xs font-bold uppercase tracking-[0.1em]",
+        "inline-flex items-center px-1.5 py-0.5 text-xs font-bold uppercase tracking-[0.1em]",
         className,
       )}
       {...props}
@@ -110,7 +110,7 @@ export function Toggle<T extends string>({
               )
             : cn(
                 "px-2 py-0.5 focus-ring",
-                active ? "bg-accent font-bold text-accent-fg" : "text-fg-muted",
+                active ? "bg-accent text-accent-fg" : "text-fg-muted",
               )
         }
       >

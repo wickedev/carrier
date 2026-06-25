@@ -54,7 +54,7 @@ export function OrgPage() {
                 <li key={p.id}>
                   <Link
                     to={`/${org}/${p.id}`}
-                    className="flex items-center gap-4 px-4 py-4 transition-colors hover:bg-white/[0.04] focus-ring"
+                    className="flex items-center gap-4 px-4 py-4 transition-colors hover:bg-hover focus-ring"
                   >
                     <FolderGit2 className="h-5 w-5 shrink-0 text-accent" aria-hidden />
                     <div className="min-w-0 flex-1">

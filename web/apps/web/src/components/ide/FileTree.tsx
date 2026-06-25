@@ -142,7 +142,7 @@ export function FileTree({
               role="treeitem"
               onClick={() => toggle(entry.path)}
               style={{ paddingLeft: depth * INDENT_STEP + ROW_PAD }}
-              className="flex w-full items-center gap-1 py-1 pr-2 text-left text-sm text-fg hover:bg-neutral-900 focus-ring"
+              className="flex w-full items-center gap-1 py-1 pr-2 text-left text-sm text-fg hover:bg-hover focus-ring"
               aria-expanded={isOpen}
             >
               {isOpen ? (
@@ -166,8 +166,8 @@ export function FileTree({
           onClick={() => onSelect(entry.path)}
           style={{ paddingLeft: depth * INDENT_STEP + ROW_PAD + ICON_GUTTER }}
           className={cn(
-            "flex w-full items-center gap-1 py-1 pr-2 text-left text-sm text-fg hover:bg-neutral-900 focus-ring",
-            selected && "bg-neutral-900 text-accent",
+            "flex w-full items-center gap-1 py-1 pr-2 text-left text-sm text-fg hover:bg-hover focus-ring",
+            selected && "bg-accent/15",
           )}
           aria-current={selected ? "true" : undefined}
         >

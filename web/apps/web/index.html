@@ -5,11 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Carrier</title>
     <script>
+      // Dark-first industrial theme: the app is dark-only.
       (function () {
-        var s = localStorage.getItem("carrier.theme");
-        var dark = s === "dark" ? true : s === "light" ? false
-          : matchMedia("(prefers-color-scheme: dark)").matches;
-        if (dark) document.documentElement.classList.add("dark");
+        document.documentElement.classList.add("dark");
       })();
     </script>
   </head>

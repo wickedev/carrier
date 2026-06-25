@@ -119,7 +119,7 @@ export function ProjectPage() {
                 <li key={s.id}>
                   <Link
                     to={`/${org}/${project}/s/${s.id}`}
-                    className={`${SESSION_COLS} px-4 py-3.5 transition-colors hover:bg-white/[0.04] focus-ring ${
+                    className={`${SESSION_COLS} px-4 py-3.5 transition-colors hover:bg-hover focus-ring ${
                       s.archived ? "opacity-60" : ""
                     }`}
                   >

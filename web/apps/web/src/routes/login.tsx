@@ -2,7 +2,6 @@ import * as React from "react";
 import { Github } from "lucide-react";
 import { Button, buttonVariants } from "@carrier/ui";
 import { Input } from "../components/primitives";
-import { ThemeToggleStandalone } from "./shared";
 import { api } from "../api/client";
 
 /** Human-readable messages for the BFF's auth error codes. */
@@ -56,9 +55,6 @@ export function LoginPage() {
 
   return (
     <div className="relative flex h-full flex-col items-center justify-center gap-6 bg-bg text-fg">
-      <div className="absolute right-3 top-3">
-        <ThemeToggleStandalone />
-      </div>
       <div className="flex flex-col items-center gap-2">
         <h1 className="font-display text-2xl font-bold uppercase tracking-[0.15em]">Carrier</h1>
         <p className="text-xs uppercase tracking-[0.1em] text-fg-muted">

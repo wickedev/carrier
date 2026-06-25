@@ -2,24 +2,9 @@ import * as React from "react";
 import { Link, useParams, useNavigate, Outlet } from "react-router";
 import { Button } from "@carrier/ui";
 import { cn } from "@carrier/ui";
-import { Sun, Moon, ChevronDown, LogOut } from "lucide-react";
+import { ChevronDown, LogOut } from "lucide-react";
 import type { Me } from "@carrier/contract";
-import { useTheme } from "./theme";
 import { api } from "../api/client";
-
-function ThemeToggle() {
-  const { theme, toggle } = useTheme();
-  return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={toggle}
-      aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
-    >
-      {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-    </Button>
-  );
-}
 
 function OrgSwitcher({ me, activeSlug }: { me: Me; activeSlug?: string }) {
   const [open, setOpen] = React.useState(false);
@@ -76,7 +61,7 @@ function OrgSwitcher({ me, activeSlug }: { me: Me; activeSlug?: string }) {
 }
 
 /**
- * App shell — header with brand, org switcher, theme toggle, and account.
+ * App shell — header with brand, org switcher, and account.
  * Used as the layout route for all authenticated pages. The IDE route renders
  * inside the shell's `<Outlet/>` but uses the full content area.
  */
@@ -106,7 +91,6 @@ export function Shell({ me }: { me: Me }) {
         </Link>
         <OrgSwitcher me={me} activeSlug={org} />
         <div className="ml-auto flex items-center gap-2">
-          <ThemeToggle />
           <span className="hidden text-sm text-fg-muted sm:inline">{me.account.login}</span>
           <img
             src={me.account.avatarUrl}
