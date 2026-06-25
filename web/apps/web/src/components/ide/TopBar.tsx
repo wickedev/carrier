@@ -2,39 +2,12 @@ import * as React from "react";
 import { Link } from "react-router";
 import { Button } from "@carrier/ui";
 import { cn } from "@carrier/ui";
-import {
-  GitBranch,
-  GitPullRequest,
-  GitMerge,
-  CircleDot,
-  Circle,
-  Loader2,
-  ChevronRight,
-} from "lucide-react";
+import { GitBranch, GitPullRequest, GitMerge } from "lucide-react";
 import type { Session, SessionStatus, Usage } from "@carrier/contract";
 import type { ConnectionState } from "../../session/stream";
 import { Spinner } from "../primitives";
+import { SessionStatusPill } from "../SessionStatusPill";
 import { UsagePill } from "./UsagePanel";
-
-function StatusDot({ status }: { status: SessionStatus }) {
-  if (status === "running")
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-success">
-        <Loader2 className="h-3 w-3 animate-spin motion-reduce:animate-none" aria-hidden /> running
-      </span>
-    );
-  if (status === "terminated")
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-fg-muted">
-        <Circle className="h-3 w-3" aria-hidden /> terminated
-      </span>
-    );
-  return (
-    <span className="inline-flex items-center gap-1 text-xs text-info">
-      <CircleDot className="h-3 w-3" aria-hidden /> idle
-    </span>
-  );
-}
 
 function ConnectionPill({ connection }: { connection: ConnectionState }) {
   const map: Record<ConnectionState, { label: string; cls: string }> = {
@@ -128,7 +101,7 @@ export function TopBar({
       <div className="ml-auto flex items-center gap-3">
         <UsagePill usage={usage} loading={usageLoading} />
         <ConnectionPill connection={connection} />
-        <StatusDot status={status} />
+        <SessionStatusPill status={status} />
         {prUrl ? (
           <a
             href={prUrl}

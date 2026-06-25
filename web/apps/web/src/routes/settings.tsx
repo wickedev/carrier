@@ -3,7 +3,9 @@ import { useParams, useRouteLoaderData, Link, useNavigate } from "react-router";
 import type { Me, Org, Role } from "@carrier/contract";
 import { Button } from "@carrier/ui";
 import { Plus, UserPlus, Github, Loader2 } from "lucide-react";
-import { Card, EmptyState, Loading, ErrorState, Input } from "../components/primitives";
+import { Card, EmptyState, Loading, ErrorState, Input, SELECT_CLASS } from "../components/primitives";
+import { PageFrame } from "../components/PageFrame";
+import { Breadcrumb, BreadcrumbSep } from "../components/Breadcrumb";
 import { ConfigSection, DeleteButton } from "../components/config-controls";
 import { useToast } from "../components/toast";
 import {
@@ -29,10 +31,6 @@ function canManage(role?: Role): boolean {
   return role === "owner" || role === "admin";
 }
 
-/** Industrial select control: transparent, 1px line, radius 0, amber focus. */
-const SELECT_CLASS =
-  "h-9 border border-line bg-transparent px-2 text-sm text-fg focus-ring";
-
 // ─── Org settings: members + installations (Req 17/21) ───────────────────────
 
 export function OrgSettingsPage() {
@@ -41,18 +39,16 @@ export function OrgSettingsPage() {
   const current = me?.orgs.find((o) => o.slug === org);
 
   return (
-    <div className="grid-rule min-h-[calc(100vh-3.25rem)]">
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <nav
-          aria-label="Breadcrumb"
-          className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.1em] text-fg-muted"
-        >
-          <Link to={`/${org}`} className="hover:underline focus-ring">
-            {org}
-          </Link>
-          <span className="text-fg-subtle">/</span>
-          <span className="font-medium text-accent">Settings</span>
-        </nav>
+    <PageFrame>
+        <div className="mb-3">
+          <Breadcrumb>
+            <Link to={`/${org}`} className="hover:underline focus-ring">
+              {org}
+            </Link>
+            <BreadcrumbSep />
+            <span className="font-medium text-accent">Settings</span>
+          </Breadcrumb>
+        </div>
         <h1 className="mb-4 font-display text-2xl font-bold">ORG SETTINGS</h1>
 
       <Card className="mb-4 p-4">
@@ -81,8 +77,7 @@ export function OrgSettingsPage() {
       </h2>
       <ConfigSections scope="org" ownerKey={org} manage={canManage(current?.role)} />
       <InstalledPluginsSection scope="org" ownerKey={org} manage={canManage(current?.role)} />
-      </div>
-    </div>
+    </PageFrame>
   );
 }
 
@@ -210,18 +205,16 @@ export function ProjectSettingsPage() {
   const manage = canManage(currentOrg?.role);
 
   return (
-    <div className="grid-rule min-h-[calc(100vh-3.25rem)]">
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <nav
-          aria-label="Breadcrumb"
-          className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.1em] text-fg-muted"
-        >
-          <Link to={`/${org}/${project}`} className="hover:underline focus-ring">
-            {projectQ.data?.name ?? project}
-          </Link>
-          <span className="text-fg-subtle">/</span>
-          <span className="font-medium text-accent">Settings</span>
-        </nav>
+    <PageFrame>
+        <div className="mb-3">
+          <Breadcrumb>
+            <Link to={`/${org}/${project}`} className="hover:underline focus-ring">
+              {projectQ.data?.name ?? project}
+            </Link>
+            <BreadcrumbSep />
+            <span className="font-medium text-accent">Settings</span>
+          </Breadcrumb>
+        </div>
         <h1 className="mb-4 font-display text-2xl font-bold">PROJECT SETTINGS</h1>
 
       <RepoBindingSection orgSlug={currentOrg?.slug ?? org} projectId={project} manage={manage} />
@@ -235,8 +228,7 @@ export function ProjectSettingsPage() {
 
       <UsageSection projectId={project} />
       <DangerZone orgSlug={org} projectId={project} manage={manage} />
-      </div>
-    </div>
+    </PageFrame>
   );
 }
 

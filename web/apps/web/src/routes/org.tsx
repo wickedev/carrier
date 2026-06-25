@@ -4,6 +4,7 @@ import { Button } from "@carrier/ui";
 import { Plus, FolderGit2, Settings, Github, X, Loader2, ArrowRight } from "lucide-react";
 import { useProjects, useCreateProject, useInstallations } from "../api/queries";
 import { Card, Input, Loading, ErrorState, EmptyState } from "../components/primitives";
+import { PageFrame } from "../components/PageFrame";
 import { useToast } from "../components/toast";
 
 /** /:org — project list within an org/personal context (Req 4). */
@@ -14,8 +15,7 @@ export function OrgPage() {
   const count = projects.data?.length ?? 0;
 
   return (
-    <div className="grid-rule min-h-[calc(100vh-3.25rem)]">
-      <div className="mx-auto max-w-6xl px-6 py-8">
+    <PageFrame>
         <div className="mb-0 flex items-end justify-between border-b border-line pb-3">
           <div>
             <h1 className="font-display text-2xl font-bold">PROJECTS</h1>
@@ -96,8 +96,7 @@ export function OrgPage() {
         )}
 
         {showNew ? <NewProjectDialog org={org} onClose={() => setShowNew(false)} /> : null}
-      </div>
-    </div>
+    </PageFrame>
   );
 }
 

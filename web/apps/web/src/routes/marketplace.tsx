@@ -22,6 +22,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { Card, Badge, Input, Loading, ErrorState, EmptyState } from "../components/primitives";
+import { PageFrame } from "../components/PageFrame";
+import { Breadcrumb, BreadcrumbSep } from "../components/Breadcrumb";
 import { ConfigSection, DeleteButton, EnableToggle } from "../components/config-controls";
 import { useToast } from "../components/toast";
 import {
@@ -57,18 +59,16 @@ export function MarketplacePage() {
   const search = useMarketplaceSearch(query);
 
   return (
-    <div className="grid-rule min-h-[calc(100vh-3.25rem)]">
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <nav
-          aria-label="Breadcrumb"
-          className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.1em] text-fg-muted"
-        >
-          <Link to={`/${org}`} className="hover:underline focus-ring">
-            {org}
-          </Link>
-          <span className="text-fg-subtle">/</span>
-          <span className="font-medium text-accent">Marketplace</span>
-        </nav>
+    <PageFrame>
+        <div className="mb-3">
+          <Breadcrumb>
+            <Link to={`/${org}`} className="hover:underline focus-ring">
+              {org}
+            </Link>
+            <BreadcrumbSep />
+            <span className="font-medium text-accent">Marketplace</span>
+          </Breadcrumb>
+        </div>
         <h1 className="mb-4 font-display text-2xl font-bold">PLUGIN MARKETPLACE</h1>
 
       <div className="relative mb-6">
@@ -106,8 +106,7 @@ export function MarketplacePage() {
           description="Try a different search, or check back later for new plugins."
         />
       )}
-      </div>
-    </div>
+    </PageFrame>
   );
 }
 
@@ -160,18 +159,16 @@ export function PluginDetailPage() {
   const manifest = detail.data?.manifest ?? current?.manifest;
 
   return (
-    <div className="grid-rule min-h-[calc(100vh-3.25rem)]">
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <nav
-          aria-label="Breadcrumb"
-          className="mb-4 flex items-center gap-2 text-xs uppercase tracking-[0.1em] text-fg-muted"
-        >
-          <Link to={`/${org}/marketplace`} className="hover:underline focus-ring">
-            Marketplace
-          </Link>
-          <span className="text-fg-subtle">/</span>
-          <span className="font-medium text-accent">{name}</span>
-        </nav>
+    <PageFrame>
+        <div className="mb-4">
+          <Breadcrumb>
+            <Link to={`/${org}/marketplace`} className="hover:underline focus-ring">
+              Marketplace
+            </Link>
+            <BreadcrumbSep />
+            <span className="font-medium text-accent">{name}</span>
+          </Breadcrumb>
+        </div>
 
       {versions.isLoading ? (
         <Loading />
@@ -224,8 +221,7 @@ export function PluginDetailPage() {
           ) : null}
         </>
       )}
-      </div>
-    </div>
+    </PageFrame>
   );
 }
 

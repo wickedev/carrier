@@ -1,34 +1,12 @@
 import * as React from "react";
 import { Link, useParams, useNavigate } from "react-router";
 import { Button } from "@carrier/ui";
-import { Plus, Settings, Loader2, CircleDot, Circle, ArrowRight, GitBranch } from "lucide-react";
-import type { SessionStatus } from "@carrier/contract";
+import { Plus, Settings, ArrowRight, GitBranch } from "lucide-react";
 import { useProject, useSessions, useCreateSession } from "../api/queries";
 import { Loading, ErrorState, EmptyState } from "../components/primitives";
-
-/** Status pill: info=idle, success=running, subtle=terminated. */
-function StatusPill({ status }: { status: SessionStatus }) {
-  if (status === "running")
-    return (
-      <span className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.1em] text-success">
-        <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
-        Running
-      </span>
-    );
-  if (status === "terminated")
-    return (
-      <span className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.1em] text-fg-subtle">
-        <Circle className="h-3.5 w-3.5" aria-hidden />
-        Ended
-      </span>
-    );
-  return (
-    <span className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.1em] text-info">
-      <CircleDot className="h-3.5 w-3.5" aria-hidden />
-      Idle
-    </span>
-  );
-}
+import { PageFrame } from "../components/PageFrame";
+import { Breadcrumb, BreadcrumbSep } from "../components/Breadcrumb";
+import { SessionStatusPill } from "../components/SessionStatusPill";
 
 const SESSION_COLS = "grid grid-cols-[2.5rem_1fr_6rem_8rem_2rem] items-center gap-3";
 
@@ -55,23 +33,19 @@ export function ProjectPage() {
   const count = sessions.data?.length ?? 0;
 
   return (
-    <div className="grid-rule min-h-[calc(100vh-3.25rem)]">
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <nav
-          aria-label="Breadcrumb"
-          className="flex items-center gap-2 text-xs uppercase tracking-[0.1em] text-fg-muted"
-        >
+    <PageFrame>
+        <Breadcrumb>
           <Link to={`/${org}`} className="hover:underline focus-ring">
             {org}
           </Link>
-          <span className="text-fg-subtle">/</span>
+          <BreadcrumbSep />
           <span className="font-medium text-accent">{projectQ.data?.name ?? project}</span>
           <span className="border border-line px-1.5 text-2xs text-fg-subtle">
             {projectQ.data?.repo
               ? `${projectQ.data.repo.repoFullName} (${projectQ.data.repo.defaultBranch})`
               : "Unbound workspace"}
           </span>
-        </nav>
+        </Breadcrumb>
 
         <div className="mt-3 flex items-end justify-between border-b border-line pb-3">
           <h1 className="font-display text-2xl font-bold">SESSIONS</h1>
@@ -133,7 +107,7 @@ export function ProjectPage() {
                         {s.planMode ? " · plan mode" : ""}
                       </div>
                     </div>
-                    <StatusPill status={s.status} />
+                    <SessionStatusPill status={s.status} />
                     <span className="text-xs text-fg-muted">
                       {new Date(s.createdAt).toLocaleString()}
                     </span>
@@ -149,7 +123,6 @@ export function ProjectPage() {
         ) : (
           <EmptyState title="No sessions yet" description="Start a session to begin coding." />
         )}
-      </div>
-    </div>
+    </PageFrame>
   );
 }

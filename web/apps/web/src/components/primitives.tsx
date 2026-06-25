@@ -145,6 +145,10 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
   },
 );
 
+/** Industrial select control: transparent, 1px line, radius 0, amber focus. */
+export const SELECT_CLASS =
+  "h-9 border border-line bg-transparent px-2 text-sm text-fg focus-ring";
+
 export function Loading({ label = "Loading…" }: { label?: string }) {
   return (
     <div
