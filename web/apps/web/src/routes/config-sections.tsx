@@ -31,9 +31,9 @@ export interface SectionProps {
 // ── Shared styling helpers (mirror settings.tsx form controls) ────────────────
 
 const SELECT_CLASS =
-  "h-9 rounded-md border border-neutral-300 bg-white px-2 text-sm focus-ring dark:border-neutral-700 dark:bg-neutral-950";
+  "h-9 border border-line bg-transparent px-2 text-sm text-fg focus-ring";
 const TEXTAREA_CLASS =
-  "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm outline-none placeholder:text-fg-subtle focus-ring dark:border-neutral-700 dark:bg-neutral-950";
+  "w-full border border-line bg-transparent px-3 py-2 text-sm text-fg outline-none placeholder:text-fg-subtle focus-ring";
 
 /** Parse a comma/space-separated list into trimmed, non-empty tokens. */
 function splitList(raw: string): string[] {

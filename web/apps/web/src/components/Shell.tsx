@@ -50,7 +50,7 @@ function OrgSwitcher({ me, activeSlug }: { me: Me; activeSlug?: string }) {
       {open ? (
         <ul
           role="listbox"
-          className="absolute left-0 z-20 mt-1 min-w-48 rounded-md border border-neutral-200 bg-white py-1 shadow-lg dark:border-neutral-800 dark:bg-neutral-900"
+          className="absolute left-0 z-20 mt-1 min-w-48 border border-line bg-panel py-1"
         >
           {me.orgs.map((org) => (
             <li key={org.id} role="option" aria-selected={org.slug === activeSlug}>
@@ -60,8 +60,8 @@ function OrgSwitcher({ me, activeSlug }: { me: Me; activeSlug?: string }) {
                   navigate(`/${org.slug}`);
                 }}
                 className={cn(
-                  "flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-neutral-100 focus-ring dark:hover:bg-neutral-800",
-                  org.slug === activeSlug && "font-medium",
+                  "flex w-full items-center justify-between px-3 py-1.5 text-left text-sm hover:bg-bg focus-ring",
+                  org.slug === activeSlug && "font-medium text-accent",
                 )}
               >
                 <span>{org.name}</span>
@@ -90,15 +90,18 @@ export function Shell({ me }: { me: Me }) {
   };
 
   return (
-    <div className="flex h-full flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+    <div className="flex h-full flex-col bg-bg text-fg">
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-neutral-900 focus:px-3 focus:py-1.5 focus:text-sm focus:text-white dark:focus:bg-neutral-100 dark:focus:text-neutral-900"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:bg-accent focus:px-3 focus:py-1.5 focus:text-sm focus:text-accent-fg"
       >
         Skip to content
       </a>
-      <header className="flex items-center gap-3 border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
-        <Link to="/" className="text-sm font-semibold">
+      <header className="flex items-center gap-3 border-b border-line bg-panel px-4 py-2">
+        <Link
+          to="/"
+          className="font-display text-sm font-bold uppercase tracking-[0.2em] focus-ring"
+        >
           Carrier
         </Link>
         <OrgSwitcher me={me} activeSlug={org} />

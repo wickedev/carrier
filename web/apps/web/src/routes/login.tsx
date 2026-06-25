@@ -55,13 +55,13 @@ export function LoginPage() {
   };
 
   return (
-    <div className="relative flex h-full flex-col items-center justify-center gap-6 bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100">
+    <div className="relative flex h-full flex-col items-center justify-center gap-6 bg-bg text-fg">
       <div className="absolute right-3 top-3">
         <ThemeToggleStandalone />
       </div>
       <div className="flex flex-col items-center gap-2">
-        <h1 className="text-2xl font-semibold">Carrier</h1>
-        <p className="text-sm text-fg-muted">
+        <h1 className="font-display text-2xl font-bold uppercase tracking-[0.15em]">Carrier</h1>
+        <p className="text-xs uppercase tracking-[0.1em] text-fg-muted">
           {mode === "login"
             ? "Sign in to access your projects."
             : "Create your account."}
@@ -105,14 +105,18 @@ export function LoginPage() {
             {error}
           </p>
         ) : null}
-        <Button type="submit" disabled={busy || !email || !password}>
+        <Button
+          type="submit"
+          disabled={busy || !email || !password}
+          className="btn-primary"
+        >
           {mode === "login" ? "Sign in" : "Create account"}
         </Button>
       </form>
 
       <button
         type="button"
-        className="rounded text-sm text-fg-muted hover:underline focus-ring"
+        className="text-xs uppercase tracking-[0.1em] text-fg-muted hover:underline focus-ring"
         onClick={() => {
           setMode((m) => (m === "login" ? "register" : "login"));
           setError(null);
