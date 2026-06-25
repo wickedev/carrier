@@ -24,11 +24,11 @@ async function setupSession(h: Harness) {
 }
 
 describe("normalizeEvent: snake→camel mapping", () => {
-  it("maps tool_result.is_error → isError", () => {
+  it("maps tool_result.is_error → isError and tool_call_id → id", () => {
     const raw: RawCarrierEvent = {
       seq: 1,
       kind: "tool_result",
-      id: "t1",
+      tool_call_id: "t1",
       content: "out",
       is_error: true,
     };
@@ -60,16 +60,16 @@ describe("normalizeEvent: snake→camel mapping", () => {
     });
   });
 
-  it("parses tool_call input from JSON text", () => {
+  it("parses tool_call input from JSON text and keeps tool_call_id", () => {
     const raw: RawCarrierEvent = {
       seq: 3,
       kind: "tool_call",
-      id: "c1",
+      tool_call_id: "c1",
       name: "edit",
       text: JSON.stringify({ path: "a.ts" }),
     };
     const ev = normalizeEvent(raw);
-    expect(ev).toMatchObject({ kind: "tool_call", input: { path: "a.ts" } });
+    expect(ev).toMatchObject({ kind: "tool_call", id: "c1", input: { path: "a.ts" } });
   });
 
   it("drops unknown kinds", () => {
@@ -84,7 +84,7 @@ describe("SSE relay: history-then-live ordering + dedupe", () => {
       { seq: 1, kind: "status", state: "running" }, // history
       { seq: 2, kind: "text", text: "hello" }, // history
       { seq: 2, kind: "text", text: "dup" }, // duplicate seq → dropped
-      { seq: 3, kind: "tool_result", id: "x", content: "ok", is_error: false }, // live
+      { seq: 3, kind: "tool_result", tool_call_id: "x", content: "ok", is_error: false }, // live
       { seq: 4, kind: "status", state: "idle" },
     ];
     const { cookie, session } = await setupSession(h);

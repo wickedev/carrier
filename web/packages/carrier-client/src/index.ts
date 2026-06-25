@@ -75,7 +75,9 @@ export interface RawCarrierEvent {
   kind: string;
   text?: string;
   name?: string;
-  id?: string;
+  // The runtime tags tool_call / tool_result frames with `tool_call_id` (not
+  // `id`); it is what correlates a result back to its call.
+  tool_call_id?: string;
   content?: string;
   is_error?: boolean;
   path?: string;

@@ -47,7 +47,7 @@ export function normalizeEvent(raw: RawCarrierEvent): SessionEvent | null {
       candidate = {
         seq,
         kind: "tool_call",
-        id: raw.id ?? "",
+        id: raw.tool_call_id ?? "",
         name: raw.name ?? "",
         input: parseMaybeJson(raw.text),
       };
@@ -56,7 +56,7 @@ export function normalizeEvent(raw: RawCarrierEvent): SessionEvent | null {
       candidate = {
         seq,
         kind: "tool_result",
-        id: raw.id ?? "",
+        id: raw.tool_call_id ?? "",
         content: raw.content ?? "",
         isError: raw.is_error ?? false,
       };
