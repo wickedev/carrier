@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { loadConfig } from "../config.js";
 import {
   isGithubAppConfigured,
-  StubGithubProvider,
+  OctokitGithubProvider,
 } from "../auth/github-provider.js";
 
 // A minimal but structurally-valid PEM so isGithubAppConfigured treats it as real.
@@ -24,25 +24,35 @@ describe("GitHub App configuration gating", () => {
   });
 });
 
-describe("StubGithubProvider", () => {
-  const stub = new StubGithubProvider();
+describe("OctokitGithubProvider with no App configured", () => {
+  // Placeholder App key (dev default) but real-looking OAuth client creds.
+  const provider = new OctokitGithubProvider(
+    loadConfig({ githubClientId: "Iv1.abc123", githubClientSecret: "shh" }),
+  );
 
   it("returns no installations instead of throwing", async () => {
-    await expect(stub.listInstallations()).resolves.toEqual([]);
-    await expect(stub.listInstallationRepos(1)).resolves.toEqual([]);
+    await expect(provider.listInstallations()).resolves.toEqual([]);
+    await expect(provider.listInstallationRepos(1)).resolves.toEqual([]);
   });
 
-  it("fails with a clear message for operations that require GitHub", async () => {
-    expect(() => stub.getAuthorizeUrl("s")).toThrow(/not configured/i);
-    await expect(stub.getCloneInfo(1, "a/b")).rejects.toThrow(/not configured/i);
+  it("fails App-only operations (clone/PR) with a clear message", async () => {
+    await expect(provider.getCloneInfo(1, "a/b")).rejects.toThrow(/App is not configured/i);
     await expect(
-      stub.openPullRequest({
+      provider.openPullRequest({
         installationId: 1,
         repoFullName: "a/b",
         head: "h",
         base: "b",
         title: "t",
       }),
-    ).rejects.toThrow(/not configured/i);
+    ).rejects.toThrow(/App is not configured/i);
+  });
+
+  it("KEEPS GitHub OAuth login working (it is independent of the App key)", () => {
+    // Regression: missing App private key must not disable OAuth login.
+    const url = provider.getAuthorizeUrl("state-xyz");
+    expect(url).toContain("github.com/login/oauth/authorize");
+    expect(url).toContain("Iv1.abc123");
+    expect(url).toContain("state-xyz");
   });
 });

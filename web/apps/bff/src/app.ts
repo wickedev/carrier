@@ -9,7 +9,6 @@ import { loadConfig, type Config } from "./config.js";
 import { createDb } from "./db/client.js";
 import {
   OctokitGithubProvider,
-  StubGithubProvider,
   isGithubAppConfigured,
 } from "./auth/github-provider.js";
 import { createCarrierClient } from "./carrier.js";
@@ -33,19 +32,14 @@ export async function createDeps(
 ): Promise<AppDeps> {
   const config = overrides.config ?? loadConfig();
   const db = overrides.db ?? (await createDb({ dataDir: config.databaseUrl }));
-  // Without real GitHub App credentials (local dev), Octokit can't sign its JWT
-  // and every installations call would 500; fall back to a stub that reports no
-  // installations so GitHub features degrade gracefully instead of erroring.
-  let github = overrides.github;
-  if (!github) {
-    if (isGithubAppConfigured(config)) {
-      github = new OctokitGithubProvider(config);
-    } else {
-      console.warn(
-        "[bff] GitHub App not configured (no GITHUB_PRIVATE_KEY); using stub provider — installations will be empty.",
-      );
-      github = new StubGithubProvider();
-    }
+  const github = overrides.github ?? new OctokitGithubProvider(config);
+  // App-scoped features (installations/repos/clone/PR) degrade to empty/clear
+  // errors inside the provider when the App key is absent; OAuth login is
+  // independent and unaffected. Warn so the empty installations are explainable.
+  if (!overrides.github && !isGithubAppConfigured(config)) {
+    console.warn(
+      "[bff] GitHub App not configured (no GITHUB_PRIVATE_KEY); installation listings will be empty. GitHub OAuth login is unaffected.",
+    );
   }
   const workspace =
     overrides.workspace ?? new Workspace(config.workspaceRoot, github);

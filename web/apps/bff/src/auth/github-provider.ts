@@ -105,6 +105,15 @@ export class OctokitGithubProvider implements GithubProvider {
     };
   }
 
+  /** Throw a clear, actionable error when an App-only operation needs the App. */
+  private requireApp(): void {
+    if (!isGithubAppConfigured(this.cfg)) {
+      throw new Error(
+        "GitHub App is not configured (set GITHUB_APP_ID and GITHUB_PRIVATE_KEY).",
+      );
+    }
+  }
+
   /** App-authenticated Octokit (JWT) — used to enumerate installations. */
   private appOctokit(): Octokit {
     return new Octokit({
@@ -129,6 +138,9 @@ export class OctokitGithubProvider implements GithubProvider {
   }
 
   async listInstallations(): Promise<GithubInstallationRef[]> {
+    // No App configured → no installations (rather than a 500 from signing the
+    // App JWT with a placeholder key). OAuth login is unaffected by this.
+    if (!isGithubAppConfigured(this.cfg)) return [];
     const octokit = this.appOctokit();
     const installs = await octokit.paginate(
       octokit.rest.apps.listInstallations,
@@ -146,6 +158,7 @@ export class OctokitGithubProvider implements GithubProvider {
   }
 
   async listInstallationRepos(installationId: number): Promise<GithubRepoRef[]> {
+    if (!isGithubAppConfigured(this.cfg)) return [];
     const octokit = this.installationOctokit(installationId);
     const repos = await octokit.paginate(
       octokit.rest.apps.listReposAccessibleToInstallation,
@@ -162,6 +175,7 @@ export class OctokitGithubProvider implements GithubProvider {
     installationId: number,
     repoFullName: string,
   ): Promise<{ token: string; cloneUrl: string }> {
+    this.requireApp();
     // Mint a short-lived installation access token and embed it in the https
     // clone URL: https://x-access-token:<token>@github.com/<repo>.git
     const auth = createAppAuth({
@@ -178,6 +192,7 @@ export class OctokitGithubProvider implements GithubProvider {
   async openPullRequest(
     input: OpenPullRequestInput,
   ): Promise<{ url: string }> {
+    this.requireApp();
     const octokit = this.installationOctokit(input.installationId);
     const [owner, repo] = input.repoFullName.split("/");
     const { data } = await octokit.rest.pulls.create({
@@ -202,44 +217,12 @@ function normalizePrivateKey(key: string): string {
 }
 
 /**
- * Whether a real GitHub App is configured. A genuine App private key is a PEM
+ * Whether a real GitHub *App* is configured. A genuine App private key is a PEM
  * block ("-----BEGIN ... PRIVATE KEY-----"); the dev/test default is a
- * placeholder string. Without a real key, authenticating to GitHub throws, so
- * we fall back to {@link StubGithubProvider} rather than 500 on every call.
+ * placeholder string. This gates ONLY the App-scoped capabilities (installations,
+ * repos, clone, PR) — GitHub OAuth login is independent (it needs only
+ * GITHUB_CLIENT_ID/SECRET) and must keep working when only the App key is absent.
  */
 export function isGithubAppConfigured(cfg: Config): boolean {
   return normalizePrivateKey(cfg.githubPrivateKey).includes("PRIVATE KEY");
-}
-
-/**
- * No-op provider used when the GitHub App is not configured (e.g. local dev with
- * no GITHUB_* credentials). Listing endpoints return empty so the UI degrades to
- * "no installations" instead of surfacing a 500 from Octokit trying to sign a
- * JWT with a placeholder key. Operations that genuinely require GitHub fail with
- * a clear, actionable message.
- */
-export class StubGithubProvider implements GithubProvider {
-  private notConfigured(): never {
-    throw new Error(
-      "GitHub is not configured in this environment. Set GITHUB_APP_ID and GITHUB_PRIVATE_KEY (and GITHUB_CLIENT_ID/SECRET) to enable GitHub features.",
-    );
-  }
-  getAuthorizeUrl(): string {
-    this.notConfigured();
-  }
-  async exchangeCode(): Promise<{ user: GithubUser; orgs: GithubOrgRef[] }> {
-    this.notConfigured();
-  }
-  async listInstallations(): Promise<GithubInstallationRef[]> {
-    return [];
-  }
-  async listInstallationRepos(): Promise<GithubRepoRef[]> {
-    return [];
-  }
-  async getCloneInfo(): Promise<{ token: string; cloneUrl: string }> {
-    this.notConfigured();
-  }
-  async openPullRequest(): Promise<{ url: string }> {
-    this.notConfigured();
-  }
 }
