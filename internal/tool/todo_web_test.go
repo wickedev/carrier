@@ -6,12 +6,14 @@ import (
 	"testing"
 )
 
-func TestTodoTool(t *testing.T) {
-	td := NewTodo()
-	if !td.IsReadOnly(nil) {
-		t.Fatal("todo_write should be read-only (usable in plan mode)")
+func TestTodoTools(t *testing.T) {
+	store := NewTodoStore()
+	tw := NewTodoWrite(store)
+	tr := NewTodoRead(store)
+	if !tw.IsReadOnly(nil) || !tr.IsReadOnly(nil) {
+		t.Fatal("todo tools should be read-only (usable in plan mode)")
 	}
-	r := run(t, td, "", map[string]any{
+	r := run(t, tw, "", map[string]any{
 		"todos": []any{
 			map[string]any{"content": "design", "status": "completed"},
 			map[string]any{"content": "build", "status": "in_progress"},
@@ -19,19 +21,22 @@ func TestTodoTool(t *testing.T) {
 		},
 	})
 	if r.IsError {
-		t.Fatalf("todo: %+v", r)
+		t.Fatalf("todo_write: %+v", r)
 	}
+	// todo_read returns the same list the write recorded (shared store).
+	rr := run(t, tr, "", map[string]any{})
 	for _, want := range []string{"[x] design", "[~] build", "[ ] test"} {
-		if !strings.Contains(r.Content, want) {
-			t.Fatalf("todo render missing %q in %q", want, r.Content)
+		if !strings.Contains(rr.Content, want) {
+			t.Fatalf("todo_read missing %q in %q", want, rr.Content)
 		}
 	}
 	// Replacing the list keeps only the new items (full-replace semantics).
-	r = run(t, td, "", map[string]any{
+	run(t, tw, "", map[string]any{
 		"todos": []any{map[string]any{"content": "ship", "status": "pending"}},
 	})
-	if strings.Contains(r.Content, "design") || !strings.Contains(r.Content, "[ ] ship") {
-		t.Fatalf("todo should fully replace: %q", r.Content)
+	rr = run(t, tr, "", map[string]any{})
+	if strings.Contains(rr.Content, "design") || !strings.Contains(rr.Content, "[ ] ship") {
+		t.Fatalf("todo should fully replace: %q", rr.Content)
 	}
 }
 

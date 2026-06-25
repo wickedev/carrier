@@ -35,8 +35,12 @@ func (rt *runtime) newSession(sessionID string, opts server.SessionOptions) (*fl
 	reg.Register(tool.NewWrite())
 	reg.Register(tool.NewEdit())
 	reg.Register(tool.NewMultiEdit())
+	reg.Register(tool.NewApplyPatch())
+	reg.Register(tool.NewNotebookEdit())
 	reg.Register(tool.NewWebFetch())
-	reg.Register(tool.NewTodo()) // per-session task list (fresh per registry)
+	todos := tool.NewTodoStore() // per-session task list (fresh per registry)
+	reg.Register(tool.NewTodoWrite(todos))
+	reg.Register(tool.NewTodoRead(todos))
 
 	// In-memory skills → a per-session skill gateway. Bodies are captured by a
 	// closure (no filesystem), matching skill.Skill's lazy-body contract.
