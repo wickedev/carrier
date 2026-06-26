@@ -58,6 +58,14 @@ func TestOpenAITools(t *testing.T) {
 	if openAITools(nil) != nil {
 		t.Error("expected nil for no tools")
 	}
+	// A provider-hosted native tool is dropped (Chat Completions can't host it).
+	dropped := openAITools([]agent.Tool{
+		{Name: "web_search", Native: "web_search"},
+		{Name: "search", Schema: map[string]any{"type": "object"}},
+	})
+	if len(dropped) != 1 || dropped[0].Function.Name != "search" {
+		t.Errorf("expected only the function tool, got %#v", dropped)
+	}
 }
 
 func TestOpenAIMessages(t *testing.T) {

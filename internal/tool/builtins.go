@@ -17,14 +17,20 @@ type Bash struct{ Base }
 // NewBash returns the bash tool.
 func NewBash() *Bash {
 	return &Bash{Base: Base{
-		ToolName:        "bash",
-		ToolDescription: "Run a shell command in the session sandbox.",
+		ToolName: "bash",
+		ToolDescription: "Run a shell command in the session sandbox. Set run_in_background to " +
+			"launch a long-running command (dev server, watcher, build) without blocking; it " +
+			"returns a shell ID — read its output with bash_output and stop it with kill_shell.",
 		ToolSchema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"command": map[string]any{
 					"type":        "string",
 					"description": "The shell command to run.",
+				},
+				"run_in_background": map[string]any{
+					"type":        "boolean",
+					"description": "Run the command in the background and return a shell ID immediately.",
 				},
 			},
 			"required": []string{"command"},
@@ -46,11 +52,30 @@ func (b *Bash) Exec(ctx context.Context, input map[string]any, ec ExecContext) (
 		// Layer the per-session env/secrets on top of the host environment.
 		env = append(os.Environ(), ec.Env...)
 	}
-	res, err := ec.Executor.Exec(ctx, bay.ExecSpec{
+	spec := bay.ExecSpec{
 		Argv: []string{"/bin/sh", "-c", cmd},
 		Cwd:  ec.Cwd,
 		Env:  env,
-	})
+	}
+
+	// Background mode: launch and return a shell ID immediately. The process is
+	// tracked in the session's registry (reaped on session end); its output is
+	// read via bash_output and it is stopped via kill_shell.
+	if bg, _ := input["run_in_background"].(bool); bg {
+		if ec.Shells == nil {
+			return Result{Content: "error: background shells are not available in this context", IsError: true}, nil
+		}
+		proc, err := ec.Executor.Start(ec.Shells.Context(), spec)
+		if err != nil {
+			return Result{}, err
+		}
+		id := ec.Shells.Add(cmd, proc)
+		return Result{Content: fmt.Sprintf(
+			"Started background shell %s. Read its output with bash_output(bash_id=%q); stop it with kill_shell(shell_id=%q).",
+			id, id, id)}, nil
+	}
+
+	res, err := ec.Executor.Exec(ctx, spec)
 	if err != nil {
 		return Result{}, err
 	}

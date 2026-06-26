@@ -42,6 +42,14 @@ export interface PendingApproval {
   receivedAt: number;
 }
 
+export interface PendingQuestion {
+  reqId: string;
+  prompt: string;
+  /** Suggested answers (may be empty); the user can still reply freely. */
+  choices: string[];
+  seq: number;
+}
+
 /** A message the local user sent. Carrier doesn't echo user input on the event
  *  stream, so the transcript renders these from the client. Ordering is a
  *  tuple, not a fudged seq: the message sorts right after all events present
@@ -70,6 +78,8 @@ export interface SessionStreamState {
   status: SessionStatus;
   /** Pending HITL approvals keyed by reqId, in arrival order. */
   pendingApprovals: PendingApproval[];
+  /** Pending ask_user questions keyed by reqId, in arrival order. */
+  pendingQuestions: PendingQuestion[];
   /** Most recent error event message, if any (cleared on reconnect success). */
   lastError: string | null;
   connection: ConnectionState;
@@ -79,6 +89,7 @@ export interface SessionStreamState {
   ingestEvent: (event: SessionEvent) => void;
   addUserMessage: (text: string) => void;
   resolveApproval: (reqId: string) => void;
+  resolveQuestion: (reqId: string) => void;
   reset: (sessionId: string | null) => void;
   setConnection: (c: ConnectionState) => void;
 }
@@ -101,9 +112,15 @@ function insertIndex(events: SessionEvent[], seq: number): number {
  * a duplicate and nothing changes). Exported for direct unit testing.
  */
 export function reduce(
-  state: Pick<SessionStreamState, "events" | "seen" | "status" | "pendingApprovals" | "lastError">,
+  state: Pick<
+    SessionStreamState,
+    "events" | "seen" | "status" | "pendingApprovals" | "pendingQuestions" | "lastError"
+  >,
   event: SessionEvent,
-): Pick<SessionStreamState, "events" | "seen" | "status" | "pendingApprovals" | "lastError"> | null {
+): Pick<
+  SessionStreamState,
+  "events" | "seen" | "status" | "pendingApprovals" | "pendingQuestions" | "lastError"
+> | null {
   if (state.seen.has(event.seq)) return null;
 
   const seen = new Set(state.seen);
@@ -114,6 +131,7 @@ export function reduce(
 
   let status = state.status;
   let pendingApprovals = state.pendingApprovals;
+  let pendingQuestions = state.pendingQuestions;
   let lastError = state.lastError;
 
   switch (event.kind) {
@@ -135,6 +153,19 @@ export function reduce(
         ];
       }
       break;
+    case "question":
+      if (!pendingQuestions.some((q) => q.reqId === event.reqId)) {
+        pendingQuestions = [
+          ...pendingQuestions,
+          {
+            reqId: event.reqId,
+            prompt: event.prompt,
+            choices: event.choices ?? [],
+            seq: event.seq,
+          },
+        ];
+      }
+      break;
     case "error":
       lastError = event.message;
       break;
@@ -142,7 +173,7 @@ export function reduce(
       break;
   }
 
-  return { events, seen, status, pendingApprovals, lastError };
+  return { events, seen, status, pendingApprovals, pendingQuestions, lastError };
 }
 
 const INITIAL = {
@@ -152,6 +183,7 @@ const INITIAL = {
   seen: new Set<number>(),
   status: "idle" as SessionStatus,
   pendingApprovals: [] as PendingApproval[],
+  pendingQuestions: [] as PendingQuestion[],
   lastError: null as string | null,
   connection: "idle" as ConnectionState,
 };
@@ -165,6 +197,7 @@ export const createSessionStreamStore = (): SessionStreamStore =>
     events: [],
     userMessages: [],
     pendingApprovals: [],
+    pendingQuestions: [],
 
     ingest(raw) {
       const parsed = SessionEventSchema.safeParse(raw);
@@ -198,6 +231,12 @@ export const createSessionStreamStore = (): SessionStreamStore =>
       }));
     },
 
+    resolveQuestion(reqId) {
+      set((s) => ({
+        pendingQuestions: s.pendingQuestions.filter((q) => q.reqId !== reqId),
+      }));
+    },
+
     reset(sessionId) {
       set({
         sessionId,
@@ -206,6 +245,7 @@ export const createSessionStreamStore = (): SessionStreamStore =>
         seen: new Set<number>(),
         status: "idle",
         pendingApprovals: [],
+        pendingQuestions: [],
         lastError: null,
         connection: "idle",
       });

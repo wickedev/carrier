@@ -49,6 +49,11 @@ type ExecResult struct {
 // single swappable boundary.
 type Executor interface {
 	Exec(ctx context.Context, spec ExecSpec) (ExecResult, error)
+	// Start launches a long-running (background) command and returns a handle
+	// immediately. The process runs under the SAME confinement as Exec (the
+	// executor wraps argv identically) but with no timeout; its lifetime is
+	// bounded by ctx — cancelling ctx kills the process group.
+	Start(ctx context.Context, spec ExecSpec) (*Process, error)
 	Close() error
 }
 
@@ -74,6 +79,11 @@ func (e *LocalExecutor) Close() error { return nil }
 // Exec implements Executor.
 func (e *LocalExecutor) Exec(ctx context.Context, spec ExecSpec) (ExecResult, error) {
 	return runConfined(ctx, spec.Argv, spec)
+}
+
+// Start implements Executor. No isolation: the argv runs as-is in the background.
+func (e *LocalExecutor) Start(ctx context.Context, spec ExecSpec) (*Process, error) {
+	return startConfined(ctx, spec.Argv, spec)
 }
 
 // runConfined executes argv (already wrapped by any sandbox prefix) with output

@@ -13,6 +13,18 @@ import (
 // losslessly.
 const liveSeqBase = 1 << 32
 
+// resurfaceSeqBase offsets re-surfaced pending-question seqs into the gap
+// BETWEEN the history range (small append indices) and the live range
+// (liveSeqBase = 1<<32 and up). A re-surfaced question is written right after
+// history replay and before live events resume, so its seq must sort there too:
+// greater than any history seq (2^31 append records — never reached) yet less
+// than any live seq. Staying below liveSeqBase is essential — a downstream relay
+// forwards in arrival order with a monotonic high-water guard (drop seq <= last
+// seen); a seq above the live range would advance that guard past every future
+// live event and suppress the rest of the stream. Each question's stable ordinal
+// keeps the mapped seq fixed so reconnects dedupe by seq.
+const resurfaceSeqBase = 1 << 31
+
 // hub is the per-session fan-out. One goroutine drains the Flight's single event
 // channel (its EQ) and broadcasts each event to every subscriber. Many
 // subscribers may observe one session (Req 17.3); a slow subscriber is lagged

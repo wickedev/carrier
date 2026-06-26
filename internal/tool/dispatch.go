@@ -102,5 +102,22 @@ func runOne(ctx context.Context, c agent.ToolCall, reg *Registry, ec ExecContext
 			content = content[:ec.MaxResultBytes]
 		}
 	}
-	return agent.ToolResult{ToolCallID: c.ID, Content: content, IsError: res.IsError}
+	return agent.ToolResult{
+		ToolCallID: c.ID,
+		Content:    content,
+		IsError:    res.IsError,
+		Images:     toAgentImages(res.Images),
+	}
+}
+
+// toAgentImages maps tool images onto the contract type. Returns nil for none.
+func toAgentImages(imgs []Image) []agent.ImageData {
+	if len(imgs) == 0 {
+		return nil
+	}
+	out := make([]agent.ImageData, len(imgs))
+	for i, im := range imgs {
+		out[i] = agent.ImageData{MediaType: im.MediaType, Base64: im.Base64}
+	}
+	return out
 }

@@ -57,6 +57,7 @@ export function SessionPage() {
   const userMessages = useStore(stream, (s) => s.userMessages);
   const status = useStore(stream, (s) => s.status);
   const approvals = useStore(stream, (s) => s.pendingApprovals);
+  const questions = useStore(stream, (s) => s.pendingQuestions);
   const connection = useStore(stream, (s) => s.connection);
 
   const [selectedPath, setSelectedPath] = React.useState<string | null>(null);
@@ -65,6 +66,7 @@ export function SessionPage() {
   const [treeRefreshToken, setTreeRefreshToken] = React.useState(0);
   const [sending, setSending] = React.useState(false);
   const [deciding, setDeciding] = React.useState<string | null>(null);
+  const [answering, setAnswering] = React.useState<string | null>(null);
   const [prUrl, setPrUrl] = React.useState<string | null>(null);
   const [promoting, setPromoting] = React.useState(false);
   const [promoteStatus, setPromoteStatus] = React.useState<string | null>(null);
@@ -153,6 +155,16 @@ export function SessionPage() {
       stream.getState().resolveApproval(reqId);
     } finally {
       setDeciding(null);
+    }
+  };
+
+  const onAnswer = async (reqId: string, answer: string) => {
+    setAnswering(reqId);
+    try {
+      await api.answerQuestion(sessionId, reqId, answer);
+      stream.getState().resolveQuestion(reqId);
+    } finally {
+      setAnswering(null);
     }
   };
 
@@ -256,6 +268,7 @@ export function SessionPage() {
                 events={events}
                 userMessages={userMessages}
                 approvals={approvals}
+                questions={questions}
                 running={status === "running"}
                 sending={sending}
                 onSend={onSend}
@@ -263,6 +276,8 @@ export function SessionPage() {
                 onDecide={onDecide}
                 decidingReqId={deciding}
                 onApprovalExpire={onApprovalExpire}
+                onAnswer={onAnswer}
+                answeringReqId={answering}
                 defaults={composerDefaults}
               />
             }

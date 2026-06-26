@@ -183,6 +183,33 @@ func TestMessagesProjection(t *testing.T) {
 	}
 }
 
+func TestMessagesProjectionCarriesImages(t *testing.T) {
+	ctx := context.Background()
+	fs := newStore(t)
+	sid := SessionID("s")
+
+	// A tool result with an attached image (view_image) must survive persistence
+	// and projection so the image stays in the model's replayed context.
+	rec := Record{Kind: KindTurn, Role: agent.RoleTool, ToolResult: &agent.ToolResult{
+		ToolCallID: "tc1",
+		Content:    "Attached image pic.png",
+		Images:     []agent.ImageData{{MediaType: "image/png", Base64: "QUJD"}},
+	}}
+	if err := fs.Append(ctx, sid, rec); err != nil {
+		t.Fatalf("Append: %v", err)
+	}
+	msgs, err := fs.Messages(ctx, sid)
+	if err != nil {
+		t.Fatalf("Messages: %v", err)
+	}
+	if len(msgs) != 1 || len(msgs[0].Images) != 1 {
+		t.Fatalf("image not projected: %+v", msgs)
+	}
+	if msgs[0].Images[0].MediaType != "image/png" || msgs[0].Images[0].Base64 != "QUJD" {
+		t.Fatalf("image round-trip mismatch: %+v", msgs[0].Images[0])
+	}
+}
+
 func TestMessagesCheckpointBecomesContext(t *testing.T) {
 	ctx := context.Background()
 	fs := newStore(t)

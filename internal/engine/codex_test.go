@@ -15,6 +15,31 @@ import (
 	"github.com/wickedev/carrier/internal/agent"
 )
 
+func TestCodexToolsNativeWebSearch(t *testing.T) {
+	got := codexTools([]agent.Tool{
+		{Name: "web_search", Native: "web_search", Schema: map[string]any{"type": "object"}},
+		{Name: "get_weather", Description: "weather", Schema: map[string]any{"type": "object"}},
+	})
+	if len(got) != 2 {
+		t.Fatalf("expected 2 tools, got %d", len(got))
+	}
+	if got[0].Type != "web_search_preview" || got[0].Name != "" {
+		t.Errorf("native tool = %#v, want {Type:web_search_preview, Name:\"\"}", got[0])
+	}
+	if got[1].Type != "function" || got[1].Name != "get_weather" {
+		t.Errorf("function tool = %#v", got[1])
+	}
+	// The hosted tool must marshal WITHOUT a name field (a bare "" would be
+	// rejected by the Responses API).
+	b, err := json.Marshal(got[0])
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(b), "\"name\"") {
+		t.Errorf("web_search tool should omit name, got %s", b)
+	}
+}
+
 // writeCodexAuth writes a fake ~/.codex/auth.json with a JWT whose exp is `exp`,
 // pointing CODEX_HOME at a temp dir, and returns a cleanup.
 func writeCodexAuth(t *testing.T, exp time.Time) {
@@ -58,6 +83,39 @@ func TestLoadCodexAuthValidAndExpired(t *testing.T) {
 	}
 	if CodexAuthAvailable() {
 		t.Fatal("CodexAuthAvailable should be false for an expired token")
+	}
+}
+
+func TestCodexInputAttachesToolImages(t *testing.T) {
+	in := codexInput([]agent.Message{
+		{Role: agent.RoleTool, ToolCallID: "c1", Text: "Attached pic.png",
+			Images: []agent.ImageData{{MediaType: "image/png", Base64: "QUJD"}}},
+	})
+	// function_call_output (text) then a user message carrying the image.
+	if len(in) != 2 {
+		t.Fatalf("want 2 items (output + image message), got %d: %+v", len(in), in)
+	}
+	if in[0].Type != "function_call_output" || in[0].Output != "Attached pic.png" {
+		t.Fatalf("output item wrong: %+v", in[0])
+	}
+	if in[1].Type != "message" || in[1].Role != "user" || len(in[1].Content) != 1 {
+		t.Fatalf("image message wrong: %+v", in[1])
+	}
+	part := in[1].Content[0]
+	if part.Type != "input_image" || part.ImageURL != "data:image/png;base64,QUJD" || part.Detail != "auto" {
+		t.Fatalf("input_image part wrong: %+v", part)
+	}
+	if part.Text != "" {
+		t.Errorf("input_image must not carry text, got %q", part.Text)
+	}
+}
+
+func TestCodexInputNoImageMessageWhenNone(t *testing.T) {
+	in := codexInput([]agent.Message{
+		{Role: agent.RoleTool, ToolCallID: "c1", Text: "plain result"},
+	})
+	if len(in) != 1 || in[0].Type != "function_call_output" {
+		t.Fatalf("text-only tool result must yield exactly one output item: %+v", in)
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/wickedev/carrier/internal/bay"
+	"github.com/wickedev/carrier/internal/lsp"
 )
 
 // Exposure controls whether a tool is visible to the model, only discoverable
@@ -28,6 +29,16 @@ const (
 type Result struct {
 	Content string
 	IsError bool
+	// Images carries any image content the tool produced (e.g. view_image),
+	// attached to the model's context as vision input by engines that support it.
+	Images []Image
+}
+
+// Image is a base64-encoded image a tool attaches to context. MediaType is an
+// IANA type such as "image/png".
+type Image struct {
+	MediaType string
+	Base64    string
 }
 
 // Spiller offloads an oversized tool result to storage and returns a bounded
@@ -48,6 +59,30 @@ type ExecContext struct {
 	Env            []string
 	Spiller        Spiller
 	MaxResultBytes int // 0 → no spill
+	// Asker, when set, lets a tool put a question to the user and block for the
+	// answer (the ask_user tool). Nil in contexts without a human transport (e.g.
+	// sub-agents, tests) — tools must handle that.
+	Asker Asker
+	// Shells, when set, is the session's background-shell registry (the bash
+	// run_in_background / bash_output / kill_shell tools). Nil in contexts without
+	// one — those tools must handle that.
+	Shells *ShellRegistry
+	// LSP, when set, is the session's language-server manager (the lsp tool). Nil
+	// in contexts without one — the tool must handle that.
+	LSP *lsp.Manager
+}
+
+// AskRequest is a question a tool surfaces to the user. Choices, when non-empty,
+// are suggested answers the UI may render as buttons.
+type AskRequest struct {
+	Prompt  string
+	Choices []string
+}
+
+// Asker delivers a question to the user and blocks until they answer (or the
+// context is cancelled / it times out).
+type Asker interface {
+	Ask(ctx context.Context, req AskRequest) (string, error)
 }
 
 // Tool is the uniform contract every tool implements. The predicates drive
@@ -88,12 +123,15 @@ func (b Base) Exposure() Exposure                    { return b.Expose }
 // registered before plugins/MCP keep their name), so the model-visible list has
 // a stable, cache-friendly prefix.
 type Registry struct {
-	mu    sync.RWMutex
-	tools map[string]Tool
+	mu       sync.RWMutex
+	tools    map[string]Tool
+	revealed map[string]bool // Deferred tools made visible this session (tool_search)
 }
 
 // NewRegistry returns an empty registry.
-func NewRegistry() *Registry { return &Registry{tools: make(map[string]Tool)} }
+func NewRegistry() *Registry {
+	return &Registry{tools: make(map[string]Tool), revealed: make(map[string]bool)}
+}
 
 // Register adds a tool unless its name is already taken (first-wins).
 func (r *Registry) Register(t Tool) {
@@ -126,13 +164,51 @@ func (r *Registry) List() []Tool {
 	return out
 }
 
-// Visible returns the model-visible tools (Direct exposure), sorted by name.
+// Visible returns the model-visible tools: Direct exposure plus any Deferred
+// tools revealed this session (via tool_search), sorted by name.
 func (r *Registry) Visible() []Tool {
+	r.mu.RLock()
+	revealed := make(map[string]bool, len(r.revealed))
+	for k := range r.revealed {
+		revealed[k] = true
+	}
+	r.mu.RUnlock()
 	out := make([]Tool, 0)
 	for _, t := range r.List() {
-		if t.Exposure() == Direct {
+		switch t.Exposure() {
+		case Direct:
+			out = append(out, t)
+		case Deferred:
+			if revealed[t.Name()] {
+				out = append(out, t)
+			}
+		}
+	}
+	return out
+}
+
+// Deferred returns the Deferred tools (the discoverable pool tool_search
+// searches), sorted by name.
+func (r *Registry) Deferred() []Tool {
+	out := make([]Tool, 0)
+	for _, t := range r.List() {
+		if t.Exposure() == Deferred {
 			out = append(out, t)
 		}
 	}
 	return out
+}
+
+// Reveal makes a Deferred tool model-visible for the rest of the session. It
+// returns false if no Deferred tool has that name (Direct tools are already
+// visible; unknown names can't be revealed).
+func (r *Registry) Reveal(name string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	t, ok := r.tools[name]
+	if !ok || t.Exposure() != Deferred {
+		return false
+	}
+	r.revealed[name] = true
+	return true
 }

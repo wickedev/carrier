@@ -39,6 +39,57 @@ func (echoTool) Exec(context.Context, map[string]any, tool.ExecContext) (tool.Re
 	return tool.Result{Content: "ok"}, nil
 }
 
+func TestVisibleToolsPropagatesNativeMarker(t *testing.T) {
+	reg := tool.NewRegistry()
+	reg.Register(tool.NewWebSearch()) // provider-native
+	reg.Register(tool.NewLs())        // ordinary read-only tool
+	f := newFlight(t, &fakeEngine{name: "fake"}, reg, 0)
+
+	defs := f.visibleTools()
+	var ws, ls *agent.Tool
+	for i := range defs {
+		switch defs[i].Name {
+		case "web_search":
+			ws = &defs[i]
+		case "ls":
+			ls = &defs[i]
+		}
+	}
+	if ws == nil || ls == nil {
+		t.Fatalf("expected both tools visible, got %+v", defs)
+	}
+	if ws.Native != "web_search" {
+		t.Errorf("web_search Native = %q, want web_search", ws.Native)
+	}
+	if ls.Native != "" {
+		t.Errorf("ordinary tool must not be marked native, got %q", ls.Native)
+	}
+}
+
+func TestResourceForReviewsContent(t *testing.T) {
+	cases := []struct {
+		name  string
+		input map[string]any
+		want  string
+	}{
+		{"bash command", map[string]any{"command": "rm -rf /"}, "rm -rf /"},
+		// write_stdin's payload must be reviewable content, not skipped — else
+		// driving an interactive shell via stdin would bypass permission review.
+		{"write_stdin input", map[string]any{"bash_id": "bash-1", "input": "rm -rf /\n"}, "rm -rf /\n"},
+		{"read path", map[string]any{"path": "/etc/passwd"}, "/etc/passwd"},
+		{"web url", map[string]any{"url": "http://x"}, "http://x"},
+		{"command wins over input", map[string]any{"command": "ls", "input": "x"}, "ls"},
+		{"no reviewable field", map[string]any{"bash_id": "bash-1"}, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := resourceFor(agent.ToolCall{Name: "t", Input: tc.input}); got != tc.want {
+				t.Errorf("resourceFor = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func newFlight(t *testing.T, eng *fakeEngine, reg *tool.Registry, maxSteps int) *Flight {
 	t.Helper()
 	st, err := store.NewFileStore(t.TempDir())

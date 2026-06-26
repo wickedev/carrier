@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"errors"
+	"testing"
+
+	"github.com/wickedev/carrier/internal/engine"
+)
 
 func TestIsLoopbackAddr(t *testing.T) {
 	loopback := []string{"127.0.0.1:39099", "localhost:8080", "[::1]:8080", "127.0.0.1"}
@@ -31,5 +36,35 @@ func TestByosRequestedExplicitOnly(t *testing.T) {
 	t.Setenv("CARRIER_AUTH", "codex")
 	if !byosRequested() {
 		t.Fatal("CARRIER_AUTH=codex must enable BYOS")
+	}
+}
+
+func TestSelectEngineDefaultsToAnthropic(t *testing.T) {
+	t.Setenv("CARRIER_AUTH", "")
+	eng, err := selectEngine()
+	if err != nil || eng == nil {
+		t.Fatalf("default selection should yield an engine, got eng=%v err=%v", eng, err)
+	}
+	if eng.Name() != "anthropic" {
+		t.Errorf("default engine = %q, want anthropic", eng.Name())
+	}
+}
+
+func TestSelectEngineExplicitGeminiFailsLoud(t *testing.T) {
+	// An explicit CARRIER_AUTH=gemini whose engine cannot construct must FAIL —
+	// never silently fall back to a different provider.
+	t.Setenv("CARRIER_AUTH", "gemini")
+	orig := newGeminiEngine
+	t.Cleanup(func() { newGeminiEngine = orig })
+	newGeminiEngine = func() (engine.Engine, error) {
+		return nil, errors.New("no credentials")
+	}
+
+	eng, err := selectEngine()
+	if err == nil {
+		t.Fatalf("explicit gemini that can't construct must error, got engine %v", eng)
+	}
+	if eng != nil {
+		t.Fatalf("on failure no engine must be returned (no silent fallback), got %v", eng)
 	}
 }

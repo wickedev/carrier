@@ -60,6 +60,23 @@ describe("normalizeEvent: snake→camel mapping", () => {
     });
   });
 
+  it("maps a question event with prompt + choices", () => {
+    const raw: RawCarrierEvent = {
+      seq: 4,
+      kind: "question",
+      req_id: "q7",
+      prompt: "which file?",
+      choices: ["a.ts", "b.ts"],
+    };
+    expect(normalizeEvent(raw)).toEqual({
+      seq: 4,
+      kind: "question",
+      reqId: "q7",
+      prompt: "which file?",
+      choices: ["a.ts", "b.ts"],
+    });
+  });
+
   it("parses tool_call input from JSON text and keeps tool_call_id", () => {
     const raw: RawCarrierEvent = {
       seq: 3,
@@ -106,5 +123,38 @@ describe("SSE relay: history-then-live ordering + dedupe", () => {
     // native EventSource.onmessage, which never fires for `event:`-named frames.
     // A per-kind name here would render an empty agent panel (kind lives in data).
     expect(text).not.toMatch(/^event:/m);
+  });
+
+  it("a re-surfaced question (sub-live seq) does not suppress later live events", async () => {
+    const h = await makeHarness();
+    // The carrier re-surfaces a still-pending question right after history with a
+    // seq in the gap between history (small) and the live range (>= 2^32). The
+    // relay's monotonic high-water guard must still forward later live events —
+    // it would not if the question's seq sat ABOVE the live range.
+    const RESURFACE = 2 ** 31 + 1; // resurfaceSeqBase + 1 (between history and live)
+    const LIVE = 2 ** 32 + 1; // liveSeqBase + 1
+    h.carrier.events = [
+      { seq: 1, kind: "text", text: "history" },
+      { seq: RESURFACE, kind: "question", req_id: "q1", prompt: "which?", choices: ["a"] },
+      { seq: LIVE, kind: "text", text: "after-question" },
+      { seq: LIVE + 1, kind: "status", state: "idle" },
+    ];
+    const { cookie, session } = await setupSession(h);
+    const res = await h.app.request(`/sessions/${session.id}/events`, {
+      headers: { cookie, accept: "text/event-stream" },
+    });
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    const datas = [...text.matchAll(/data: (.+)/g)].map((m) => JSON.parse(m[1]!));
+    const seqs = datas.map((d) => d.seq);
+    // Every frame forwarded, in order — crucially the live frames AFTER the
+    // question are not dropped by the guard.
+    expect(seqs).toEqual([1, RESURFACE, LIVE, LIVE + 1]);
+    expect(datas.find((d) => d.kind === "question")).toMatchObject({
+      reqId: "q1",
+      prompt: "which?",
+      choices: ["a"],
+    });
+    expect(datas.some((d) => d.kind === "text" && d.text === "after-question")).toBe(true);
   });
 });

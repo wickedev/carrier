@@ -79,6 +79,15 @@ export function normalizeEvent(raw: RawCarrierEvent): SessionEvent | null {
         reason: raw.reason ?? "",
       };
       break;
+    case "question":
+      candidate = {
+        seq,
+        kind: "question",
+        reqId: raw.req_id ?? "",
+        prompt: raw.prompt ?? "",
+        choices: raw.choices,
+      };
+      break;
     case "status":
       candidate = {
         seq,

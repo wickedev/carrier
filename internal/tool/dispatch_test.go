@@ -12,6 +12,20 @@ import (
 	"github.com/wickedev/carrier/internal/bay"
 )
 
+func TestDispatchCarriesImages(t *testing.T) {
+	reg := NewRegistry()
+	reg.Register(newFake("view_image", true, func(context.Context, map[string]any, ExecContext) (Result, error) {
+		return Result{Content: "Attached", Images: []Image{{MediaType: "image/png", Base64: "QUJD"}}}, nil
+	}))
+	res := Dispatch(context.Background(), []agent.ToolCall{{ID: "x", Name: "view_image"}}, reg, ExecContext{}, 4)
+	if len(res) != 1 || len(res[0].Images) != 1 {
+		t.Fatalf("images not carried through dispatch: %+v", res)
+	}
+	if res[0].Images[0].MediaType != "image/png" || res[0].Images[0].Base64 != "QUJD" {
+		t.Fatalf("image mismatch: %+v", res[0].Images[0])
+	}
+}
+
 // fakeTool is a configurable Tool for dispatch tests.
 type fakeTool struct {
 	Base

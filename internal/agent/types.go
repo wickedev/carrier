@@ -31,6 +31,18 @@ type Message struct {
 
 	// ToolCallID links a RoleTool turn back to the ToolCall it answers.
 	ToolCallID string
+
+	// Images carries image content on a RoleTool turn (e.g. from view_image), so
+	// a tool can attach pictures to the model's context. Engines whose provider
+	// supports vision render these as image blocks; others drop them.
+	Images []ImageData
+}
+
+// ImageData is a base64-encoded image attached to model context. MediaType is an
+// IANA type such as "image/png" or "image/jpeg".
+type ImageData struct {
+	MediaType string
+	Base64    string
 }
 
 // ToolCall is the model's request to run a single tool.
@@ -46,6 +58,13 @@ type Tool struct {
 	Description string
 	// Schema is a JSON Schema object describing the tool's input.
 	Schema map[string]any
+	// Native, when non-empty, names a provider-hosted server tool (e.g.
+	// "web_search") that the Engine injects in its provider-native form. The
+	// provider executes it server-side and folds results into the turn — the
+	// Flight never dispatches it locally, so Schema is advisory only. An Engine
+	// whose provider can't host the named tool simply drops it (doesn't
+	// advertise it).
+	Native string
 }
 
 // StepInput is one model turn's request.

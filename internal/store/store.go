@@ -153,6 +153,7 @@ func projectMessages(recs []Record) []agent.Message {
 			}
 			if r.ToolResult != nil {
 				msg.ToolCallID = r.ToolResult.ToolCallID
+				msg.Images = r.ToolResult.Images
 				if r.Text == "" {
 					msg.Text = r.ToolResult.Content
 				}

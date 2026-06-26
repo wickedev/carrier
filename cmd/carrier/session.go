@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/wickedev/carrier/internal/flight"
+	"github.com/wickedev/carrier/internal/lsp"
 	"github.com/wickedev/carrier/internal/mcp"
 	"github.com/wickedev/carrier/internal/perm"
 	"github.com/wickedev/carrier/internal/plugin"
@@ -26,6 +27,11 @@ import (
 func (rt *runtime) newSession(sessionID string, opts server.SessionOptions) (*flight.Flight, func()) {
 	reg := tool.NewRegistry()
 	reg.Register(tool.NewBash())
+	// Background-shell companions to bash (run_in_background): read output and
+	// stop the process. Wired to the session's shell registry via ExecContext.
+	reg.Register(tool.NewBashOutput())
+	reg.Register(tool.NewWriteStdin())
+	reg.Register(tool.NewKillShell())
 	// First-class file tools (read-only ones are concurrency-safe + usable in
 	// plan mode; edit/write are mutating). All are confined to the working copy.
 	reg.Register(tool.NewRead())
@@ -37,7 +43,16 @@ func (rt *runtime) newSession(sessionID string, opts server.SessionOptions) (*fl
 	reg.Register(tool.NewMultiEdit())
 	reg.Register(tool.NewApplyPatch())
 	reg.Register(tool.NewNotebookEdit())
+	reg.Register(tool.NewViewImage())
+	reg.Register(tool.NewLSP())
 	reg.Register(tool.NewWebFetch())
+	// Provider-hosted web search (Anthropic / Codex Responses API). Engines whose
+	// provider can't host it drop it; the model just won't see it there.
+	reg.Register(tool.NewWebSearch())
+	reg.Register(tool.NewAskUser())
+	// Discovery for Deferred tools (e.g. notebook_edit): reveals them on demand so
+	// the default tool list stays small. Bound to this session's registry.
+	reg.Register(tool.NewToolSearch(reg))
 	todos := tool.NewTodoStore() // per-session task list (fresh per registry)
 	reg.Register(tool.NewTodoWrite(todos))
 	reg.Register(tool.NewTodoRead(todos))
@@ -68,6 +83,18 @@ func (rt *runtime) newSession(sessionID string, opts server.SessionOptions) (*fl
 	if len(opts.Env) > 0 {
 		exec.Env = envSlice(opts.Env)
 	}
+
+	// Per-session background-shell registry. Its context bounds the lifetime of
+	// every background process (bash run_in_background) — cancelled on cleanup so
+	// no background work outlives the session.
+	shellCtx, cancelShells := context.WithCancel(context.Background())
+	shells := tool.NewShellRegistry(shellCtx)
+	exec.Shells = shells
+
+	// Per-session language servers (the lsp tool), rooted at the working copy and
+	// reaped on cleanup. Lazily spawned per language on first use.
+	lspMgr := lsp.NewManager(shellCtx, exec.Cwd)
+	exec.LSP = lspMgr
 
 	// Permission policy from the session's rules (nil → permissive default).
 	var policy perm.Policy
@@ -201,6 +228,11 @@ func (rt *runtime) newSession(sessionID string, opts server.SessionOptions) (*fl
 	runHooks(context.Background(), exec, opts.Hooks, "SessionStart")
 
 	cleanup := func() {
+		// Reap background shells first: cancel their context (kills via the watcher)
+		// and kill any still tracked, so nothing outlives the session.
+		cancelShells()
+		shells.CloseAll()
+		lspMgr.Close()
 		runHooks(context.Background(), exec, opts.Hooks, "SessionEnd")
 		for _, c := range closers {
 			c()

@@ -15,6 +15,7 @@ const (
 	EvError                            // a classified engine error
 	EvApprovalRequest                  // a tool action awaiting human approval
 	EvTitleSuggested                   // an auto-generated session title (first turn)
+	EvAskUser                          // the agent is asking the user a question
 )
 
 // StreamEvent is the canonical, provider-agnostic unit of streaming output.
@@ -43,6 +44,9 @@ type StreamEvent struct {
 	// Approval is set for EvApprovalRequest.
 	Approval *ApprovalRequest
 
+	// Question is set for EvAskUser.
+	Question *AskRequest
+
 	// Title carries the auto-generated session title for EvTitleSuggested.
 	Title string
 }
@@ -53,6 +57,9 @@ type ToolResult struct {
 	ToolCallID string
 	Content    string
 	IsError    bool
+	// Images carries any image content the tool produced (e.g. view_image), fed
+	// back to the model as vision input where the engine supports it.
+	Images []ImageData `json:",omitempty"`
 }
 
 // ApprovalRequest is a tool action surfaced to a human for approval, carried on
@@ -62,6 +69,15 @@ type ApprovalRequest struct {
 	Tool     string
 	Resource string
 	Reason   string
+}
+
+// AskRequest is a free-form question the agent surfaces to the user, carried on
+// an EvAskUser event and answered (by string) back through ReqID. Choices, when
+// non-empty, are suggested answers the UI may render as buttons.
+type AskRequest struct {
+	ReqID   string
+	Prompt  string
+	Choices []string
 }
 
 func (k EventKind) String() string {
@@ -88,6 +104,8 @@ func (k EventKind) String() string {
 		return "approval_request"
 	case EvTitleSuggested:
 		return "title_suggested"
+	case EvAskUser:
+		return "question"
 	default:
 		return "unknown"
 	}
