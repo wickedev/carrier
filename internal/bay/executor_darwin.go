@@ -38,24 +38,41 @@ func NewSeatbeltExecutor() *SeatbeltExecutor { return &SeatbeltExecutor{} }
 // Close implements Executor.
 func (e *SeatbeltExecutor) Close() error { return nil }
 
-// Exec implements Executor. It validates the hardcoded helper path, generates an
-// SBPL policy from the spec, wraps the command, and runs it via runConfined.
-func (e *SeatbeltExecutor) Exec(ctx context.Context, spec ExecSpec) (ExecResult, error) {
+// wrap validates the hardcoded helper path and prepends the sandbox-exec prefix
+// (with an SBPL policy from the spec) to the command. Shared by Exec and Start so
+// foreground and background runs are confined identically.
+func (e *SeatbeltExecutor) wrap(spec ExecSpec) ([]string, error) {
 	if len(spec.Argv) == 0 {
-		return ExecResult{}, fmt.Errorf("bay: empty argv")
+		return nil, fmt.Errorf("bay: empty argv")
 	}
 	if err := validateHelperPath(seatbeltExecPath); err != nil {
-		return ExecResult{}, err
+		return nil, err
 	}
-
 	policy := buildSeatbeltPolicy(spec)
-
 	// /usr/bin/sandbox-exec -p <policy> -- <argv...>
 	argv := make([]string, 0, len(spec.Argv)+4)
 	argv = append(argv, seatbeltExecPath, "-p", policy, "--")
 	argv = append(argv, spec.Argv...)
+	return argv, nil
+}
 
+// Exec implements Executor. It validates the hardcoded helper path, generates an
+// SBPL policy from the spec, wraps the command, and runs it via runConfined.
+func (e *SeatbeltExecutor) Exec(ctx context.Context, spec ExecSpec) (ExecResult, error) {
+	argv, err := e.wrap(spec)
+	if err != nil {
+		return ExecResult{}, err
+	}
 	return runConfined(ctx, argv, spec)
+}
+
+// Start implements Executor: the same sandbox wrapping, run in the background.
+func (e *SeatbeltExecutor) Start(ctx context.Context, spec ExecSpec) (*Process, error) {
+	argv, err := e.wrap(spec)
+	if err != nil {
+		return nil, err
+	}
+	return startConfined(ctx, argv, spec)
 }
 
 // validateHelperPath stats a hardcoded sandbox-helper path and confirms it is a

@@ -1,13 +1,14 @@
 import { describe, it, expect } from "vitest";
 import type { SessionEvent, SessionStatus } from "@carrier/contract";
 import { createSessionStreamStore, reduce } from "./stream";
-import type { PendingApproval } from "./stream";
+import type { PendingApproval, PendingQuestion } from "./stream";
 
 interface ReducerState {
   events: SessionEvent[];
   seen: Set<number>;
   status: SessionStatus;
   pendingApprovals: PendingApproval[];
+  pendingQuestions: PendingQuestion[];
   lastError: string | null;
 }
 
@@ -32,6 +33,13 @@ const ev = {
     path,
     status: "M",
   }),
+  question: (seq: number, reqId: string, choices?: string[]): SessionEvent => ({
+    seq,
+    kind: "question",
+    reqId,
+    prompt: "which one?",
+    choices,
+  }),
   error: (seq: number, message: string): SessionEvent => ({ seq, kind: "error", message }),
   title: (seq: number, title: string): SessionEvent => ({ seq, kind: "title", title }),
 };
@@ -41,6 +49,7 @@ const emptyState = (): ReducerState => ({
   seen: new Set<number>(),
   status: "idle",
   pendingApprovals: [],
+  pendingQuestions: [],
   lastError: null,
 });
 
@@ -84,6 +93,19 @@ describe("reduce (pure reducer)", () => {
     // a re-seen approval (different seq, same reqId) does not duplicate
     s = reduce(s, ev.approval(3, "req-a"))!;
     expect(s.pendingApprovals.filter((a) => a.reqId === "req-a")).toHaveLength(1);
+  });
+
+  it("accumulates pending questions keyed by reqId without duplicates", () => {
+    let s = emptyState();
+    s = reduce(s, ev.question(1, "q-a", ["yes", "no"]))!;
+    s = reduce(s, ev.question(2, "q-b"))!;
+    expect(s.pendingQuestions.map((q) => q.reqId)).toEqual(["q-a", "q-b"]);
+    expect(s.pendingQuestions[0]!.choices).toEqual(["yes", "no"]);
+    // missing choices default to an empty array
+    expect(s.pendingQuestions[1]!.choices).toEqual([]);
+    // a re-seen question (different seq, same reqId) does not duplicate
+    s = reduce(s, ev.question(3, "q-a"))!;
+    expect(s.pendingQuestions.filter((q) => q.reqId === "q-a")).toHaveLength(1);
   });
 
   it("records the latest error message in lastError", () => {

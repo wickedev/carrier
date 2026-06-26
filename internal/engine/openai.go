@@ -150,6 +150,12 @@ func openAITools(tools []agent.Tool) []openai.ChatCompletionToolParam {
 	}
 	out := make([]openai.ChatCompletionToolParam, 0, len(tools))
 	for _, t := range tools {
+		// Provider-hosted tools (e.g. web_search) are a Responses-API feature; the
+		// Chat Completions API can't host them, so drop them rather than advertise
+		// a tool the model could call but this engine can't satisfy.
+		if t.Native != "" {
+			continue
+		}
 		fn := shared.FunctionDefinitionParam{Name: t.Name}
 		if t.Description != "" {
 			fn.Description = openai.String(t.Description)

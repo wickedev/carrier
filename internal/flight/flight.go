@@ -182,6 +182,11 @@ func (f *Flight) Queues() *sq.Queues { return f.queues }
 // right after constructing the Flight so Ask-effect tools surface for approval.
 func (f *Flight) SetApprover(a Approver) { f.approver = a }
 
+// SetAsker installs the user-question transport used by the ask_user tool. Like
+// SetApprover, call it before Run starts. It is threaded to tools via the
+// ExecContext.
+func (f *Flight) SetAsker(a tool.Asker) { f.exec.Asker = a }
+
 func (f *Flight) sid() store.SessionID { return store.SessionID(f.id) }
 
 // Run drives the session until ctx is cancelled. It blocks for input, runs
@@ -534,7 +539,11 @@ func (f *Flight) emit(ctx context.Context, ev agent.StreamEvent) {
 }
 
 func resourceFor(c agent.ToolCall) string {
-	for _, key := range []string{"command", "path", "file_path", "url"} {
+	// "input" covers write_stdin: its payload is fed to a background shell's stdin
+	// and can run arbitrary commands (e.g. driving an interactive `sh`), so it
+	// must face the same content-based permission review as a bash `command` —
+	// otherwise it would be a review bypass.
+	for _, key := range []string{"command", "input", "path", "file_path", "url"} {
 		if v, ok := c.Input[key].(string); ok && v != "" {
 			return v
 		}
@@ -566,11 +575,18 @@ func (f *Flight) visibleTools() []agent.Tool {
 		if f.curPlanMode && !t.IsReadOnly(nil) {
 			continue
 		}
-		defs = append(defs, agent.Tool{
+		def := agent.Tool{
 			Name:        t.Name(),
 			Description: t.Description(),
 			Schema:      t.Schema(),
-		})
+		}
+		// A provider-native tool (e.g. web_search) is hosted server-side: the
+		// Engine emits it in its native form and the model's calls are handled by
+		// the provider, never dispatched here.
+		if nt, ok := t.(interface{ Native() string }); ok {
+			def.Native = nt.Native()
+		}
+		defs = append(defs, def)
 	}
 	return defs
 }

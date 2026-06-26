@@ -17,6 +17,9 @@ func NewNotebookEdit() *notebookEditTool {
 		ToolName: "notebook_edit",
 		ToolDescription: "Edit a Jupyter notebook (.ipynb): replace, insert, or delete a cell by " +
 			"0-based index.",
+		// Niche (Jupyter-only): Deferred keeps it out of the default tool list;
+		// the model recovers it via tool_search when it needs to edit a notebook.
+		Expose: Deferred,
 		ToolSchema: obj(props{
 			"path":       strProp("Notebook (.ipynb) path within the working copy."),
 			"cell_index": intProp("0-based cell index (replace/delete target, or insert position)."),

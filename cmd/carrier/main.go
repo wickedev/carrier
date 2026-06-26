@@ -101,12 +101,36 @@ func isLoopbackAddr(addr string) bool {
 // key), shares that subscription's rate limit, and is a ToS gray area. `serve`
 // additionally refuses to start with BYOS unless bound to a loopback address (see
 // serve), so it can never serve remote/multi-tenant traffic.
-func selectEngine() engine.Engine {
+func selectEngine() (engine.Engine, error) {
 	if byosRequested() {
 		fmt.Fprintln(os.Stderr, "carrier: using Codex BYOS engine (ChatGPT subscription, LOCAL DEV ONLY)")
-		return engine.NewCodexEngine()
+		return engine.NewCodexEngine(), nil
 	}
-	return engine.NewAnthropicEngine()
+	if os.Getenv("CARRIER_AUTH") == "gemini" {
+		// Native Google Gemini (unified SDK). Backend resolves from the
+		// environment: Developer API via GEMINI_API_KEY/GOOGLE_API_KEY, or Vertex
+		// AI via GOOGLE_GENAI_USE_VERTEXAI=1 + GOOGLE_CLOUD_PROJECT/_LOCATION.
+		// An explicit selection must never silently fall back to a different
+		// provider — fail startup if Gemini can't be constructed.
+		eng, err := newGeminiEngine()
+		if err != nil {
+			return nil, fmt.Errorf("CARRIER_AUTH=gemini but the Gemini engine could not start: %w", err)
+		}
+		fmt.Fprintln(os.Stderr, "carrier: using Gemini engine (google.golang.org/genai)")
+		return eng, nil
+	}
+	return engine.NewAnthropicEngine(), nil
+}
+
+// newGeminiEngine constructs the Gemini engine. It is a package var so a test can
+// substitute a failing constructor and assert that explicit selection fails
+// loudly instead of silently falling back.
+var newGeminiEngine = func() (engine.Engine, error) {
+	eng, err := engine.NewGeminiEngine()
+	if err != nil {
+		return nil, err
+	}
+	return eng, nil
 }
 
 // buildRuntime assembles the shared Store, Engine, Executor, and durable Memory.
@@ -117,7 +141,11 @@ func buildRuntime() (*runtime, error) {
 	}
 
 	// Throttled engine to protect the provider from 429 storms across sessions.
-	eng := engine.NewThrottle(selectEngine(), 8, 4)
+	selected, err := selectEngine()
+	if err != nil {
+		return nil, err
+	}
+	eng := engine.NewThrottle(selected, 8, 4)
 
 	cwd, _ := os.Getwd()
 	mem, _ := memory.LoadInstructions(cwd, 0)

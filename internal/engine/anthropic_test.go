@@ -81,6 +81,63 @@ func TestAnthropicTools(t *testing.T) {
 	}
 }
 
+func TestAnthropicToolsNativeWebSearch(t *testing.T) {
+	tools := []agent.Tool{
+		{Name: "web_search", Description: "search", Native: "web_search"},
+		{Name: "get_weather", Description: "weather", Schema: map[string]any{"type": "object"}},
+	}
+	got := anthropicTools(tools)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 tools, got %d", len(got))
+	}
+	// The native tool becomes the server-side web search param, not a function tool.
+	ws := got[0].OfWebSearchTool20250305
+	if ws == nil {
+		t.Fatal("expected OfWebSearchTool20250305 to be set for the native tool")
+	}
+	if ws.MaxUses.Value != maxWebSearchUses {
+		t.Errorf("MaxUses = %d, want %d", ws.MaxUses.Value, maxWebSearchUses)
+	}
+	if got[0].OfTool != nil {
+		t.Error("native tool must not also be a function tool")
+	}
+	// The ordinary tool is still a function tool.
+	if got[1].OfTool == nil || got[1].OfTool.Name != "get_weather" {
+		t.Error("expected the second tool to remain a function tool")
+	}
+}
+
+func TestAnthropicMessagesAttachesToolImages(t *testing.T) {
+	msgs := []agent.Message{{
+		Role:       agent.RoleTool,
+		ToolCallID: "call-1",
+		Text:       "Attached image pic.png",
+		Images:     []agent.ImageData{{MediaType: "image/png", Base64: "QUJD"}},
+	}}
+	got := anthropicMessages(msgs)
+	if len(got) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(got))
+	}
+	// Find the tool_result block and assert it carries a text AND an image block.
+	var foundImage, foundText bool
+	for _, blk := range got[0].Content {
+		if blk.OfToolResult == nil {
+			continue
+		}
+		for _, c := range blk.OfToolResult.Content {
+			if c.OfText != nil {
+				foundText = true
+			}
+			if c.OfImage != nil {
+				foundImage = true
+			}
+		}
+	}
+	if !foundText || !foundImage {
+		t.Fatalf("tool_result must carry text+image, got text=%v image=%v", foundText, foundImage)
+	}
+}
+
 func TestAnthropicMessages(t *testing.T) {
 	msgs := []agent.Message{
 		{Role: agent.RoleUser, Text: "weather in Seoul?"},

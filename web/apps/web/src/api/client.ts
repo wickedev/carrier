@@ -532,6 +532,14 @@ export const api = {
     );
   },
 
+  answerQuestion(sessionId: string, reqId: string, answer: string): Promise<void> {
+    return request(
+      `/sessions/${encodeURIComponent(sessionId)}/questions/${encodeURIComponent(reqId)}`,
+      VoidSchema,
+      { method: "POST", body: { answer } },
+    );
+  },
+
   promote(sessionId: string): Promise<PromoteResult> {
     return request(`/sessions/${encodeURIComponent(sessionId)}/promote`, PromoteResultSchema, {
       method: "POST",

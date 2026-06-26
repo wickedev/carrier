@@ -22,6 +22,13 @@ import {
   NotebookPen,
   Globe,
   ListChecks,
+  MessageCircleQuestion,
+  ScrollText,
+  CircleStop,
+  Keyboard,
+  Image as ImageIcon,
+  Stethoscope,
+  PackageSearch,
 } from "lucide-react";
 import { Card, Badge, CardHeader } from "../primitives";
 
@@ -37,6 +44,9 @@ function formatInput(input: unknown): string {
 /** Per-tool icon for the first-class file tools (others fall back to Wrench). */
 const TOOL_ICON: Record<string, typeof Wrench> = {
   bash: Terminal,
+  bash_output: ScrollText,
+  write_stdin: Keyboard,
+  kill_shell: CircleStop,
   read: FileText,
   ls: FolderTree,
   glob: FolderSearch,
@@ -46,9 +56,13 @@ const TOOL_ICON: Record<string, typeof Wrench> = {
   multi_edit: FilePen,
   apply_patch: FileStack,
   notebook_edit: NotebookPen,
+  view_image: ImageIcon,
+  lsp: Stethoscope,
+  tool_search: PackageSearch,
   web_fetch: Globe,
   todo_write: ListChecks,
   todo_read: ListChecks,
+  ask_user: MessageCircleQuestion,
 };
 
 /** A compact view of a tool call: a one-line `primary` arg for the header, and
@@ -58,7 +72,16 @@ function toolCallView(name: string, input: unknown): { primary: string; body: st
   const s = (k: string) => (typeof o[k] === "string" ? (o[k] as string) : "");
   switch (name) {
     case "bash":
-      return { primary: "", body: s("command") || formatInput(input) };
+      return {
+        primary: o.run_in_background ? "background" : "",
+        body: s("command") || formatInput(input),
+      };
+    case "bash_output":
+      return { primary: s("bash_id") + (s("filter") ? `  /${s("filter")}/` : ""), body: null };
+    case "write_stdin":
+      return { primary: s("bash_id"), body: s("input") || null };
+    case "kill_shell":
+      return { primary: s("shell_id"), body: null };
     case "read": {
       const range = o.offset || o.limit ? ` :${(o.offset as number) ?? 1}+${(o.limit as number) ?? ""}` : "";
       return { primary: s("path") + range, body: null };
@@ -84,12 +107,22 @@ function toolCallView(name: string, input: unknown): { primary: string; body: st
       return { primary: `${s("path")}  #${(o.cell_index as number) ?? 0} ${s("edit_mode") || "replace"}`, body: null };
     case "web_fetch":
       return { primary: s("url"), body: null };
+    case "view_image":
+      return { primary: s("path"), body: null };
+    case "lsp": {
+      const pos = o.line !== undefined ? `:${o.line as number}` : "";
+      return { primary: s("path") + pos, body: null };
+    }
     case "todo_write": {
       const n = Array.isArray(o.todos) ? o.todos.length : 0;
       return { primary: `${n} task${n === 1 ? "" : "s"}`, body: null };
     }
     case "todo_read":
       return { primary: "", body: null };
+    case "tool_search":
+      return { primary: s("query"), body: null };
+    case "ask_user":
+      return { primary: s("question"), body: null };
     default:
       return { primary: "", body: formatInput(input) };
   }
@@ -218,9 +251,11 @@ function buildRows(events: SessionEvent[], userMessages: UserMessage[]): Row[] {
     | { seq: number; rank: 1; ord: number; user: UserMessage };
   const items: Item[] = [
     ...events
-      // approval_request is surfaced separately; title is metadata (TopBar /
-      // session list), not part of the inline transcript.
-      .filter((e) => e.kind !== "approval_request" && e.kind !== "title")
+      // approval_request and question are surfaced separately (as cards); title
+      // is metadata (TopBar / session list), not part of the inline transcript.
+      .filter(
+        (e) => e.kind !== "approval_request" && e.kind !== "question" && e.kind !== "title",
+      )
       .map((event) => ({ seq: event.seq, rank: 0 as const, ord: 0, event })),
     ...userMessages.map((m) => ({
       seq: m.anchorSeq,

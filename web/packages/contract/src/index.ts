@@ -163,6 +163,15 @@ export const SessionEventSchema = z.discriminatedUnion("kind", [
     resource: z.string(),
     reason: z.string(),
   }),
+  // The agent (via ask_user) is asking the user a free-form question. Choices,
+  // when present, are suggested answers; the user may still reply freely.
+  z.object({
+    seq: z.number(),
+    kind: z.literal("question"),
+    reqId: z.string(),
+    prompt: z.string(),
+    choices: z.array(z.string()).optional(),
+  }),
   z.object({
     seq: z.number(),
     kind: z.literal("status"),
@@ -190,6 +199,8 @@ export const SendInputSchema = z.object({
   planMode: z.boolean().optional(),
 });
 export const ApprovalDecisionSchema = z.object({ allow: z.boolean() });
+/** The user's answer to an ask_user question. */
+export const AnswerDecisionSchema = z.object({ answer: z.string() });
 
 /** A session's RESOLVED effective model params — the values the runtime actually
  *  uses by default (org⊕project⊕plugins merge, with the engine's built-in model

@@ -132,6 +132,7 @@ type Server struct {
 	owners    map[string]string                // session ID → owning tenant
 	hubs      map[string]*hub                  // session ID → fan-out hub
 	approvers map[string]*hitl.ChannelApprover // session ID → HITL approver
+	askers    map[string]*hitl.ChannelAsker    // session ID → ask_user transport
 }
 
 // New builds a Server. tokens maps each accepted bearer token to its tenant;
@@ -152,6 +153,7 @@ func New(tw *tower.Tower, factory Factory, st store.Store, tokens map[string]str
 		owners:     make(map[string]string),
 		hubs:       make(map[string]*hub),
 		approvers:  make(map[string]*hitl.ChannelApprover),
+		askers:     make(map[string]*hitl.ChannelAsker),
 	}
 }
 
@@ -170,6 +172,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/sessions/{id}/interrupt", s.handleInterrupt)
 	mux.HandleFunc("GET /v1/sessions/{id}/events", s.handleEvents)
 	mux.HandleFunc("POST /v1/sessions/{id}/approvals/{reqId}", s.handleApproval)
+	mux.HandleFunc("POST /v1/sessions/{id}/questions/{reqId}", s.handleAnswer)
 	return mux
 }
 
@@ -304,6 +307,10 @@ type eventDTO struct {
 	Tool     string `json:"tool,omitempty"`
 	Resource string `json:"resource,omitempty"`
 	Reason   string `json:"reason,omitempty"`
+	// Question fields (question events from ask_user). ReqID is shared with the
+	// approval fields above.
+	Prompt  string   `json:"prompt,omitempty"`
+	Choices []string `json:"choices,omitempty"`
 	// Usage fields (usage / step_finish events).
 	InputTokens      int `json:"input_tokens,omitempty"`
 	OutputTokens     int `json:"output_tokens,omitempty"`
@@ -346,6 +353,19 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	}, 10*time.Minute)
 	f.SetApprover(approver)
 
+	// Wire the ask_user transport: when the agent asks a question, surface a
+	// `question` event and block the tool until the client answers via
+	// POST /v1/sessions/{id}/questions/{reqId}.
+	asker := hitl.NewAsker(func(q hitl.QuestionRequest) {
+		_ = f.Queues().Emit(s.baseCtx, agent.StreamEvent{
+			Kind: agent.EvAskUser,
+			Question: &agent.AskRequest{
+				ReqID: q.ID, Prompt: q.Prompt, Choices: q.Choices,
+			},
+		})
+	}, 30*time.Minute)
+	f.SetAsker(asker)
+
 	// Launch on the Tower under the server's base context; the Flight runs on its
 	// own goroutine until the context ends (request lifetime / Shutdown).
 	if err := s.tower.Launch(s.baseCtx, f); err != nil {
@@ -358,6 +378,7 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	s.owners[sid] = tenant
 	s.hubs[sid] = h
 	s.approvers[sid] = approver
+	s.askers[sid] = asker
 	s.mu.Unlock()
 
 	// Drain the Flight's single event channel into the hub; clean up the per-session
@@ -368,6 +389,7 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 		delete(s.owners, sid)
 		delete(s.hubs, sid)
 		delete(s.approvers, sid)
+		delete(s.askers, sid)
 		s.mu.Unlock()
 		// Release per-session resources (e.g. MCP subprocesses) once the Flight
 		// has ended and its events are fully drained.
@@ -468,6 +490,38 @@ func (s *Server) handleApproval(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// answerRequest is the body of POST /v1/sessions/{id}/questions/{reqId}.
+type answerRequest struct {
+	Answer string `json:"answer"`
+}
+
+// handleAnswer delivers the user's answer to a blocked ask_user tool,
+// correlated by request ID.
+func (s *Server) handleAnswer(w http.ResponseWriter, r *http.Request) {
+	sid := r.PathValue("id")
+	if _, ok := s.authorize(w, r, sid); !ok {
+		return
+	}
+	reqID := r.PathValue("reqId")
+	var body answerRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid body: "+err.Error())
+		return
+	}
+	s.mu.RLock()
+	asker := s.askers[sid]
+	s.mu.RUnlock()
+	if asker == nil {
+		writeError(w, http.StatusNotFound, "session not found")
+		return
+	}
+	if !asker.Resolve(reqID, body.Answer) {
+		writeError(w, http.StatusNotFound, "no pending question for that request id")
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
 // handleEvents streams a session's events as SSE. It first replays the Store
 // history so a (re)connecting client catches up, then streams live hub events
 // until the client disconnects.
@@ -508,6 +562,31 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	if recs, err := s.store.History(r.Context(), store.SessionID(sid)); err == nil {
 		for _, rec := range recs {
 			if !writeSSE(w, flusher, recordToDTO(rec)) {
+				return
+			}
+		}
+	}
+
+	// Re-surface any still-pending ask_user questions. These are not persisted to
+	// the Store and the hub doesn't buffer, so a question emitted before this
+	// connection would otherwise be lost on reconnect/reload — leaving the tool
+	// blocked. Written here (after history, before live events resume) each
+	// carries a stable seq (resurfaceSeqBase + its ordinal) that sorts in that
+	// same gap — above history, below the live range — so a seq-deduping client
+	// that already saw it (a live reconnect) drops the repeat while a fresh client
+	// (full reload) renders the card, and a monotonic downstream relay still
+	// forwards every later live event.
+	s.mu.RLock()
+	asker := s.askers[sid]
+	s.mu.RUnlock()
+	if asker != nil {
+		for _, q := range asker.Snapshot() {
+			dto := eventToDTO(agent.StreamEvent{
+				Kind:     agent.EvAskUser,
+				Question: &agent.AskRequest{ReqID: q.ID, Prompt: q.Prompt, Choices: q.Choices},
+			})
+			dto.Seq = resurfaceSeqBase + int(q.Seq)
+			if !writeSSE(w, flusher, dto) {
 				return
 			}
 		}
@@ -624,6 +703,10 @@ func eventToDTO(ev agent.StreamEvent) eventDTO {
 		dto.Tool = ev.Approval.Tool
 		dto.Resource = ev.Approval.Resource
 		dto.Reason = ev.Approval.Reason
+	case ev.Question != nil:
+		dto.ReqID = ev.Question.ReqID
+		dto.Prompt = ev.Question.Prompt
+		dto.Choices = ev.Question.Choices
 	case ev.Usage != nil:
 		dto.InputTokens = ev.Usage.InputTokens
 		dto.OutputTokens = ev.Usage.OutputTokens

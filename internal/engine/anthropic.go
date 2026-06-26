@@ -32,6 +32,9 @@ type AnthropicEngine struct {
 const (
 	defaultAnthropicModel     = "claude-opus-4-8"
 	defaultAnthropicMaxTokens = 16000
+	// maxWebSearchUses caps server-side searches per request (matches the
+	// reference agents' bound).
+	maxWebSearchUses = 8
 )
 
 // NewAnthropicEngine returns an engine configured for the current Opus model.
@@ -167,6 +170,16 @@ func anthropicTools(tools []agent.Tool) []anthropic.ToolUnionParam {
 	}
 	out := make([]anthropic.ToolUnionParam, 0, len(tools))
 	for _, t := range tools {
+		// Provider-hosted tools (e.g. web_search) are injected in their native
+		// server-tool form; the API runs them and folds results into the turn.
+		if t.Native == "web_search" {
+			out = append(out, anthropic.ToolUnionParam{
+				OfWebSearchTool20250305: &anthropic.WebSearchTool20250305Param{
+					MaxUses: anthropic.Int(maxWebSearchUses),
+				},
+			})
+			continue
+		}
 		schema := anthropic.ToolInputSchemaParam{}
 		if t.Schema != nil {
 			if props, ok := t.Schema["properties"]; ok {
@@ -212,8 +225,16 @@ func anthropicMessages(msgs []agent.Message) []anthropic.MessageParam {
 			}
 			out = append(out, anthropic.NewAssistantMessage(blocks...))
 		case agent.RoleTool:
-			// tool_result blocks live on a user turn.
+			// tool_result blocks live on a user turn. Attach any images (view_image)
+			// as image content blocks alongside the text.
 			block := anthropic.NewToolResultBlock(m.ToolCallID, m.Text, false)
+			if len(m.Images) > 0 && block.OfToolResult != nil {
+				for _, img := range m.Images {
+					imgBlock := anthropic.NewImageBlockBase64(img.MediaType, img.Base64)
+					block.OfToolResult.Content = append(block.OfToolResult.Content,
+						anthropic.ToolResultBlockParamContentUnion{OfImage: imgBlock.OfImage})
+				}
+			}
 			out = append(out, anthropic.NewUserMessage(block))
 		}
 	}

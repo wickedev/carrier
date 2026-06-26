@@ -59,19 +59,37 @@ func NewBwrapExecutor() *BwrapExecutor { return &BwrapExecutor{} }
 // Close implements Executor.
 func (e *BwrapExecutor) Close() error { return nil }
 
-// Exec implements Executor. It locates and validates the hardcoded bwrap helper,
-// builds the namespace/bind wrapping from the spec, and runs it via runConfined.
-func (e *BwrapExecutor) Exec(ctx context.Context, spec ExecSpec) (ExecResult, error) {
+// wrap locates and validates the hardcoded bwrap helper and builds the
+// namespace/bind wrapping from the spec. Shared by Exec and Start so foreground
+// and background runs are confined identically.
+func (e *BwrapExecutor) wrap(spec ExecSpec) ([]string, error) {
 	if len(spec.Argv) == 0 {
-		return ExecResult{}, fmt.Errorf("bay: empty argv")
+		return nil, fmt.Errorf("bay: empty argv")
 	}
 	bwrap, err := resolveBwrapPath()
 	if err != nil {
+		return nil, err
+	}
+	return buildBwrapArgv(bwrap, spec), nil
+}
+
+// Exec implements Executor. It locates and validates the hardcoded bwrap helper,
+// builds the namespace/bind wrapping from the spec, and runs it via runConfined.
+func (e *BwrapExecutor) Exec(ctx context.Context, spec ExecSpec) (ExecResult, error) {
+	argv, err := e.wrap(spec)
+	if err != nil {
 		return ExecResult{}, err
 	}
-
-	argv := buildBwrapArgv(bwrap, spec)
 	return runConfined(ctx, argv, spec)
+}
+
+// Start implements Executor: the same bubblewrap wrapping, run in the background.
+func (e *BwrapExecutor) Start(ctx context.Context, spec ExecSpec) (*Process, error) {
+	argv, err := e.wrap(spec)
+	if err != nil {
+		return nil, err
+	}
+	return startConfined(ctx, argv, spec)
 }
 
 // resolveBwrapPath returns the first valid hardcoded bwrap path, validating that

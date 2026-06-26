@@ -69,8 +69,8 @@ type codexReasoning struct {
 }
 
 type codexTool struct {
-	Type        string         `json:"type"` // "function"
-	Name        string         `json:"name"`
+	Type        string         `json:"type"`           // "function" | "web_search"
+	Name        string         `json:"name,omitempty"` // omitted for hosted tools (web_search)
 	Description string         `json:"description,omitempty"`
 	Parameters  map[string]any `json:"parameters,omitempty"`
 }
@@ -88,8 +88,10 @@ type codexInputItem struct {
 }
 
 type codexContent struct {
-	Type string `json:"type"` // input_text | output_text
-	Text string `json:"text"`
+	Type     string `json:"type"`                // input_text | output_text | input_image
+	Text     string `json:"text,omitempty"`      // for input_text / output_text
+	ImageURL string `json:"image_url,omitempty"` // for input_image (a data: URL)
+	Detail   string `json:"detail,omitempty"`    // for input_image (low|high|auto)
 }
 
 // codexEvent is one SSE frame from the Responses stream.
@@ -284,6 +286,23 @@ func (e *CodexEngine) consume(ctx context.Context, body io.Reader, emit func(age
 }
 
 // codexInput converts canonical turns into Responses-API input items: user/
+// codexImageParts renders attached images as Responses-API input_image content
+// parts (base64 data URLs). Returns nil when there are none.
+func codexImageParts(imgs []agent.ImageData) []codexContent {
+	if len(imgs) == 0 {
+		return nil
+	}
+	parts := make([]codexContent, 0, len(imgs))
+	for _, img := range imgs {
+		parts = append(parts, codexContent{
+			Type:     "input_image",
+			ImageURL: "data:" + img.MediaType + ";base64," + img.Base64,
+			Detail:   "auto",
+		})
+	}
+	return parts
+}
+
 // assistant messages, prior assistant tool calls (function_call), and tool
 // results (function_call_output). Pure: no network.
 func codexInput(msgs []agent.Message) []codexInputItem {
@@ -305,6 +324,12 @@ func codexInput(msgs []agent.Message) []codexInputItem {
 		case agent.RoleTool:
 			out = append(out, codexInputItem{Type: "function_call_output",
 				CallID: m.ToolCallID, Output: m.Text})
+			// The Responses API's function_call_output is text-only; attach any
+			// images (view_image) as a following user message of input_image parts
+			// (data URLs) so a vision model still sees them.
+			if parts := codexImageParts(m.Images); len(parts) > 0 {
+				out = append(out, codexInputItem{Type: "message", Role: "user", Content: parts})
+			}
 		}
 	}
 	return out
@@ -318,6 +343,16 @@ func codexTools(tools []agent.Tool) []codexTool {
 	}
 	out := make([]codexTool, 0, len(tools))
 	for _, t := range tools {
+		// Provider-hosted tools (e.g. web_search) are Responses-API built-ins:
+		// emit the bare typed entry; the API runs the search inline and the stream
+		// loop ignores the resulting server items (only message/function_call are
+		// consumed). The Responses API names this tool "web_search_preview" — the
+		// bare "web_search" type is rejected (see openai-go responses.WebSearchTool
+		// and the matching TODO in openai/codex).
+		if t.Native == "web_search" {
+			out = append(out, codexTool{Type: "web_search_preview"})
+			continue
+		}
 		out = append(out, codexTool{Type: "function", Name: t.Name, Description: t.Description, Parameters: t.Schema})
 	}
 	return out

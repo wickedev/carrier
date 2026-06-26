@@ -2,9 +2,10 @@ import * as React from "react";
 import type { SessionEvent } from "@carrier/contract";
 import { EventList } from "./EventList";
 import { ApprovalCard } from "./ApprovalCard";
+import { QuestionCard } from "./QuestionCard";
 import { Composer, type SendOptions, type SessionDefaults } from "./Composer";
 import { EmptyState } from "../primitives";
-import type { PendingApproval, UserMessage } from "../../session/stream";
+import type { PendingApproval, PendingQuestion, UserMessage } from "../../session/stream";
 
 /**
  * AgentPanel — the right pane: streamed event log + pending approvals + composer.
@@ -13,6 +14,7 @@ export function AgentPanel({
   events,
   userMessages,
   approvals,
+  questions,
   running,
   sending,
   onSend,
@@ -20,11 +22,14 @@ export function AgentPanel({
   onDecide,
   decidingReqId,
   onApprovalExpire,
+  onAnswer,
+  answeringReqId,
   defaults,
 }: {
   events: SessionEvent[];
   userMessages: UserMessage[];
   approvals: PendingApproval[];
+  questions: PendingQuestion[];
   running: boolean;
   sending?: boolean;
   onSend: (text: string, opts: SendOptions) => void;
@@ -32,6 +37,8 @@ export function AgentPanel({
   onDecide: (reqId: string, allow: boolean) => void;
   decidingReqId?: string | null;
   onApprovalExpire?: (reqId: string) => void;
+  onAnswer: (reqId: string, answer: string) => void;
+  answeringReqId?: string | null;
   defaults: SessionDefaults;
 }) {
   const scrollRef = React.useRef<HTMLDivElement | null>(null);
@@ -40,7 +47,7 @@ export function AgentPanel({
   React.useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [events.length, approvals.length]);
+  }, [events.length, approvals.length, questions.length]);
 
   return (
     <div className="flex h-full flex-col">
@@ -48,7 +55,10 @@ export function AgentPanel({
         Agent stream
       </div>
       <div ref={scrollRef} className="flex-1 overflow-auto" data-testid="agent-scroll">
-        {events.length === 0 && userMessages.length === 0 && approvals.length === 0 ? (
+        {events.length === 0 &&
+        userMessages.length === 0 &&
+        approvals.length === 0 &&
+        questions.length === 0 ? (
           <EmptyState title="No activity yet" description="Send a message to start the session." />
         ) : (
           <>
@@ -60,6 +70,14 @@ export function AgentPanel({
                 onDecide={onDecide}
                 pending={decidingReqId === a.reqId}
                 onExpire={onApprovalExpire}
+              />
+            ))}
+            {questions.map((q) => (
+              <QuestionCard
+                key={q.reqId}
+                question={q}
+                onAnswer={onAnswer}
+                pending={answeringReqId === q.reqId}
               />
             ))}
           </>

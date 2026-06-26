@@ -15,6 +15,7 @@ import (
 	"github.com/wickedev/carrier/internal/agent"
 	"github.com/wickedev/carrier/internal/flight"
 	"github.com/wickedev/carrier/internal/store"
+	"github.com/wickedev/carrier/internal/tool"
 	"github.com/wickedev/carrier/internal/tower"
 )
 
@@ -237,6 +238,97 @@ func TestCrossTenantForbidden(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("cross-tenant events status = %d, want 403", resp.StatusCode)
+	}
+}
+
+// readUntilQuestion scans SSE data lines until a `question` DTO whose prompt
+// contains want, returning that DTO. ok is false if the stream/context ends
+// first.
+func readUntilQuestion(r io.Reader, want string) (eventDTO, bool) {
+	sc := bufio.NewScanner(r)
+	for sc.Scan() {
+		line := sc.Text()
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		var dto eventDTO
+		if err := json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &dto); err != nil {
+			continue
+		}
+		if dto.Kind == "question" && strings.Contains(dto.Prompt, want) {
+			return dto, true
+		}
+	}
+	return eventDTO{}, false
+}
+
+// A pending ask_user question is not persisted to the Store and the hub does not
+// buffer, so a question emitted before a connection would be lost on reconnect —
+// blocking the tool. A fresh subscriber must have it re-surfaced.
+func TestReconnectResurfacesPendingQuestion(t *testing.T) {
+	srv, _ := newTestServer(t, map[string]string{"tok-a": "tenant-a"})
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	sid := createSession(t, ts, "tok-a")
+
+	// Grab the session's asker and register a pending question, as the ask_user
+	// tool would. Ask blocks until answered, so run it in a goroutine.
+	srv.mu.RLock()
+	asker := srv.askers[sid]
+	srv.mu.RUnlock()
+	if asker == nil {
+		t.Fatal("session has no asker")
+	}
+	answered := make(chan string, 1)
+	go func() {
+		ans, _ := asker.Ask(context.Background(), tool.AskRequest{
+			Prompt:  "which file?",
+			Choices: []string{"a.ts", "b.ts"},
+		})
+		answered <- ans
+	}()
+
+	// Wait until the question is registered as pending.
+	deadline := time.Now().Add(5 * time.Second)
+	for asker.Pending() == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("question never became pending")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+
+	// A fresh connection (simulating a reload) must re-surface the question.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	resp := openEvents(t, ctx, ts, "tok-a", sid)
+	defer resp.Body.Close()
+	dto, ok := readUntilQuestion(resp.Body, "which file?")
+	if !ok {
+		t.Fatal("reconnect did not re-surface the pending question")
+	}
+	if dto.ReqID == "" || len(dto.Choices) != 2 {
+		t.Fatalf("re-surfaced question missing fields: %+v", dto)
+	}
+	// The seq must sit in the gap between history and the live range: a value at
+	// or above liveSeqBase would advance a downstream monotonic forwarding guard
+	// past every future live event and suppress the rest of the stream.
+	if dto.Seq < resurfaceSeqBase || dto.Seq >= liveSeqBase {
+		t.Fatalf("re-surfaced seq %d outside [%d, %d)", dto.Seq, resurfaceSeqBase, liveSeqBase)
+	}
+
+	// Answering via the asker unblocks the tool — proving the re-surfaced reqId
+	// still correlates to the live pending question.
+	if !asker.Resolve(dto.ReqID, "a.ts") {
+		t.Fatalf("resolve of re-surfaced reqId %q failed", dto.ReqID)
+	}
+	select {
+	case ans := <-answered:
+		if ans != "a.ts" {
+			t.Fatalf("answer = %q, want a.ts", ans)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("tool did not unblock after answering re-surfaced question")
 	}
 }
 

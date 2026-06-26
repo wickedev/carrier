@@ -7,6 +7,7 @@ import { streamSSE } from "hono/streaming";
 import { eq } from "drizzle-orm";
 import {
   ApprovalDecisionSchema,
+  AnswerDecisionSchema,
   FileContentSchema,
   FileDiffSchema,
   SendInputSchema,
@@ -298,6 +299,28 @@ export function sessionRoutes(): Hono<AppEnv> {
       body.data.allow,
     );
     return c.json({ ok: true, reqId, allow: body.data.allow });
+  });
+
+  // ── ask_user answers ─────────────────────────────────────────────────────────
+  app.post("/:id/questions/:reqId", async (c) => {
+    const { db, carrier } = c.var.deps;
+    const ctx = await resolveSession(db, c.var.account.id, c.req.param("id"));
+    if (!ctx) return c.json({ error: "not_found" }, 404);
+    const body = AnswerDecisionSchema.safeParse(
+      await c.req.json().catch(() => ({})),
+    );
+    if (!body.success) return c.json({ error: "invalid_body" }, 400);
+    if (!ctx.session.carrierSessionId) {
+      return c.json({ error: "no_carrier_session" }, 409);
+    }
+    const reqId = c.req.param("reqId");
+    // Deliver the user's answer to Carrier, correlated by reqId.
+    await carrier().answerQuestion(
+      ctx.session.carrierSessionId,
+      reqId,
+      body.data.answer,
+    );
+    return c.json({ ok: true, reqId });
   });
 
   // ── promote ────────────────────────────────────────────────────────────────
